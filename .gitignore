@@ -1,0 +1,22 @@
+# Dependencies — restored with `npm install`. libheif-js alone is ~6MB and is
+# inlined into the built artifact at build time, so it never needs to be in git.
+node_modules/
+
+# Probe scratch: generated test corpora and benchmark images. The FINDINGS.md
+# files and probe source ARE tracked; the multi-hundred-MB image sets are not.
+tools/probes/**/fixtures/
+tools/probes/**/corpus/
+tools/probes/**/out/
+tools/probes/**/*.png
+tools/probes/**/*.jpg
+tools/probes/**/*.jpeg
+tools/probes/**/*.heic
+tools/probes/**/*.avif
+
+# Playwright
+test-results/
+playwright-report/
+
+# OS
+.DS_Store
+Thumbs.db

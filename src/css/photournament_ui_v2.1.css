@@ -2101,6 +2101,42 @@ kbd {
 }
 #app .stack-badge-cap:hover { background: var(--surface-2); }
 
+/*
+ * Rotate / flip. On a grid cell they surface on hover only — two more always-on
+ * chips would make every cell read as a control panel. Same fixed-dark chip
+ * language as the index and stack badges, because they sit on photographs.
+ */
+#app .orient-btns {
+  position: absolute; bottom: 6px; right: 6px;
+  z-index: 3;
+  display: flex; gap: 4px;
+  opacity: 0;
+  transition: opacity var(--t, 120ms);
+}
+#app .photo-cell:hover .orient-btns,
+#app .orient-btns:focus-within { opacity: 1; }
+#app .orient-btn {
+  min-width: 22px; height: 22px; padding: 0 5px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--chip);
+  color: var(--on-photo);
+  font: inherit;
+  font-size: 12px; line-height: 22px;
+  backdrop-filter: blur(3px);
+  cursor: pointer;
+}
+#app .orient-btn:hover { background: oklch(0 0 0 / 0.78); }
+
+/* In the bracket caption they flow inline beside the pixel size. */
+#app .bk-cap .orient-btn {
+  background: var(--surface-3);
+  color: var(--text-dim);
+  backdrop-filter: none;
+  flex: none;
+}
+#app .bk-cap .orient-btn:hover { background: var(--surface-2); color: var(--text); }
+
 /* The bundle, opened: pick which frame stands for the group. */
 #app .stack-pick {
   display: grid;

@@ -1,6 +1,6 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -726,6 +726,18 @@
       el('kbd', { text: side === 0 ? '←' : '→' }),
       el('span', { class: 'nm' }),
       el('span', { class: 'spacer' }),
+      // Redraws the cached pixels, so the fix holds everywhere afterwards; the
+      // pane reloads and the fit math reads the new natural dimensions.
+      el('button', {
+        class: 'orient-btn', type: 'button', text: '\u21bb', dataset: { t: 'bk-rot' },
+        title: 'Rotate a quarter turn clockwise',
+        onclick: function (e) { e.stopPropagation(); orientPane(P, 'cw'); }
+      }),
+      el('button', {
+        class: 'orient-btn', type: 'button', text: '\u21c4', dataset: { t: 'bk-flip' },
+        title: 'Mirror horizontally',
+        onclick: function (e) { e.stopPropagation(); orientPane(P, 'flip'); }
+      }),
       el('span', { class: 'dim px' })
     ]);
     var pane = el('div', { class: 'bk-pane' }, [vp, cap]);
@@ -1111,6 +1123,21 @@
     S.bar.appendChild(el('span', { class: 'small dim', text: 'scroll to zoom · drag to pan · both photos move together' }));
 
     applyView();
+  }
+
+  /** One orient press on a pane: redraw, reload — nat dims refit the view. */
+  function orientPane(P, kind) {
+    if (!P.id || P._orienting) return;
+    P._orienting = true;
+    PT.orient.bump(P.id, kind).then(function (ok) {
+      P._orienting = false;
+      if (!ok || !S) return;
+      var blob = blobFor(P.id, true);
+      if (blob) PT.dom.setImg(P.img, blob);
+    }).catch(function (e) {
+      P._orienting = false;
+      PT.warn('bracket', 'orient failed', e);
+    });
   }
 
   function loadPane(P, id) {
@@ -1582,4 +1609,7 @@
  *   id, so rewriting pool, order and op winners hands the standing to the
  *   chosen frame. Same-match pane reloads follow a face swap without resetting
  *   the shared zoom.
+ * v1.5 (2026-07-28): Rotate/flip per pane in the caption. The pane reloads the
+ *   redrawn blob and the fit math reads the new natural dimensions, so the dual
+ *   zoom just works on the corrected pixels.
 */

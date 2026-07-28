@@ -1,6 +1,6 @@
 /**
  * @file 60_screen_grid.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -252,6 +252,23 @@
       el('span', { class: 'pt-cell-name', text: photoName(id) })
     ]);
 
+    // Rotate / flip, revealed on hover. They redraw the cached pixels, so the
+    // fix follows the photo to every later screen. Clicks must not toggle keep.
+    if (blob) {
+      cell.appendChild(el('span', { class: 'orient-btns' }, [
+        el('button', {
+          class: 'orient-btn', type: 'button', text: '\u21bb', dataset: { t: 'rot' },
+          title: 'Rotate a quarter turn clockwise \u2014 for a wrong or missing orientation tag',
+          onclick: function (e) { e.stopPropagation(); orientCell(cell, img, id, 'cw'); }
+        }),
+        el('button', {
+          class: 'orient-btn', type: 'button', text: '\u21c4', dataset: { t: 'flip' },
+          title: 'Mirror horizontally \u2014 for a flipped scan or selfie',
+          onclick: function (e) { e.stopPropagation(); orientCell(cell, img, id, 'flip'); }
+        })
+      ]));
+    }
+
     // A bundled burst wears its representative and says so: the badge names the
     // count, and opening it is the only action that must NOT toggle keep.
     if (members && members.length > 1) {
@@ -263,6 +280,21 @@
       }));
     }
     return { cell: cell, img: blob ? img : null };
+  }
+
+  /** One orient press on a cell: redraw the pixels, then show the new blob. */
+  function orientCell(cell, img, id, kind) {
+    if (cell.dataset.orienting) return;
+    cell.dataset.orienting = '1';
+    PT.orient.bump(id, kind).then(function (ok) {
+      delete cell.dataset.orienting;
+      if (!ok || !img) return;
+      dom.releaseImg(img);
+      dom.setImg(img, thumbOf(id));
+    }).catch(function (e) {
+      delete cell.dataset.orienting;
+      PT.warn('grid', 'orient failed', e);
+    });
   }
 
   /**
@@ -1274,4 +1306,7 @@
  *   swaps which one fronts the slot — order, kept, sel, the slot map and the
  *   group's pinned representative all follow. standingIds and the finish-early
  *   modal expand slots, so stopping early still keeps bursts whole.
+ * v1.5 (2026-07-28): Rotate/flip on every grid cell, revealed on hover. The
+ *   correction redraws the cached derivative pixels (PT.orient), so it follows
+ *   the photo to every later screen.
 */

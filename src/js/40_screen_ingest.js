@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.8
+ * @version 1.9
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -123,25 +123,32 @@
       dirInput.setAttribute('webkitdirectory', '');
 
       var looseInput = el('input', {
-        type: 'file', id: 'loose-files', multiple: true, accept: 'image/*', style: 'display:none'
+        type: 'file', id: 'loose-files', multiple: true,
+        // Some platforms do not register HEIC under image/*; list it explicitly
+        // or iPhone folders lose exactly the files this tool decodes for them.
+        accept: 'image/*,.heic,.heif,.HEIC,.HEIF', style: 'display:none'
       });
 
+      // A folder and a hand-picked set are EQUAL ways in — the folder is only
+      // primary because it is what the tool is usually pointed at. Both accept
+      // drops too: the handler takes directories and loose files alike.
       var drop = el('div', { class: 'dropzone', id: 'dropzone' }, [
         el('div', { class: 'dropzone-inner' }, [
-          el('div', { class: 'drop-title', text: 'Drop a folder here' }),
+          el('div', { class: 'drop-title', text: 'Drop a folder or photos here' }),
           el('div', { class: 'muted small', text: 'or' }),
-          el('button', { class: 'btn btn-primary', id: 'pick-folder', text: 'Choose a folder' }),
+          el('div', { class: 'row', style: 'justify-content:center' }, [
+            el('button', { class: 'btn btn-primary', id: 'pick-folder', text: 'Choose a folder' }),
+            el('button', {
+              class: 'btn', id: 'pick-files', text: 'Choose photos',
+              title: 'Pick individual photos instead of a whole folder',
+              onclick: function () { looseInput.click(); }
+            })
+          ]),
           el('div', { class: 'small dim', id: 'fallback-note' })
         ])
       ]);
 
-      var extras = el('div', { class: 'row small' }, [
-        dirInput, looseInput,
-        el('button', {
-          class: 'btn btn-quiet btn-sm', id: 'pick-files', text: 'Pick individual files instead',
-          onclick: function () { looseInput.click(); }
-        })
-      ]);
+      var extras = el('div', { class: 'row small' }, [dirInput, looseInput]);
 
       root.appendChild(drop);
       root.appendChild(extras);
@@ -647,9 +654,9 @@
           done++;
           PT.sources[rec.id] = e.handle || e.file;
 
-          if (rec.thumb || rec.preview) {
-            derivatives.push({ id: rec.id, thumb: rec.thumb, preview: rec.preview });
-          }
+          // A photo the user rotated or flipped keeps that correction across
+          // cache eviction: the freshly derived pixels are re-spun to the
+          // stored dihedral state before anything renders them.
           var lean = {};
           Object.keys(rec).forEach(function (k) {
             if (k !== 'thumb' && k !== 'preview') lean[k] = rec[k];
@@ -660,6 +667,21 @@
             var rate = (Date.now() - t0) / done;
             var left = Math.round((rate * (total - done)) / 1000);
             setProgress(done, total, left > 1 ? '~' + PT.fmt.duration(left * 1000) + ' left' : '');
+          }
+
+          if (!rec.thumb && !rec.preview) return;
+
+          // A photo the user rotated or flipped keeps that correction across
+          // cache eviction: freshly derived pixels are re-spun to the stored
+          // dihedral state before anything renders or persists them. Returned
+          // into the chain so the spin completes before the batch save.
+          var prior = PT.store.get().photos[rec.id];
+          var out = { id: rec.id, thumb: rec.thumb, preview: rec.preview };
+          derivatives.push(out);
+          if (prior && prior.orient) {
+            return PT.orient.reapply(out, prior.orient).catch(function (e) {
+              PT.warn('ingest', 'orient reapply failed', e);
+            });
           }
         });
       });
@@ -740,4 +762,8 @@
  * v1.8 (2026-07-28): The wordmark (docs/wordmark spec v1.0) replaces the plain
  *   entry heading: PHO/TO/URNAMENT as grid columns with the two rails, display
  *   cut, aria carrying the real name.
+ * v1.9 (2026-07-28): Choosing photos is an equal entry beside choosing a folder
+ *   (the loose picker also names HEIC explicitly, which image/* misses on some
+ *   platforms), and re-derived thumbnails re-apply a stored manual orientation
+ *   before anything renders or persists them.
 */

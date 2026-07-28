@@ -1,6 +1,6 @@
 /**
  * @file 80_screen_export.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -68,6 +68,23 @@
       var sets = resultSets(session);
 
       root.appendChild(el('h1', { text: 'Export review' }));
+
+      // Files are written exactly as shot; a manual rotation or flip lives in
+      // the derivatives, so it shows here and on the contact sheet but not in
+      // an exported original. Said only when it actually applies.
+      var st0 = PT.store.get();
+      var oriented = sets.some(function (set) {
+        return set.ids.some(function (id) {
+          var ph = st0.photos[id];
+          return ph && ph.orient;
+        });
+      });
+      if (oriented) {
+        root.appendChild(el('div', { class: 'notice notice-note small', text:
+          'Some finalists were rotated or flipped by hand. That correction shows everywhere in ' +
+          'this tool, including the contact sheet \u2014 but exported files are written exactly ' +
+          'as shot, so fix the orientation in your photo app after export.' }));
+      }
 
       if (!sets.length) {
         root.appendChild(el('div', { class: 'card' }, [
@@ -730,4 +747,6 @@
  *   contact sheet — one PNG, grouped by source, rank-ordered. Composed on a canvas
  *   rather than rendered as another screen, because the useful artifact for a
  *   portfolio is a single image you can open, print or send.
+ * v1.4 (2026-07-28): Says so when finalists carry a manual rotation or flip:
+ *   the exported originals are as shot; the correction lives in the derivatives.
 */

@@ -2157,6 +2157,42 @@ kbd {
 }
 #app .stack-badge-cap:hover { background: var(--surface-2); }
 
+/*
+ * Rotate / flip. On a grid cell they surface on hover only — two more always-on
+ * chips would make every cell read as a control panel. Same fixed-dark chip
+ * language as the index and stack badges, because they sit on photographs.
+ */
+#app .orient-btns {
+  position: absolute; bottom: 6px; right: 6px;
+  z-index: 3;
+  display: flex; gap: 4px;
+  opacity: 0;
+  transition: opacity var(--t, 120ms);
+}
+#app .photo-cell:hover .orient-btns,
+#app .orient-btns:focus-within { opacity: 1; }
+#app .orient-btn {
+  min-width: 22px; height: 22px; padding: 0 5px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--chip);
+  color: var(--on-photo);
+  font: inherit;
+  font-size: 12px; line-height: 22px;
+  backdrop-filter: blur(3px);
+  cursor: pointer;
+}
+#app .orient-btn:hover { background: oklch(0 0 0 / 0.78); }
+
+/* In the bracket caption they flow inline beside the pixel size. */
+#app .bk-cap .orient-btn {
+  background: var(--surface-3);
+  color: var(--text-dim);
+  backdrop-filter: none;
+  flex: none;
+}
+#app .bk-cap .orient-btn:hover { background: var(--surface-2); color: var(--text); }
+
 /* The bundle, opened: pick which frame stands for the group. */
 #app .stack-pick {
   display: grid;
@@ -3074,7 +3110,7 @@ kbd {
 /* ===== 00_core.js ===== */
 /**
  * @file 00_core.js
- * @version 1.2
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -3579,6 +3615,103 @@ kbd {
     canPersistToDisk: function () { return PT.env.hasFSA; }
   };
 
+  /* ------------------------------------------------------------- orient -- */
+
+  /**
+   * Manual rotate / flip, for photos whose EXIF orientation is wrong or
+   * missing, and for mirrored scans. Photos with CORRECT EXIF never need this:
+   * the ingest decode honours the tag, so they arrive upright.
+   *
+   * The transform is applied to the CACHED DERIVATIVE PIXELS, not painted over
+   * them with CSS: the thumb and preview blobs are redrawn through a canvas and
+   * written back to the store and IndexedDB. That one decision is what makes
+   * every renderer — grid cells, the duplicate review, the bracket's dual zoom
+   * (whose fit math reads the image's natural dimensions), the runoff, the
+   * export review and the contact sheet — inherit the correction with no code
+   * of their own. The ORIGINAL FILES are never touched; export writes them
+   * exactly as shot.
+   *
+   * The accumulated state rides on the photo record as `orient` = {r, f},
+   * meaning rotate r quarter-turns clockwise THEN mirror horizontally (the
+   * dihedral-group normal form), so an evicted-and-rederived thumbnail can be
+   * corrected again without replaying individual presses. Composition:
+   * a clockwise turn applied on top of (r, f) lands on (r±1, f) — minus when
+   * a flip is already in effect, because the mirror reverses the direction of
+   * rotation the viewer sees. A neutral state stores null, not {0, false}.
+   */
+  PT.orient = (function () {
+    /** Redraw a blob rotated q quarter-turns CW, then mirrored if f. */
+    function spin(blob, q, f) {
+      return createImageBitmap(blob).then(function (bmp) {
+        var odd = q % 2 === 1;
+        var c = document.createElement('canvas');
+        c.width = odd ? bmp.height : bmp.width;
+        c.height = odd ? bmp.width : bmp.height;
+        var x = c.getContext('2d');
+        x.translate(c.width / 2, c.height / 2);
+        // Canvas transforms compose right-to-left onto the image: declaring the
+        // mirror BEFORE the rotation makes the pixels rotate first, mirror
+        // second — the {r, f} normal form.
+        if (f) x.scale(-1, 1);
+        x.rotate(q * Math.PI / 2);
+        x.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+        bmp.close();
+        return new Promise(function (res) {
+          c.toBlob(res, blob.type || 'image/jpeg', 0.92);
+        });
+      });
+    }
+
+    /** Rotate/mirror both cached derivatives in place and persist them. */
+    function respin(id, q, f) {
+      var s = PT.store.get();
+      var rec = s && s.derivatives && s.derivatives[id];
+      if (!rec || (!rec.thumb && !rec.preview)) return Promise.resolve(false);
+      var jobs = ['thumb', 'preview'].map(function (k) {
+        if (!rec[k]) return null;
+        return spin(rec[k], q, f).then(function (b) { if (b) rec[k] = b; });
+      }).filter(Boolean);
+      return Promise.all(jobs).then(function () {
+        return PT.db.put('derivatives', { id: id, thumb: rec.thumb, preview: rec.preview });
+      }).then(function () { return true; });
+    }
+
+    /**
+     * One user press: 'cw' or 'flip'. Applies the delta to the pixels, folds it
+     * into the photo's normal form, and persists the photo record (photo
+     * mutations are saved explicitly — the store's debounced persist covers the
+     * session, not the photos table).
+     */
+    function bump(id, kind) {
+      return respin(id, kind === 'cw' ? 1 : 0, kind === 'flip').then(function (ok) {
+        if (!ok) return false;
+        var saved = null;
+        PT.store.dispatch('photo:orient', function (st) {
+          var p = st.photos[id];
+          if (!p) return;
+          var o = p.orient || { r: 0, f: false };
+          if (kind === 'cw') o.r = (o.r + (o.f ? 3 : 1)) % 4;
+          else o.f = !o.f;
+          p.orient = (o.r === 0 && !o.f) ? null : o;
+          saved = p;
+        });
+        return saved ? PT.db.put('photos', saved).then(function () { return true; }) : true;
+      });
+    }
+
+    /** Re-apply a stored state to a freshly re-derived record (cache eviction). */
+    function reapply(rec, orient) {
+      if (!orient || (!orient.r && !orient.f)) return Promise.resolve(rec);
+      var jobs = ['thumb', 'preview'].map(function (k) {
+        if (!rec[k]) return null;
+        return spin(rec[k], orient.r || 0, !!orient.f).then(function (b) { if (b) rec[k] = b; });
+      }).filter(Boolean);
+      return Promise.all(jobs).then(function () { return rec; });
+    }
+
+    return { bump: bump, reapply: reapply };
+  })();
+
   PT.log('core', 'ready', {
     version: PT.VERSION,
     origin: location.protocol,
@@ -3599,6 +3732,9 @@ kbd {
  *   decoding aborted the load, surfacing on a file:// origin as "Not allowed to
  *   load local resource". src is now detached before revoking.
  * v1.2 (2026-07-28): App version to 1.0.
+ * v1.3 (2026-07-28): PT.orient — manual rotate/flip for wrong-EXIF and mirrored
+ *   photos, applied to the cached derivative pixels so every screen inherits it,
+ *   with the accumulated dihedral state on the photo record for re-derivation.
 */
 
 </script>
@@ -6344,7 +6480,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 40_screen_ingest.js ===== */
 /**
  * @file 40_screen_ingest.js
- * @version 1.8
+ * @version 1.9
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -6467,25 +6603,32 @@ v1.0 - 2026-07-28 - Samuel Cao
       dirInput.setAttribute('webkitdirectory', '');
 
       var looseInput = el('input', {
-        type: 'file', id: 'loose-files', multiple: true, accept: 'image/*', style: 'display:none'
+        type: 'file', id: 'loose-files', multiple: true,
+        // Some platforms do not register HEIC under image/*; list it explicitly
+        // or iPhone folders lose exactly the files this tool decodes for them.
+        accept: 'image/*,.heic,.heif,.HEIC,.HEIF', style: 'display:none'
       });
 
+      // A folder and a hand-picked set are EQUAL ways in — the folder is only
+      // primary because it is what the tool is usually pointed at. Both accept
+      // drops too: the handler takes directories and loose files alike.
       var drop = el('div', { class: 'dropzone', id: 'dropzone' }, [
         el('div', { class: 'dropzone-inner' }, [
-          el('div', { class: 'drop-title', text: 'Drop a folder here' }),
+          el('div', { class: 'drop-title', text: 'Drop a folder or photos here' }),
           el('div', { class: 'muted small', text: 'or' }),
-          el('button', { class: 'btn btn-primary', id: 'pick-folder', text: 'Choose a folder' }),
+          el('div', { class: 'row', style: 'justify-content:center' }, [
+            el('button', { class: 'btn btn-primary', id: 'pick-folder', text: 'Choose a folder' }),
+            el('button', {
+              class: 'btn', id: 'pick-files', text: 'Choose photos',
+              title: 'Pick individual photos instead of a whole folder',
+              onclick: function () { looseInput.click(); }
+            })
+          ]),
           el('div', { class: 'small dim', id: 'fallback-note' })
         ])
       ]);
 
-      var extras = el('div', { class: 'row small' }, [
-        dirInput, looseInput,
-        el('button', {
-          class: 'btn btn-quiet btn-sm', id: 'pick-files', text: 'Pick individual files instead',
-          onclick: function () { looseInput.click(); }
-        })
-      ]);
+      var extras = el('div', { class: 'row small' }, [dirInput, looseInput]);
 
       root.appendChild(drop);
       root.appendChild(extras);
@@ -6991,9 +7134,9 @@ v1.0 - 2026-07-28 - Samuel Cao
           done++;
           PT.sources[rec.id] = e.handle || e.file;
 
-          if (rec.thumb || rec.preview) {
-            derivatives.push({ id: rec.id, thumb: rec.thumb, preview: rec.preview });
-          }
+          // A photo the user rotated or flipped keeps that correction across
+          // cache eviction: the freshly derived pixels are re-spun to the
+          // stored dihedral state before anything renders them.
           var lean = {};
           Object.keys(rec).forEach(function (k) {
             if (k !== 'thumb' && k !== 'preview') lean[k] = rec[k];
@@ -7004,6 +7147,21 @@ v1.0 - 2026-07-28 - Samuel Cao
             var rate = (Date.now() - t0) / done;
             var left = Math.round((rate * (total - done)) / 1000);
             setProgress(done, total, left > 1 ? '~' + PT.fmt.duration(left * 1000) + ' left' : '');
+          }
+
+          if (!rec.thumb && !rec.preview) return;
+
+          // A photo the user rotated or flipped keeps that correction across
+          // cache eviction: freshly derived pixels are re-spun to the stored
+          // dihedral state before anything renders or persists them. Returned
+          // into the chain so the spin completes before the batch save.
+          var prior = PT.store.get().photos[rec.id];
+          var out = { id: rec.id, thumb: rec.thumb, preview: rec.preview };
+          derivatives.push(out);
+          if (prior && prior.orient) {
+            return PT.orient.reapply(out, prior.orient).catch(function (e) {
+              PT.warn('ingest', 'orient reapply failed', e);
+            });
           }
         });
       });
@@ -7084,6 +7242,10 @@ v1.0 - 2026-07-28 - Samuel Cao
  * v1.8 (2026-07-28): The wordmark (docs/wordmark spec v1.0) replaces the plain
  *   entry heading: PHO/TO/URNAMENT as grid columns with the two rails, display
  *   cut, aria carrying the real name.
+ * v1.9 (2026-07-28): Choosing photos is an equal entry beside choosing a folder
+ *   (the loose picker also names HEIC explicitly, which image/* misses on some
+ *   platforms), and re-derived thumbnails re-apply a stored manual orientation
+ *   before anything renders or persists them.
 */
 
 </script>
@@ -8608,7 +8770,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 60_screen_grid.js ===== */
 /**
  * @file 60_screen_grid.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -8860,6 +9022,23 @@ v1.0 - 2026-07-28 - Samuel Cao
       el('span', { class: 'pt-cell-name', text: photoName(id) })
     ]);
 
+    // Rotate / flip, revealed on hover. They redraw the cached pixels, so the
+    // fix follows the photo to every later screen. Clicks must not toggle keep.
+    if (blob) {
+      cell.appendChild(el('span', { class: 'orient-btns' }, [
+        el('button', {
+          class: 'orient-btn', type: 'button', text: '\u21bb', dataset: { t: 'rot' },
+          title: 'Rotate a quarter turn clockwise \u2014 for a wrong or missing orientation tag',
+          onclick: function (e) { e.stopPropagation(); orientCell(cell, img, id, 'cw'); }
+        }),
+        el('button', {
+          class: 'orient-btn', type: 'button', text: '\u21c4', dataset: { t: 'flip' },
+          title: 'Mirror horizontally \u2014 for a flipped scan or selfie',
+          onclick: function (e) { e.stopPropagation(); orientCell(cell, img, id, 'flip'); }
+        })
+      ]));
+    }
+
     // A bundled burst wears its representative and says so: the badge names the
     // count, and opening it is the only action that must NOT toggle keep.
     if (members && members.length > 1) {
@@ -8871,6 +9050,21 @@ v1.0 - 2026-07-28 - Samuel Cao
       }));
     }
     return { cell: cell, img: blob ? img : null };
+  }
+
+  /** One orient press on a cell: redraw the pixels, then show the new blob. */
+  function orientCell(cell, img, id, kind) {
+    if (cell.dataset.orienting) return;
+    cell.dataset.orienting = '1';
+    PT.orient.bump(id, kind).then(function (ok) {
+      delete cell.dataset.orienting;
+      if (!ok || !img) return;
+      dom.releaseImg(img);
+      dom.setImg(img, thumbOf(id));
+    }).catch(function (e) {
+      delete cell.dataset.orienting;
+      PT.warn('grid', 'orient failed', e);
+    });
   }
 
   /**
@@ -9882,6 +10076,9 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   swaps which one fronts the slot — order, kept, sel, the slot map and the
  *   group's pinned representative all follow. standingIds and the finish-early
  *   modal expand slots, so stopping early still keeps bursts whole.
+ * v1.5 (2026-07-28): Rotate/flip on every grid cell, revealed on hover. The
+ *   correction redraws the cached derivative pixels (PT.orient), so it follows
+ *   the photo to every later screen.
 */
 
 </script>
@@ -9889,7 +10086,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 70_screen_bracket.js ===== */
 /**
  * @file 70_screen_bracket.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -10615,6 +10812,18 @@ v1.0 - 2026-07-28 - Samuel Cao
       el('kbd', { text: side === 0 ? '←' : '→' }),
       el('span', { class: 'nm' }),
       el('span', { class: 'spacer' }),
+      // Redraws the cached pixels, so the fix holds everywhere afterwards; the
+      // pane reloads and the fit math reads the new natural dimensions.
+      el('button', {
+        class: 'orient-btn', type: 'button', text: '\u21bb', dataset: { t: 'bk-rot' },
+        title: 'Rotate a quarter turn clockwise',
+        onclick: function (e) { e.stopPropagation(); orientPane(P, 'cw'); }
+      }),
+      el('button', {
+        class: 'orient-btn', type: 'button', text: '\u21c4', dataset: { t: 'bk-flip' },
+        title: 'Mirror horizontally',
+        onclick: function (e) { e.stopPropagation(); orientPane(P, 'flip'); }
+      }),
       el('span', { class: 'dim px' })
     ]);
     var pane = el('div', { class: 'bk-pane' }, [vp, cap]);
@@ -11000,6 +11209,21 @@ v1.0 - 2026-07-28 - Samuel Cao
     S.bar.appendChild(el('span', { class: 'small dim', text: 'scroll to zoom · drag to pan · both photos move together' }));
 
     applyView();
+  }
+
+  /** One orient press on a pane: redraw, reload — nat dims refit the view. */
+  function orientPane(P, kind) {
+    if (!P.id || P._orienting) return;
+    P._orienting = true;
+    PT.orient.bump(P.id, kind).then(function (ok) {
+      P._orienting = false;
+      if (!ok || !S) return;
+      var blob = blobFor(P.id, true);
+      if (blob) PT.dom.setImg(P.img, blob);
+    }).catch(function (e) {
+      P._orienting = false;
+      PT.warn('bracket', 'orient failed', e);
+    });
   }
 
   function loadPane(P, id) {
@@ -11471,6 +11695,9 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   id, so rewriting pool, order and op winners hands the standing to the
  *   chosen frame. Same-match pane reloads follow a face swap without resetting
  *   the shared zoom.
+ * v1.5 (2026-07-28): Rotate/flip per pane in the caption. The pane reloads the
+ *   redrawn blob and the fit math reads the new natural dimensions, so the dual
+ *   zoom just works on the corrected pixels.
 */
 
 </script>
@@ -11478,7 +11705,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 80_screen_export.js ===== */
 /**
  * @file 80_screen_export.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -11546,6 +11773,23 @@ v1.0 - 2026-07-28 - Samuel Cao
       var sets = resultSets(session);
 
       root.appendChild(el('h1', { text: 'Export review' }));
+
+      // Files are written exactly as shot; a manual rotation or flip lives in
+      // the derivatives, so it shows here and on the contact sheet but not in
+      // an exported original. Said only when it actually applies.
+      var st0 = PT.store.get();
+      var oriented = sets.some(function (set) {
+        return set.ids.some(function (id) {
+          var ph = st0.photos[id];
+          return ph && ph.orient;
+        });
+      });
+      if (oriented) {
+        root.appendChild(el('div', { class: 'notice notice-note small', text:
+          'Some finalists were rotated or flipped by hand. That correction shows everywhere in ' +
+          'this tool, including the contact sheet \u2014 but exported files are written exactly ' +
+          'as shot, so fix the orientation in your photo app after export.' }));
+      }
 
       if (!sets.length) {
         root.appendChild(el('div', { class: 'card' }, [
@@ -12208,6 +12452,8 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   contact sheet — one PNG, grouped by source, rank-ordered. Composed on a canvas
  *   rather than rendered as another screen, because the useful artifact for a
  *   portfolio is a single image you can open, print or send.
+ * v1.4 (2026-07-28): Says so when finalists carry a manual rotation or flip:
+ *   the exported originals are as shot; the correction lives in the derivatives.
 */
 
 </script>

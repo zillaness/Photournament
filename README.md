@@ -36,7 +36,7 @@ browser profile.
 ```
 npm install
 npm run build     # -> dist/photournament_v1.0.html  (and a slim, no-HEIC build)
-npm test          # unit tests, artifact smoke, and nine end-to-end runs
+npm test          # unit tests, artifact smoke, and ten end-to-end runs
 ```
 
 The build concatenates `src/` into one self-contained HTML file. That is not a
@@ -48,9 +48,14 @@ for the measured constraint table.
 
 ## What it does
 
-1. **Ingest** — reads the folder, decodes JPEG, HEIC, PNG, WebP and GIF, and
-   builds thumbnails off the main thread. Video and RAW are counted and skipped,
-   never treated as errors.
+1. **Ingest** — point it at a folder, or hand-pick individual photos; both can
+   also just be dropped on the page. Decodes JPEG, HEIC, PNG, WebP and GIF and
+   builds thumbnails off the main thread, honouring the EXIF orientation tag so
+   portrait shots arrive upright. Video and RAW are counted and skipped, never
+   treated as errors. For a photo whose tag is wrong or missing — or a mirrored
+   scan — every grid cell and bracket pane carries rotate and flip controls;
+   the correction redraws the cached pixels, so it follows the photo through
+   the whole tournament.
 2. **Allocation** — say how many photos you want to keep from each folder. Fixed
    counts, a share of the folder (`5%`), `0` to skip, `*` for no limit, or blank
    to compete with sibling folders for whatever the parent has left over.
@@ -83,3 +88,7 @@ which is the interference the whole tool exists to avoid.
   `webkitdirectory` input instead. Downloading a zip is fully covered.
 - **Perceptual-hash thresholds were tuned on procedurally generated images**, not
   photographs. The defaults measure well, but real bursts are the real test.
+- **Manual rotations and flips are visual.** They correct what you judge and the
+  contact sheet, and they persist with the session — but exported files are
+  written exactly as shot, byte for byte. Fix the tag in your photo app after
+  export; re-encoding originals just to turn them is not worth the quality loss.

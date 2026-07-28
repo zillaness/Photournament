@@ -1,6 +1,6 @@
 /**
  * @file 00_core.js
- * @version 1.2
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -505,6 +505,103 @@
     canPersistToDisk: function () { return PT.env.hasFSA; }
   };
 
+  /* ------------------------------------------------------------- orient -- */
+
+  /**
+   * Manual rotate / flip, for photos whose EXIF orientation is wrong or
+   * missing, and for mirrored scans. Photos with CORRECT EXIF never need this:
+   * the ingest decode honours the tag, so they arrive upright.
+   *
+   * The transform is applied to the CACHED DERIVATIVE PIXELS, not painted over
+   * them with CSS: the thumb and preview blobs are redrawn through a canvas and
+   * written back to the store and IndexedDB. That one decision is what makes
+   * every renderer — grid cells, the duplicate review, the bracket's dual zoom
+   * (whose fit math reads the image's natural dimensions), the runoff, the
+   * export review and the contact sheet — inherit the correction with no code
+   * of their own. The ORIGINAL FILES are never touched; export writes them
+   * exactly as shot.
+   *
+   * The accumulated state rides on the photo record as `orient` = {r, f},
+   * meaning rotate r quarter-turns clockwise THEN mirror horizontally (the
+   * dihedral-group normal form), so an evicted-and-rederived thumbnail can be
+   * corrected again without replaying individual presses. Composition:
+   * a clockwise turn applied on top of (r, f) lands on (r±1, f) — minus when
+   * a flip is already in effect, because the mirror reverses the direction of
+   * rotation the viewer sees. A neutral state stores null, not {0, false}.
+   */
+  PT.orient = (function () {
+    /** Redraw a blob rotated q quarter-turns CW, then mirrored if f. */
+    function spin(blob, q, f) {
+      return createImageBitmap(blob).then(function (bmp) {
+        var odd = q % 2 === 1;
+        var c = document.createElement('canvas');
+        c.width = odd ? bmp.height : bmp.width;
+        c.height = odd ? bmp.width : bmp.height;
+        var x = c.getContext('2d');
+        x.translate(c.width / 2, c.height / 2);
+        // Canvas transforms compose right-to-left onto the image: declaring the
+        // mirror BEFORE the rotation makes the pixels rotate first, mirror
+        // second — the {r, f} normal form.
+        if (f) x.scale(-1, 1);
+        x.rotate(q * Math.PI / 2);
+        x.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+        bmp.close();
+        return new Promise(function (res) {
+          c.toBlob(res, blob.type || 'image/jpeg', 0.92);
+        });
+      });
+    }
+
+    /** Rotate/mirror both cached derivatives in place and persist them. */
+    function respin(id, q, f) {
+      var s = PT.store.get();
+      var rec = s && s.derivatives && s.derivatives[id];
+      if (!rec || (!rec.thumb && !rec.preview)) return Promise.resolve(false);
+      var jobs = ['thumb', 'preview'].map(function (k) {
+        if (!rec[k]) return null;
+        return spin(rec[k], q, f).then(function (b) { if (b) rec[k] = b; });
+      }).filter(Boolean);
+      return Promise.all(jobs).then(function () {
+        return PT.db.put('derivatives', { id: id, thumb: rec.thumb, preview: rec.preview });
+      }).then(function () { return true; });
+    }
+
+    /**
+     * One user press: 'cw' or 'flip'. Applies the delta to the pixels, folds it
+     * into the photo's normal form, and persists the photo record (photo
+     * mutations are saved explicitly — the store's debounced persist covers the
+     * session, not the photos table).
+     */
+    function bump(id, kind) {
+      return respin(id, kind === 'cw' ? 1 : 0, kind === 'flip').then(function (ok) {
+        if (!ok) return false;
+        var saved = null;
+        PT.store.dispatch('photo:orient', function (st) {
+          var p = st.photos[id];
+          if (!p) return;
+          var o = p.orient || { r: 0, f: false };
+          if (kind === 'cw') o.r = (o.r + (o.f ? 3 : 1)) % 4;
+          else o.f = !o.f;
+          p.orient = (o.r === 0 && !o.f) ? null : o;
+          saved = p;
+        });
+        return saved ? PT.db.put('photos', saved).then(function () { return true; }) : true;
+      });
+    }
+
+    /** Re-apply a stored state to a freshly re-derived record (cache eviction). */
+    function reapply(rec, orient) {
+      if (!orient || (!orient.r && !orient.f)) return Promise.resolve(rec);
+      var jobs = ['thumb', 'preview'].map(function (k) {
+        if (!rec[k]) return null;
+        return spin(rec[k], orient.r || 0, !!orient.f).then(function (b) { if (b) rec[k] = b; });
+      }).filter(Boolean);
+      return Promise.all(jobs).then(function () { return rec; });
+    }
+
+    return { bump: bump, reapply: reapply };
+  })();
+
   PT.log('core', 'ready', {
     version: PT.VERSION,
     origin: location.protocol,
@@ -525,4 +622,7 @@
  *   decoding aborted the load, surfacing on a file:// origin as "Not allowed to
  *   load local resource". src is now detached before revoking.
  * v1.2 (2026-07-28): App version to 1.0.
+ * v1.3 (2026-07-28): PT.orient — manual rotate/flip for wrong-EXIF and mirrored
+ *   photos, applied to the cached derivative pixels so every screen inherits it,
+ *   with the accumulated dihedral state on the photo record for re-derivation.
 */

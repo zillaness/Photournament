@@ -17,7 +17,7 @@
 
 import { chromium } from 'playwright';
 import { deflateSync } from 'node:zlib';
-import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
@@ -338,6 +338,38 @@ print(json.dumps({
     check('zip entries keep their folders', z.foldered === true, z.sample.join(', '));
     check('zip entries have real content', z.sizes_nonzero === true, z.sizes_nonzero);
     rmSync(zipPath, { force: true });
+  }
+}
+
+// PRD 7.8's ranked thumbnail grid. Validated as a real decoded image rather than
+// by trusting the download event, since a canvas that produced nothing would
+// still download cleanly.
+if (finalScreen === 'export') {
+  const dl2 = page.waitForEvent('download', { timeout: 30000 });
+  await clickText(/contact sheet/);
+  try {
+    const d = await dl2;
+    const sheet = path.join(os.tmpdir(), 'pt-sheet-' + Date.now() + '.png');
+    await d.saveAs(sheet);
+    const dims = await page.evaluate(async (dataUrl) => {
+      const img = new Image();
+      await new Promise((r, j) => { img.onload = r; img.onerror = j; img.src = dataUrl; });
+      // Sample a band inside the first thumbnail cell; an all-black sheet means
+      // the canvas composed nothing.
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      c.getContext('2d').drawImage(img, 0, 0);
+      const d = c.getContext('2d').getImageData(18, 120, 240, 120).data;
+      let lit = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] + d[i+1] + d[i+2] > 60) lit++;
+      return { w: img.width, h: img.height, litFraction: lit / (d.length / 4) };
+    }, 'data:image/png;base64,' + readFileSync(sheet).toString('base64'));
+    rmSync(sheet, { force: true });
+    check('contact sheet is a real image', dims.w > 500 && dims.h > 500, `${dims.w}x${dims.h}`);
+    check('contact sheet actually has photos on it', dims.litFraction > 0.3,
+      (dims.litFraction * 100).toFixed(0) + '% lit');
+  } catch (e) {
+    check('contact sheet downloaded', false, e.message);
   }
 }
 

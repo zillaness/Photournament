@@ -1,6 +1,6 @@
 /**
  * file: smoke_dist.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -61,7 +61,14 @@ const r = await page.evaluate(async () => {
     bgToken: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
     bodyBg: getComputedStyle(document.body).backgroundColor,
     // No stray build tokens survived into the artifact.
-    tokensLeft: (document.documentElement.innerHTML.match(/BUILD:(CSS|JS|LIBHEIF)/g) || []).length
+    tokensLeft: (document.documentElement.innerHTML.match(/BUILD:(CSS|JS|LIBHEIF|PHASH)/g) || []).length,
+    // The favicon must be a data: URI. A sibling asset path would 404 on a
+    // file:// origin and silently lose the identity in the shipped file.
+    iconIsDataUri: (function () {
+      var l = document.querySelector('link[rel="icon"]');
+      return !!l && /^data:image\/svg\+xml/.test(l.getAttribute('href'));
+    })(),
+    themeColor: (document.querySelector('meta[name="theme-color"]') || {}).content || null
   };
 
   // The real end-to-end capability: spin a worker from the inlined source and
@@ -99,6 +106,8 @@ check('screen host exists', r.screenHost);
 check('design tokens resolved', r.bgToken.length > 0, r.bgToken || '(none)');
 check('page background is painted', r.bodyBg && r.bodyBg !== 'rgba(0, 0, 0, 0)', r.bodyBg);
 check('no build tokens left in output', r.tokensLeft === 0, r.tokensLeft);
+check('favicon is embedded as a data URI', r.iconIsDataUri === true, r.iconIsDataUri);
+check('theme colour is set', r.themeColor === '#171717', r.themeColor);
 check('libheif payload embedded', r.heicPayloadBytes > 1000000, (r.heicPayloadBytes / 1048576).toFixed(2) + ' MB');
 check('libheif NOT executed at boot', r.heicNotExecuted === true, r.heicNotExecuted);
 check('worker spawns from inlined source', r.workerFromInlineSrc === 'alive', r.workerFromInlineSrc);
@@ -106,7 +115,7 @@ check('worker spawns from inlined source', r.workerFromInlineSrc === 'alive', r.
 // The artifact must fetch nothing but itself. blob: URLs are excluded because
 // they are locally constructed, not loaded — spawning a worker from inlined
 // source necessarily creates one, and that is the mechanism working, not a leak.
-const loaded = requests.filter((u) => !u.startsWith('blob:'));
+const loaded = requests.filter((u) => !u.startsWith('blob:') && !u.startsWith('data:'));
 const external = loaded.filter((u) => !u.startsWith('file://'));
 check('zero external requests', external.length === 0, external.join(', ') || '0');
 check('no sibling assets fetched', loaded.length === 1, loaded.length + ' file:// request(s)');
@@ -118,4 +127,7 @@ process.exit(failed === 0 ? 0 : 1);
 /* CHANGELOG
  * v1.0 (2026-07-28): Initial release. Boots the dist artifact from file://,
  *   asserts self-containment, deferred libheif, and a live worker.
- */
+  * v1.1 (2026-07-28): Colour-space agnostic background check, and guards for the
+ *   embedded favicon and theme colour. data: URIs are excluded from the
+ *   self-containment count because they are inline, not loaded.
+*/

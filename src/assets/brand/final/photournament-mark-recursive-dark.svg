@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Photournament top-left deep-recursion mark</title>
+  <desc id="desc">The primary nine-cell mark with center-selected grids recursively nested through the top-left source cell to pixel-scale detail.</desc>
+  <defs>
+    <symbol id="r0" viewBox="0 0 100 100">
+      <g fill="#474747">
+        <rect x="0" y="0" width="30" height="30" rx="3"/><rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+        <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+        <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+      </g>
+      <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+    </symbol>
+    <symbol id="r1" viewBox="0 0 100 100">
+      <use href="#r0" x="0" y="0" width="30" height="30"/>
+      <g fill="#474747">
+        <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+        <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+        <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+      </g>
+      <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+    </symbol>
+    <symbol id="r2" viewBox="0 0 100 100">
+      <use href="#r1" x="0" y="0" width="30" height="30"/>
+      <g fill="#474747">
+        <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+        <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+        <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+      </g>
+      <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+    </symbol>
+    <symbol id="r3" viewBox="0 0 100 100">
+      <use href="#r2" x="0" y="0" width="30" height="30"/>
+      <g fill="#474747">
+        <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+        <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+        <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+      </g>
+      <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+    </symbol>
+    <symbol id="r4" viewBox="0 0 100 100">
+      <use href="#r3" x="0" y="0" width="30" height="30"/>
+      <g fill="#474747">
+        <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+        <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+        <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+      </g>
+      <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+    </symbol>
+  </defs>
+
+  <use href="#r4" x="0" y="0" width="32" height="32"/>
+  <g fill="#474747">
+    <rect x="34" y="0" width="32" height="32" rx="3"/>
+    <rect x="68" y="0" width="32" height="32" rx="3"/>
+    <rect x="0" y="34" width="32" height="32" rx="3"/>
+    <rect x="68" y="34" width="32" height="32" rx="3"/>
+    <rect x="0" y="68" width="32" height="32" rx="3"/>
+    <rect x="34" y="68" width="32" height="32" rx="3"/>
+    <rect x="68" y="68" width="32" height="32" rx="3"/>
+  </g>
+  <rect x="34" y="34" width="32" height="32" rx="3" fill="#F3F3F3"/>
+</svg>

@@ -1,6 +1,6 @@
 <!--
   file: index.html
-  version: 1.0
+  version: 1.3
   author: Samuel Cao
   created: 2026-07-28
   last_updated: 2026-07-28
@@ -18,7 +18,14 @@
 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#171717">
 <title>Photournament</title>
+<!--
+  The favicon is embedded because the distributable must remain one file and
+  file:// Chromium cannot load a sibling asset. Repository-ready source and
+  raster variants live in src/assets/icons/.
+-->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23171717'/%3E%3Cg fill='%23474747'%3E%3Crect x='8' y='8' width='4' height='4'/%3E%3Crect x='13' y='8' width='4' height='4'/%3E%3Crect x='18' y='8' width='4' height='4'/%3E%3Crect x='8' y='13' width='4' height='4'/%3E%3Crect x='18' y='13' width='4' height='4'/%3E%3Crect x='8' y='18' width='4' height='4'/%3E%3Crect x='13' y='18' width='4' height='4'/%3E%3Crect x='18' y='18' width='4' height='4'/%3E%3Crect x='25' y='8' width='14' height='14'/%3E%3Crect x='42' y='8' width='14' height='14'/%3E%3Crect x='8' y='25' width='14' height='14'/%3E%3Crect x='42' y='25' width='14' height='14'/%3E%3Crect x='8' y='42' width='14' height='14'/%3E%3Crect x='25' y='42' width='14' height='14'/%3E%3Crect x='42' y='42' width='14' height='14'/%3E%3C/g%3E%3Crect x='13' y='13' width='4' height='4' fill='%23F3F3F3'/%3E%3Crect x='25' y='25' width='14' height='14' fill='%23F3F3F3'/%3E%3C/svg%3E">
 
 <!--BUILD:CSS-->
 <link rel="stylesheet" href="css/00_base.css">
@@ -73,6 +80,12 @@
 <!--/BUILD:JS-->
 
 <!-- CHANGELOG
+  v1.3 (2026-07-28): Switched the small favicon family to square corners while
+    retaining rounded corners for the primary logo, mark, and large app icons.
+  v1.2 (2026-07-28): Updated the embedded favicon to preserve the final
+    top-left recursive source cell at small sizes.
+  v1.1 (2026-07-28): Added an embedded nine-cell favicon and matching browser
+    theme colour without introducing an external request into the single-file app.
   v1.0 (2026-07-28): Initial release. Shell, screen host, toast and modal
     containers, and build tokens for CSS, JS and the libheif payload.
 -->

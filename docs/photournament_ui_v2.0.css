@@ -1,0 +1,1491 @@
+/**
+ * file: photournament_ui_v2.0.css
+ * version: 2.0
+ * author: Samuel Cao
+ * created: 2026-07-28
+ * last_updated: 2026-07-28
+ * description: Complete replacement stylesheet for Photournament. Consolidates
+ *   src/css/00_base.css, src/css/10_screens.css and the four JS-injected style
+ *   blocks (pt-tree-style, pt-grid-style, pt-bracket-style, pt-export-style)
+ *   into one file. Vanilla CSS, no external resources, Chromium-only, dark only.
+ * ai_update: Update last_updated and version. Rename file to match. Append changelog at bottom.
+ *
+ * THE RULE THIS FILE IS BUILT AROUND
+ * ----------------------------------
+ * The interface must never influence the judgement being made about a photograph.
+ * Two consequences run through everything below:
+ *
+ *   1. Every grey is ACHROMATIC. They are written as oklch(L 0 0), so there is
+ *      no hue to cast — not a blue-black, not a warm grey, zero chroma by
+ *      construction rather than by eyeballing a hex triplet.
+ *
+ *   2. The kept/chosen state of a PHOTOGRAPH is signalled with --mark, which is
+ *      also achromatic. The old design put an accent-blue border directly against
+ *      the image; a kept photo now sits on a near-white mount, the way a print
+ *      sits on mat board. It is unmistakable from peripheral vision and casts no
+ *      colour. --accent never touches a photo. It is for buttons, focus rings,
+ *      progress and the allocation bars — chrome that sits away from image
+ *      content.
+ *
+ * The accent itself is one notch further desaturated than v1 (oklch chroma .072
+ * against roughly .12 for #5b8dd6) and slightly lighter, so it reads as
+ * instrument marking rather than as a hyperlink competing with the photographs.
+ *
+ * SPECIFICITY NOTE
+ * ----------------
+ * Selectors that previously lived in the JS-injected <style> blocks are written
+ * here under #app. A <style> element injected into <head> at runtime would
+ * otherwise win over an identical class-only selector in this file purely by
+ * document order, so the id keeps this file authoritative even if a stray
+ * injectStyle() survives the consolidation.
+ */
+
+/* ==========================================================================
+   1. DESIGN TOKENS
+   ========================================================================== */
+
+:root {
+  /* -- neutral surfaces: zero chroma, so nothing near a photo has a cast ---- */
+  --bg:        oklch(0.160 0 0);
+  --surface:   oklch(0.205 0 0);
+  --surface-2: oklch(0.248 0 0);
+  --surface-3: oklch(0.300 0 0);
+  --line:      oklch(0.300 0 0);
+  --line-2:    oklch(0.390 0 0);
+
+  --text:      oklch(0.950 0 0);
+  --text-dim:  oklch(0.730 0 0);
+  --text-mute: oklch(0.565 0 0);
+
+  /* The well behind photographs. Absolute black, never tinted, never a gradient. */
+  --well:      #000;
+
+  /* -- the one accent, and the achromatic mark that replaces it on photos --- */
+  --accent:     oklch(0.680 0.072 248);
+  --accent-hi:  oklch(0.780 0.072 248);
+  --accent-dim: oklch(0.420 0.050 248);
+  --on-accent:  oklch(0.150 0 0);
+
+  /* The kept / chosen signal. Achromatic by design — see the header. */
+  --mark:      oklch(0.965 0 0);
+  --mark-edge: oklch(0.480 0 0);
+
+  /* Status. Used only in notices and never adjacent to image content. */
+  --good: oklch(0.680 0.080 150);
+  --warn: oklch(0.760 0.090 85);
+  --bad:  oklch(0.640 0.110 25);
+
+  /* -- geometry -------------------------------------------------------------- */
+  --r:     5px;
+  --r-lg:  9px;
+  --r-sm:  3px;
+  --gap:   12px;
+  --mat:   7px;   /* thickness of the mount around a kept photo */
+  --measure: 900px;
+
+  /* -- type ------------------------------------------------------------------ */
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --fs-micro:   12px;
+  --fs-small:   14px;
+  --fs-body:    16px;
+  --fs-lead:    18px;
+  --fs-h2:      21px;
+  --fs-h1:      28px;
+  --fs-display: 44px;
+
+  --topbar-h: 60px;
+
+  /* -- motion: state only, never on the hot path ---------------------------- */
+  --t:      90ms;
+  --t-snap: 60ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ==========================================================================
+   2. SHELL
+   ========================================================================== */
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-lead);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Text selection during rapid grid clicking is pure noise. */
+body { user-select: none; }
+input, textarea, .selectable, .mono, .exp-dest { user-select: text; }
+
+/*
+ * A fixed-height shell rather than min-height:100%. Stage screens then size
+ * themselves against a real box instead of growing the document, which is what
+ * the old calc(100vh - 210px) caps were working around.
+ */
+#app {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-dim); }
+a:hover { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
+
+::selection { background: var(--accent-dim); color: var(--text); }
+
+/* Chromium-only, so the native dark scrollbar is fair game. */
+* { scrollbar-color: var(--surface-3) transparent; scrollbar-width: thin; }
+
+/* ------------------------------------------------------------------ topbar */
+
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: var(--topbar-h);
+  padding: 0 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+#topbar[hidden] { display: none; }
+
+.topbar-left, .topbar-right { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.topbar-right { gap: 4px; }
+
+#topbar-title {
+  font-size: var(--fs-small);
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+#topbar-context {
+  font-size: var(--fs-small);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 14px;
+  border-left: 1px solid var(--line-2);
+}
+
+/*
+ * Counters were four undifferentiated numbers on one line. Each is now a small
+ * stat block: mute label above, bright tabular value below. The markup is a bare
+ * text node followed by <b>, and both become flex items, so this needs no
+ * change to any screen's JS.
+ */
+.counters {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  font-variant-numeric: tabular-nums;
+}
+.counters > span {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 84px;
+  padding: 0 14px;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  border-left: 1px solid var(--line);
+}
+.counters > span:first-child { border-left: 0; }
+.counters b {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--text);
+  line-height: 1.05;
+}
+
+/* ------------------------------------------------------------------ screen */
+
+#screen {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.screen { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 28px 24px; gap: 18px; }
+.screen-narrow { max-width: var(--measure); margin: 0 auto; width: 100%; }
+
+h1 { font-size: var(--fs-h1); margin: 0; font-weight: 600; letter-spacing: -0.015em; text-wrap: pretty; }
+h2 { font-size: var(--fs-h2); margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+p  { margin: 0 0 10px; text-wrap: pretty; max-width: 68ch; }
+
+.muted { color: var(--text-dim); }
+.dim   { color: var(--text-mute); }
+.small { font-size: var(--fs-small); }
+.mono  { font-family: var(--mono); font-size: 0.92em; letter-spacing: -0.01em; }
+.nums  { font-variant-numeric: tabular-nums; }
+
+.row { display: flex; align-items: center; gap: var(--gap); flex-wrap: wrap; }
+.row-end { margin-left: auto; }
+.spacer { flex: 1; }
+
+/* ==========================================================================
+   3. CONTROLS
+   ========================================================================== */
+
+.btn {
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  padding: 9px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background var(--t), border-color var(--t), color var(--t);
+}
+.btn:hover:not(:disabled) { background: var(--surface-3); border-color: oklch(0.46 0 0); }
+.btn:active:not(:disabled) { background: var(--surface-2); }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 650;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hi); border-color: var(--accent-hi); }
+.btn-primary:disabled { background: transparent; border-color: var(--line-2); color: var(--text-dim); opacity: 1; }
+
+.btn-quiet { background: transparent; border-color: transparent; color: var(--text-dim); }
+.btn-quiet:hover:not(:disabled) { background: var(--surface-2); color: var(--text); border-color: transparent; }
+
+.btn-danger { border-color: color-mix(in oklch, var(--bad) 55%, var(--line)); color: var(--bad); background: transparent; }
+.btn-danger:hover:not(:disabled) { background: color-mix(in oklch, var(--bad) 12%, transparent); border-color: var(--bad); }
+
+.btn-sm { padding: 5px 10px; font-size: var(--fs-micro); }
+
+/*
+ * A button that is refusing rather than broken. The over-quota advance button
+ * uses this: dashed, still legible, obviously "not yet" instead of "wrong".
+ * No colour, so it cannot read as an error.
+ */
+.btn-primary:disabled[data-t="advance"],
+.btn-primary:disabled[data-t="rescue-done"] {
+  border-style: dashed;
+  border-color: var(--mark-edge);
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ inputs */
+
+input[type="text"], input[type="number"], select, textarea {
+  font: inherit;
+  font-size: var(--fs-small);
+  color: var(--text);
+  background: oklch(0.130 0 0);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  transition: border-color var(--t), background var(--t);
+}
+input[type="text"]:hover, input[type="number"]:hover, select:hover { border-color: oklch(0.47 0 0); }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: oklch(0.155 0 0);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent);
+}
+input.invalid, input.invalid:focus {
+  border-color: var(--bad);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--bad) 16%, transparent);
+}
+select { cursor: pointer; padding-right: 8px; }
+
+input[type="checkbox"] {
+  appearance: none;
+  width: 18px; height: 18px;
+  flex: none;
+  margin: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: oklch(0.130 0 0);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: background var(--t), border-color var(--t);
+}
+input[type="checkbox"]:hover { border-color: oklch(0.50 0 0); }
+input[type="checkbox"]::after {
+  content: "";
+  width: 9px; height: 5px;
+  border-left: 2px solid var(--on-accent);
+  border-bottom: 2px solid var(--on-accent);
+  transform: translateY(-1px) rotate(-45deg);
+  opacity: 0;
+}
+input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+input[type="checkbox"]:checked::after { opacity: 1; }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+label.check { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; font-size: var(--fs-small); }
+label.check:hover { color: var(--text); }
+
+kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-bottom-width: 2px;
+  border-radius: var(--r-sm);
+  padding: 3px 5px 4px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------- cards */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px;
+}
+.card-tight { padding: 10px 12px; }
+
+/* ------------------------------------------------------------------ notices */
+
+.notice {
+  border-radius: var(--r);
+  padding: 12px 14px;
+  font-size: var(--fs-small);
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  border-left: 3px solid var(--line-2);
+  text-wrap: pretty;
+}
+.notice p { margin: 0 0 6px; }
+.notice p:last-child { margin: 0; }
+.notice .row { margin-top: 10px; }
+
+.notice-error { border-color: color-mix(in oklch, var(--bad) 40%, var(--line));  border-left-color: var(--bad);  background: color-mix(in oklch, var(--bad) 8%, var(--surface)); color: oklch(0.88 0.04 25); }
+.notice-warn  { border-color: color-mix(in oklch, var(--warn) 35%, var(--line)); border-left-color: var(--warn); background: color-mix(in oklch, var(--warn) 7%, var(--surface)); color: oklch(0.90 0.03 85); }
+.notice-note  { border-color: var(--line); border-left-color: var(--line-2); background: var(--surface); color: var(--text-dim); }
+
+.error-box {
+  border: 1px solid color-mix(in oklch, var(--bad) 40%, var(--line));
+  border-left: 3px solid var(--bad);
+  background: color-mix(in oklch, var(--bad) 8%, var(--surface));
+  color: oklch(0.88 0.04 25);
+  padding: 14px;
+  border-radius: var(--r);
+}
+
+/* ---------------------------------------------------------------- progress */
+
+.bar { height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); transition: width 140ms linear; }
+
+/* ==========================================================================
+   4. PHOTOGRAPHS
+   ==========================================================================
+   The mount. A kept photo sits inside a near-white mat with a mid-grey hairline
+   between mat and image, exactly like a mounted print — so the signal survives
+   even when the photograph itself is nearly white. The mat is a BORDER, not
+   padding, so toggling it changes one paint property and never reflows the cell.
+   ========================================================================== */
+
+.thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--well);
+}
+
+.photo-cell {
+  position: relative;
+  background: var(--well);
+  border: var(--mat) solid var(--well);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 3 / 2;
+  transition: border-color var(--t-snap) linear;
+}
+.photo-cell:hover { border-color: oklch(0.34 0 0); }
+
+.photo-cell.kept { border-color: var(--mark); }
+.photo-cell.kept:hover { border-color: var(--mark); }
+/* The hairline that keeps a white photo from bleeding into a white mat. */
+.photo-cell.kept::after {
+  content: "";
+  position: absolute; inset: 0;
+  box-shadow: inset 0 0 0 1px var(--mark-edge);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Position index. 1-9 map to the number keys, so it stays legible at all times. */
+.photo-cell .idx {
+  position: absolute; top: 6px; left: 6px;
+  z-index: 3;
+  min-width: 22px; height: 22px; padding: 0 6px;
+  border-radius: var(--r-sm);
+  background: color-mix(in oklch, var(--well) 70%, transparent);
+  color: var(--text-dim);
+  font-size: var(--fs-micro); line-height: 22px; text-align: center;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(3px);
+}
+.photo-cell.kept .idx {
+  background: var(--mark);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.grid { display: grid; gap: 8px; }
+.grid-6  { grid-template-columns: repeat(3, 1fr); }
+.grid-9  { grid-template-columns: repeat(3, 1fr); }
+.grid-12 { grid-template-columns: repeat(4, 1fr); }
+.grid-16 { grid-template-columns: repeat(4, 1fr); }
+
+/* ==========================================================================
+   5. TOASTS AND MODAL
+   ========================================================================== */
+
+#toasts {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 8px; z-index: 60; pointer-events: none;
+}
+.toast {
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  padding: 11px 16px;
+  font-size: var(--fs-small);
+  box-shadow: 0 10px 34px oklch(0 0 0 / 0.6);
+}
+
+#modal {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  max-width: 620px;
+  width: calc(100vw - 48px);
+  box-shadow: 0 24px 70px oklch(0 0 0 / 0.7);
+}
+#modal::backdrop { background: oklch(0 0 0 / 0.68); backdrop-filter: blur(2px); }
+#modal-body { padding: 22px; }
+#modal-body h2 { margin-bottom: 4px; }
+
+/* ==========================================================================
+   6. THE NINE-SQUARE MARK
+   ==========================================================================
+   CSS-drawn, no image and no SVG. Nine cells, one marked: the whole product in
+   one glyph. Used on the entry screen and as the ingest activity indicator.
+   ========================================================================== */
+
+.pt-mark {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  width: 62px;
+  aspect-ratio: 1;
+  flex: none;
+}
+.pt-mark i { background: var(--surface-3); border-radius: 1px; }
+.pt-mark i:nth-child(5) { background: var(--mark); }
+
+/* The ingest variant walks the mark, one cell at a time. Monochrome, no motion
+   larger than a few pixels, nothing that pulls the eye off the count. */
+.pt-mark-live i {
+  background: var(--surface-2);
+  animation: pt-cell 3.6s steps(1, end) infinite;
+}
+.pt-mark-live i:nth-child(1) { animation-delay: 0.0s; }
+.pt-mark-live i:nth-child(2) { animation-delay: 0.4s; }
+.pt-mark-live i:nth-child(3) { animation-delay: 0.8s; }
+.pt-mark-live i:nth-child(4) { animation-delay: 1.2s; }
+.pt-mark-live i:nth-child(5) { animation-delay: 1.6s; }
+.pt-mark-live i:nth-child(6) { animation-delay: 2.0s; }
+.pt-mark-live i:nth-child(7) { animation-delay: 2.4s; }
+.pt-mark-live i:nth-child(8) { animation-delay: 2.8s; }
+.pt-mark-live i:nth-child(9) { animation-delay: 3.2s; }
+@keyframes pt-cell {
+  0%, 11%  { background: var(--text-dim); }
+  12%, 100% { background: var(--surface-2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pt-mark-live i { animation: none; background: var(--surface-3); }
+}
+
+/* ==========================================================================
+   7. SCREEN: ENTRY
+   ========================================================================== */
+
+.screen-welcome {
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+  justify-content: center;
+  gap: 24px;
+}
+.screen-welcome .card {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.screen-welcome h1 { font-size: var(--fs-display); letter-spacing: -0.03em; }
+.screen-welcome .card p { font-size: var(--fs-body); color: var(--text-dim); max-width: 46ch; }
+
+/*
+ * The dropzone is the page, not a box on the page. A 2px dashed rectangle
+ * reading as a debug affordance is most of why the entry screen looked
+ * unfinished.
+ */
+.dropzone {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background:
+    linear-gradient(oklch(0.185 0 0), oklch(0.170 0 0));
+  padding: 44px 28px;
+  text-align: center;
+  transition: border-color var(--t), background var(--t);
+  position: relative;
+}
+.dropzone::after {
+  content: "";
+  position: absolute; inset: 7px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  pointer-events: none;
+  transition: border-color var(--t);
+}
+.dropzone.over { border-color: var(--accent); background: oklch(0.205 0 0); }
+.dropzone.over::after { border-color: var(--accent); }
+
+.dropzone-inner { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.drop-title { font-size: var(--fs-body); font-weight: 600; letter-spacing: -0.01em; }
+.dropzone .muted.small { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-mute); }
+
+/* The environment readout: a status strip, not stray grey text. */
+#entry-diag {
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  color: var(--text-mute);
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   8. SCREEN: INGEST
+   ==========================================================================
+   On screen for a minute or two, so it is allowed to be calm and worth looking
+   at: one display-size count, one hairline rail, and the format breakdown as
+   proportional bars.
+   ========================================================================== */
+
+.screen-ingest { justify-content: center; }
+.screen-ingest .card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 28px;
+}
+.screen-ingest h1 { font-size: var(--fs-h2); font-weight: 500; color: var(--text-dim); }
+.screen-ingest .bar { height: 2px; }
+
+/* The running count. `247 / 746` at display size with tabular figures, so the
+   digits do not jitter as they climb. Wants its own element — see the markup
+   notes; the `.nums.small.dim` rule below is the graceful fallback if the count
+   and its time estimate stay in one node. */
+.screen-ingest .ingest-count {
+  font-size: var(--fs-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1.05;
+}
+.screen-ingest .ingest-count .dim { color: var(--text-mute); }
+.screen-ingest .nums.small.dim { font-size: var(--fs-h2); color: var(--text-dim); letter-spacing: -0.01em; }
+.screen-ingest .muted:not(.small) { font-size: var(--fs-small); }
+
+#ingest-summary { display: flex; flex-direction: column; gap: 8px; }
+#ingest-summary .row { gap: 10px; }
+#ingest-summary b { font-size: var(--fs-body); font-weight: 600; }
+#ingest-summary .muted { font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+#ingest-actions { margin-top: 4px; }
+
+/* ==========================================================================
+   9. STAGE SHARED
+   ==========================================================================
+   Stage screens are full-bleed: the photographs are the interface, so the
+   surrounding chrome gets as little room as it can survive on.
+   ========================================================================== */
+
+.screen-grid, .screen-bracket, .screen-rescue, .screen-runoff {
+  padding: 10px;
+  gap: 8px;
+  min-height: 0;
+}
+
+.stage-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.stage-bar  { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.matchup { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.matchup figure {
+  margin: 0; position: relative;
+  background: var(--well);
+  border: var(--mat) solid var(--well);
+  border-radius: var(--r-sm);
+  overflow: hidden; cursor: pointer;
+  transition: border-color var(--t-snap) linear;
+}
+.matchup img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.matchup figure:hover { border-color: var(--mark); }
+
+.cutpile { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; overflow: auto; }
+
+/* ==========================================================================
+   10. SCREEN: FOLDER TREE
+   ==========================================================================
+   The row's job is: folder name -> how many photos it has -> how many you keep.
+   v1 spread those three across the full window width. Here the row is a fixed
+   column track that clusters at the left, so the distance from a folder name to
+   its field is a constant few centimetres no matter how wide the monitor.
+   ========================================================================== */
+
+#app .screen-tree { max-width: 980px; margin: 0 auto; width: 100%; }
+
+#app .tree-help {
+  font-size: var(--fs-small);
+  color: var(--text-dim);
+  max-width: 74ch;
+  text-wrap: pretty;
+}
+#app .tree-help b { color: var(--text); font-weight: 600; }
+#app .tree-help code,
+#app .tree-help kbd { font-family: var(--mono); }
+
+/* Disclosure for the second, denser line of help. */
+#app details.tree-help > summary {
+  cursor: pointer;
+  color: var(--text-mute);
+  font-size: var(--fs-small);
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+}
+#app details.tree-help > summary::-webkit-details-marker { display: none; }
+#app details.tree-help > summary::before {
+  content: "";
+  width: 0; height: 0;
+  border: 4px solid transparent;
+  border-left-color: currentColor;
+  transition: transform var(--t);
+}
+#app details.tree-help[open] > summary::before { transform: rotate(90deg) translateX(-1px); }
+#app details.tree-help > summary:hover { color: var(--text-dim); }
+#app details.tree-help > div { padding: 8px 0 2px; }
+
+#app #tree-host { padding: 8px 10px; }
+
+/*
+ * name | has | keep | infinity | keep:has bar | state | split
+ *
+ * The reading order IS the sentence the screen is asking: "Trip has 36, keep 8."
+ * Those three sit adjacent, 110px from the end of the name to the field, on any
+ * monitor width — v1 put them at opposite ends of a full-bleed table. Everything
+ * downstream of the decision (the proportion bar, the resolved state word, split)
+ * follows the field rather than separating it from its folder.
+ *
+ * FIXED tracks in px, justified to the start. Absolute rather than ch because
+ * the column header row sets its own 11px font and `ch` would resolve against it,
+ * throwing the header out of line with the rows beneath it.
+ */
+#app .tree-row {
+  --d: 0;
+  display: grid;
+  grid-template-columns:
+    252px   /* folder name, truncating */
+    86px    /* has */
+    66px    /* keep field */
+    34px    /* infinity toggle */
+    64px    /* keep : has proportion */
+    86px    /* resolved state */
+    minmax(48px, auto);  /* split */
+  align-items: center;
+  gap: 12px;
+  justify-content: start;
+  padding: 5px 8px;
+  border-radius: var(--r);
+  transition: background var(--t);
+}
+#app .tree-row:hover { background: var(--surface-2); }
+
+/* Column header. */
+#app .tree-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-mute);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  margin-bottom: 6px;
+  padding-bottom: 8px;
+}
+#app .tree-head:hover { background: none; }
+#app .tree-head .tree-alloc { border: none; background: none; text-align: center; padding: 0; font-size: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
+
+/*
+ * The hierarchy. Indentation alone barely read as a tree; each level now draws a
+ * hairline rail. Depth comes from --d on the row (see the markup notes) rather
+ * than an inline padding-left, so CSS owns the whole treatment.
+ */
+#app .tree-name {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-body);
+  padding-left: calc(var(--d) * 22px);
+}
+#app .tree-name::before {
+  content: "";
+  position: absolute;
+  left: 0; top: -5px; bottom: -5px;
+  width: calc(var(--d) * 22px);
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0 9px,
+    var(--line) 9px 10px,
+    transparent 10px 22px
+  );
+  pointer-events: none;
+}
+#app .tree-row:first-of-type .tree-name { font-weight: 600; }
+
+/* keep : has, as a proportion. Away from photo content, so the accent is fine
+   here — and it is the fastest read on the screen for "how brutal is this cut". */
+#app .tree-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+#app .tree-bar > i {
+  display: block;
+  height: 100%;
+  width: calc(var(--p, 0) * 100%);
+  background: var(--accent);
+  transition: width var(--t);
+}
+#app .tree-row.excluded .tree-bar > i { background: var(--text-mute); }
+
+#app .tree-count {
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/*
+ * FIXED / POOLED shouted in uppercase while carrying the least important
+ * information on the row. Now lowercase, mute, and small. `clamped N` is the one
+ * state that carries real information, so it is the one that gets emphasis.
+ */
+#app .tree-state {
+  font-size: var(--fs-micro);
+  color: var(--text-mute);
+  text-transform: lowercase;
+  letter-spacing: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+#app .tree-row:has(.tree-state:not(:empty)) .tree-state::first-letter { text-transform: none; }
+
+#app .tree-alloc {
+  width: 100%;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-body);
+  padding: 7px 4px;
+}
+#app .tree-alloc::placeholder { color: var(--text-mute); }
+
+/* The infinity toggle. Cryptic on its own, so it carries a hover label. */
+#app .tree-inf {
+  padding: 0;
+  width: 30px; height: 30px;
+  justify-content: center;
+  font-size: var(--fs-body);
+  line-height: 1;
+  color: var(--text-mute);
+  background: transparent;
+  border-color: var(--line);
+}
+#app .tree-inf:hover:not(:disabled) { color: var(--text); border-color: var(--line-2); background: var(--surface-3); }
+#app .tree-inf.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+/* Split was nearly invisible. It is now a real, if quiet, control. */
+#app .tree-row > .btn-quiet {
+  color: var(--text-mute);
+  font-size: var(--fs-micro);
+  padding: 5px 9px;
+  border: 1px solid transparent;
+}
+#app .tree-row:hover > .btn-quiet { color: var(--text-dim); border-color: var(--line); }
+#app .tree-row > .btn-quiet:hover { color: var(--text); background: var(--surface-3); border-color: var(--line-2); }
+
+#app .tree-row.excluded .tree-name { text-decoration: line-through; opacity: 0.42; }
+#app .tree-row.excluded .tree-count,
+#app .tree-row.excluded .tree-state { opacity: 0.5; }
+
+#app .tree-row.has-error {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--bad) 45%, transparent);
+  background: color-mix(in oklch, var(--bad) 6%, transparent);
+}
+
+#app .tree-issues { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+#app .tree-issues b { color: var(--text); }
+
+/* Footer: the live total is the answer to the whole screen, so it is the
+   largest thing on it. */
+#app #tree-footer {
+  position: sticky;
+  bottom: 0;
+  padding: 16px 20px;
+  gap: 20px;
+  background: var(--surface);
+}
+#app .totals { display: flex; gap: 14px; align-items: baseline; font-variant-numeric: tabular-nums; }
+#app .totals .small:first-child {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-mute);
+}
+#app .totals b { font-size: var(--fs-display); font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+
+/* Split preview inside the modal. */
+#modal-body .row.small { padding: 5px 0; border-bottom: 1px solid var(--line); gap: 12px; }
+#modal-body .row.small .tree-name { flex: 1; padding-left: 0; font-size: var(--fs-small); }
+#modal-body .row.small b { font-variant-numeric: tabular-nums; font-size: var(--fs-body); }
+
+/* ==========================================================================
+   11. SCREEN: GRID PASS — the hot path
+   ==========================================================================
+   Used more than every other screen combined, so: photographs as large as the
+   viewport allows, and chrome shrinking toward nothing.
+   ========================================================================== */
+
+#app .pt-wrap {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+#app .pt-wrap.screen-narrow { display: flex; flex-direction: column; gap: 18px; }
+
+#app .pt-title { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+
+/* ------------------------------------------------- the commitment, unlocked */
+
+/*
+ * Before a pass this is not a form, it is a commitment being made. The quota
+ * select is promoted to the size of a statement and everything else recedes.
+ */
+#app .pt-config {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+}
+#app .pt-config .f {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+}
+#app .pt-config select,
+#app .pt-config input[type="number"] { font-size: var(--fs-small); padding: 7px 9px; }
+#app .pt-config input[type="number"] { width: 74px; }
+
+#app .pt-config:not(.locked) .f:has(select[data-t="cfg-quota"]) select {
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 6px 8px;
+  border-color: var(--line-2);
+  background: transparent;
+}
+
+/* -------------------------------------------------- the commitment, locked */
+
+/*
+ * During a pass the lock is the feature, not a limitation — but it does not need
+ * a whole control row to say so. The disabled controls flatten into plain text
+ * and the strip collapses to one quiet line, which hands the vertical space back
+ * to the photographs.
+ */
+#app .pt-config.locked {
+  opacity: 1;
+  gap: 14px;
+  padding: 0 4px 2px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  font-size: var(--fs-micro);
+}
+#app .pt-config.locked .f { gap: 6px; }
+#app .pt-config.locked select,
+#app .pt-config.locked input[type="number"] {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: var(--fs-micro);
+  color: var(--text-dim);
+  width: auto;
+  pointer-events: none;
+  text-transform: none;
+  letter-spacing: 0;
+}
+#app .pt-config.locked input[type="checkbox"] { width: 13px; height: 13px; pointer-events: none; }
+#app .pt-config.locked input[type="checkbox"]::after { width: 7px; height: 4px; }
+#app .pt-config.locked .small.dim { display: none; }   /* the long lock note; the badge already says it */
+
+#app .pt-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 4px 12px 4px 9px;
+  white-space: nowrap;
+}
+/* A CSS-drawn padlock: a rectangle with a rounded shackle. No icon font. */
+#app .pt-lock::before {
+  content: "";
+  width: 9px; height: 7px;
+  flex: none;
+  border-radius: 1px;
+  background: var(--text-dim);
+  box-shadow:
+    0 -4px 0 -2px var(--text-dim),
+    -3px -3px 0 -2px var(--text-dim),
+     3px -3px 0 -2px var(--text-dim);
+  margin-top: 3px;
+}
+
+/* -------------------------------------------------------------- the grid */
+
+/*
+ * Rows are explicit fractions, so nine photographs fill the box exactly with no
+ * scrolling and no aspect-ratio letterboxing. This is where the extra photo size
+ * comes from: the cells own the whole middle band of the screen.
+ */
+#app .pt-grid {
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  align-content: stretch;
+  gap: 6px;
+}
+#app .pt-grid.grid-6  { grid-template-rows: repeat(2, minmax(0, 1fr)); }
+#app .pt-grid.grid-9  { grid-template-rows: repeat(3, minmax(0, 1fr)); }
+#app .pt-grid.grid-12 { grid-template-rows: repeat(3, minmax(0, 1fr)); }
+#app .pt-grid.grid-16 { grid-template-rows: repeat(4, minmax(0, 1fr)); }
+#app .pt-grid .photo-cell { aspect-ratio: auto; min-height: 0; }
+
+/*
+ * Redundant signal, second channel. Once anything on the screen is kept, the
+ * ones that are not recede slightly. Nothing is tinted — only luminance moves —
+ * so the comparison between two photographs is never biased by hue.
+ */
+#app .pt-grid:has(.photo-cell.kept) .photo-cell:not(.kept) .thumb { opacity: 0.62; }
+#app .pt-grid:has(.photo-cell.kept) .photo-cell:not(.kept):hover .thumb { opacity: 0.85; }
+
+/* The cut pile scroller keeps its own cap: the IntersectionObserver that bounds
+   object URLs depends on cells actually leaving the viewport. */
+#app .pt-pile {
+  min-height: 0;
+  max-height: calc(100dvh - 210px);
+  overflow-y: auto;
+  align-content: start;
+  padding-right: 4px;
+}
+
+#app .pt-cell-name {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  z-index: 3;
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: -0.01em;
+  padding: 12px 7px 4px;
+  background: linear-gradient(transparent, oklch(0 0 0 / 0.82));
+  color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+  opacity: 0.75;
+  transition: opacity var(--t);
+}
+#app .photo-cell:hover .pt-cell-name { opacity: 1; }
+
+#app .pt-missing {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  color: var(--text-mute);
+  font-size: var(--fs-micro);
+  text-align: center; padding: 10px;
+  background: var(--well);
+}
+
+/* -------------------------------------------------------- the action bar */
+
+#app .pt-actions {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  padding: 10px 4px 2px;
+  gap: 10px;
+  flex-wrap: nowrap;
+  min-height: 52px;
+}
+#app .pt-actions [data-t="progress"] {
+  font-size: var(--fs-small);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  padding-left: 6px;
+  white-space: nowrap;
+}
+#app .pt-actions .muted.small { color: var(--text-mute); font-size: 11px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+#app .pt-actions [data-t="advance"] { padding: 11px 22px; font-size: var(--fs-body); }
+
+/*
+ * The refusal. "keep at most 4" has to be legible instantly without reading as
+ * an error or a scolding, so it is high-contrast and colourless rather than red
+ * or amber: a statement of the rule, in the same register as the rule itself.
+ */
+#app .pt-hint {
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--mark-edge);
+  border-radius: 999px;
+  padding: 4px 13px;
+  white-space: nowrap;
+}
+#app .pt-hint:empty { display: none; }
+
+#app .pt-sum b { color: var(--text); }
+#app .pt-sum h2 { margin-bottom: 6px; }
+
+/* ==========================================================================
+   12. SCREEN: BRACKET
+   ==========================================================================
+   The two photographs are the entire interface. Everything else is held at low
+   contrast until the pointer or the keyboard asks for it.
+   ========================================================================== */
+
+#app .bk { flex: 1; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; }
+
+#app .bk-sub {
+  display: flex; align-items: center; gap: 12px;
+  font-size: var(--fs-micro);
+  color: var(--text-mute);
+  flex-wrap: wrap;
+  min-height: 26px;
+  opacity: 0.7;
+  transition: opacity var(--t);
+}
+#app .bk:hover .bk-sub, #app .bk:focus-within .bk-sub { opacity: 1; }
+
+#app .bk-tag {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+#app .bk-tag-rep  { border-color: var(--accent-dim); color: var(--accent); }
+#app .bk-tag-warn { border-color: color-mix(in oklch, var(--warn) 40%, var(--line)); color: var(--warn); }
+
+#app .bk-stage { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/*
+ * The winner signal. Hovering a pane raises its mount to near-white — the same
+ * mounted-print language as a kept grid cell, so "this one wins" is the same
+ * gesture the user already learned upstairs. No tint reaches the photograph.
+ */
+#app .bk-pane {
+  position: relative;
+  display: flex; flex-direction: column;
+  min-width: 0; min-height: 0;
+  background: var(--well);
+  border: var(--mat) solid var(--well);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  transition: border-color var(--t-snap) linear;
+}
+#app .bk-pane:hover { border-color: var(--mark); }
+#app .bk-pane.chosen { border-color: var(--mark); }
+#app .bk-pane:hover .bk-cap { color: var(--text); }
+#app .bk-pane:hover .bk-cap kbd { color: var(--text); border-color: var(--mark-edge); }
+
+#app .bk-vp { position: relative; flex: 1; min-height: 0; overflow: hidden; cursor: pointer; touch-action: none; }
+#app .bk-vp img { position: absolute; top: 0; left: 0; transform-origin: 0 0; -webkit-user-drag: none; user-select: none; pointer-events: none; }
+#app .bk-vp.grab { cursor: grabbing; }
+
+/* The caption strip used to be a lit band between the two photographs. It now
+   disappears into the well. */
+#app .bk-cap {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 4px 2px;
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: -0.01em;
+  background: var(--well);
+  color: var(--text-mute);
+  border-top: 0;
+  white-space: nowrap; overflow: hidden;
+  transition: color var(--t);
+}
+#app .bk-cap .nm { overflow: hidden; text-overflow: ellipsis; }
+#app .bk-cap .px { font-variant-numeric: tabular-nums; }
+
+/* The toolbar: nearly invisible until wanted. */
+#app .bk-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  min-height: 44px;
+  opacity: 0.4;
+  transition: opacity var(--t);
+}
+#app .bk-bar:hover, #app .bk-bar:focus-within { opacity: 1; }
+#app .bk-bar .small.dim { font-size: 11px; }
+
+/* Zoom cluster: one segmented group instead of four loose buttons. */
+#app .bk-bar > .btn-sm { padding: 6px 10px; }
+#app #bk-zoomout { border-radius: var(--r) 0 0 var(--r); }
+#app #bk-zoomin  { border-radius: 0; border-left-width: 0; }
+#app #bk-fit     { border-radius: 0; border-left-width: 0; }
+#app #bk-1to1    { border-radius: 0 var(--r) var(--r) 0; border-left-width: 0; }
+#app .bk-zoom {
+  font-variant-numeric: tabular-nums;
+  min-width: 58px; text-align: center;
+  font-size: var(--fs-micro);
+  color: var(--text-dim);
+  border: 1px solid var(--line-2);
+  border-left: 0; border-right: 0;
+  padding: 6px 0;
+  background: var(--surface);
+  align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+}
+
+#app .bk-miss {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  color: var(--text-mute);
+  font-size: var(--fs-small);
+  padding: 20px; text-align: center;
+}
+
+/* ---------------------------------------------------------- final ranking */
+
+#app .bk-results { overflow: auto; min-height: 0; }
+#app .bk-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+  transition: background var(--t);
+}
+#app .bk-row:hover { background: var(--surface); }
+#app .bk-row img {
+  width: 118px; height: 78px;
+  object-fit: contain;
+  background: var(--well);
+  border-radius: var(--r-sm);
+  flex: none;
+}
+#app .bk-rank {
+  width: 44px; flex: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  color: var(--text-mute);
+  letter-spacing: -0.02em;
+}
+#app .bk-row:nth-child(-n+3) .bk-rank { color: var(--text); }
+#app .bk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; font-size: var(--fs-body); }
+
+/* ==========================================================================
+   13. SCREEN: DUPLICATES
+   ==========================================================================
+   Groups were an undifferentiated stack of rows. Each group is now a card whose
+   thumbnail carries a stack edge — you can see there is something behind it
+   before you open it.
+   ========================================================================== */
+
+#app .ro-group {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--surface);
+  transition: border-color var(--t);
+}
+#app .ro-group:hover { border-color: var(--line-2); }
+#app .ro-group:has(.ro-cell) { background: var(--surface); border-color: var(--line-2); }
+
+#app .ro-head { display: flex; align-items: center; gap: 14px; }
+#app .ro-head img {
+  width: 118px; height: 78px;
+  object-fit: contain;
+  background: var(--well);
+  border-radius: var(--r-sm);
+  flex: none;
+  /* The stack edge: two receding slivers behind the keeper. */
+  box-shadow:
+    5px 0 0 -1px var(--surface-2),
+    9px 0 0 -2px var(--surface-3);
+}
+#app .ro-head .bk-name { flex: 1; white-space: normal; }
+#app .ro-head .bk-name > div:first-child { font-size: var(--fs-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#app .ro-head .bk-name .small { margin-top: 2px; }
+
+#app .ro-body { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+#app .ro-body .small.dim { margin-bottom: 10px; display: block; max-width: 76ch; }
+#app .ro-body .grid { gap: 8px; }
+
+#app .ro-cell { aspect-ratio: 3 / 2; }
+/* Same second channel as the grid pass: once something in a group is kept, the
+   rest recede in luminance only. No hue moves. */
+#app .ro-body .grid:has(.ro-cell.kept) .ro-cell:not(.kept):not(.dead) .thumb { opacity: 0.62; }
+#app .ro-body .grid:has(.ro-cell.kept) .ro-cell:not(.kept):hover .thumb { opacity: 0.85; }
+#app .ro-cell .tag {
+  position: absolute; bottom: 4px; left: 4px; right: 4px;
+  z-index: 3;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  background: color-mix(in oklch, var(--well) 78%, transparent);
+  backdrop-filter: blur(3px);
+  border-radius: var(--r-sm);
+  padding: 3px 4px;
+  color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#app .ro-cell.kept .tag { background: var(--mark); color: var(--bg); font-weight: 700; box-shadow: 0 0 0 1px var(--mark-edge); }
+
+/* Already a finalist in its own right: unavailable, and visibly hatched rather
+   than merely faded, so it does not read as a rendering failure. */
+#app .ro-cell.dead { cursor: not-allowed; opacity: 0.5; }
+#app .ro-cell.dead::before {
+  content: "";
+  position: absolute; inset: 0; z-index: 2;
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0 0 0 / 0.42) 0 6px,
+    transparent 6px 12px
+  );
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   14. SCREEN: EXPORT REVIEW
+   ==========================================================================
+   The label becomes part of the filename, so the derivation has to be visible:
+   the destination sits directly under the field that produces it, joined by a
+   rail and introduced by an arrow.
+   ========================================================================== */
+
+#app .exp-set { margin-bottom: 20px; padding: 16px 18px; }
+#app .exp-set > .row:first-child { padding-bottom: 12px; margin-bottom: 6px; border-bottom: 1px solid var(--line); gap: 12px; }
+#app .exp-set h2 { font-size: var(--fs-h2); }
+#app .exp-set .mono {
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 3px 8px;
+}
+
+#app .exp-row {
+  display: grid;
+  grid-template-columns: 44px 104px minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 16px;
+  align-items: center;
+  padding: 10px 8px;
+  border-radius: var(--r);
+  transition: background var(--t);
+}
+#app .exp-row:hover { background: var(--surface-2); }
+
+#app .exp-rank {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-mute);
+  text-align: right;
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+#app .exp-row:hover .exp-rank { color: var(--text-dim); }
+
+#app .exp-thumb {
+  width: 104px; height: 70px;
+  object-fit: contain;
+  background: var(--well);
+  border-radius: var(--r-sm);
+}
+
+#app .exp-name { font-size: var(--fs-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#app .exp-row .small.dim { font-family: var(--mono); font-size: 11px; letter-spacing: -0.01em; }
+
+#app .exp-row > div:last-child { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+#app .exp-row input[type="text"] { width: 100%; font-size: var(--fs-small); }
+
+/* The derivation. Rail + arrow, so what you type and what gets written read as
+   one object rather than two lines that happen to be adjacent. */
+#app .exp-dest {
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  color: var(--text-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin-left: 11px;
+  padding: 7px 0 1px 17px;
+  border-left: 1px solid var(--line-2);
+  position: relative;
+  transition: color var(--t);
+}
+#app .exp-dest::before {
+  content: "→";
+  position: absolute; left: 4px; top: 6px;
+  font-family: var(--font);
+  color: var(--line-2);
+  font-size: 11px;
+}
+#app .exp-row:hover .exp-dest,
+#app .exp-row:focus-within .exp-dest { color: var(--text); }
+#app .exp-row:focus-within .exp-dest { border-left-color: var(--accent); }
+#app .exp-row:focus-within .exp-dest::before { color: var(--accent); }
+
+/* The typed part of the filename, once wrapped (see the markup notes). */
+#app .exp-slug { color: var(--text); font-weight: 600; }
+#app .exp-row:focus-within .exp-slug { color: var(--accent-hi); }
+
+#app #exp-total, #app #exp-status { font-variant-numeric: tabular-nums; font-size: var(--fs-small); }
+
+/* ==========================================================================
+   15. MISC
+   ========================================================================== */
+
+.strike { text-decoration: line-through; opacity: 0.5; }
+
+/* Desktop-first by design. This keeps a narrow window usable without spending
+   effort on a phone layout that is not required. */
+/* The grid pass keyboard legend is a reminder, not a control, so it is the first
+   thing to go when the action bar runs out of room. Scoped away from [data-t]
+   because the progress readout is also a .muted.small and it states the quota —
+   the one thing on this screen that must never be the part that disappears. */
+@media (max-width: 1320px) {
+  #app .pt-actions .muted.small:not([data-t]) { display: none; }
+}
+
+@media (max-width: 1100px) {
+  #app .pt-config.locked .small.dim,
+  #app .pt-config.locked .f:has(input[type="checkbox"]) { display: none; }
+}
+
+@media (max-width: 900px) {
+  .grid-12, .grid-16, .grid-6, .grid-9 { grid-template-columns: repeat(2, 1fr); }
+  .screen { padding: 16px 12px; }
+  #app .bk-stage { grid-template-columns: 1fr; }
+  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px 32px 0 0 auto; }
+  #app .tree-bar, #app .tree-state { display: none; }
+  .counters > span { min-width: 64px; padding: 0 9px; }
+  .counters b { font-size: var(--fs-body); }
+}
+
+/** CHANGELOG
+ * v2.0 (2026-07-28): Full visual and layout pass, consolidating two stylesheets
+ *   and four injected style blocks into one file.
+ *   - Greys rewritten as achromatic oklch, so no surface near a photograph has a
+ *     hue to cast. Accent desaturated further and kept away from image content.
+ *   - New --mark token: the kept / chosen state of a photograph is signalled by
+ *     an achromatic near-white mount with a mid-grey hairline, like a mounted
+ *     print, replacing the accent-blue border that sat directly against images.
+ *   - Folder tree rebuilt as a fixed left-clustered column track with hairline
+ *     hierarchy rails, a keep:has proportion bar, quiet lowercase state text, a
+ *     visible split action, and a display-size live total.
+ *   - Grid pass now fills the viewport: explicit fractional rows replace the
+ *     aspect-ratio letterbox and the 100vh calc caps, and non-kept photos recede
+ *     in luminance once anything on the screen is kept. The locked config row
+ *     collapses to a single line and hands its height to the photographs. The
+ *     over-quota refusal is colourless and high-contrast rather than an error.
+ *   - Bracket chrome falls to low contrast until hovered or focused; hovering a
+ *     pane raises its mount to --mark. Caption strips moved into the well.
+ *   - Duplicate groups gained a stack edge and a hatched unavailable state.
+ *   - Export rows join the label field to the destination filename with a rail
+ *     and an arrow.
+ *   - Topbar counters became labelled stat blocks. Base size 15px -> 18px.
+ */

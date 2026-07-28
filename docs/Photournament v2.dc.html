@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="photournament_ui_v2.0.css">
+<style>
+/* Prototype scaffolding only. Not part of the deliverable stylesheet. */
+.pxt { position:absolute; inset:0; display:grid; place-items:center; background:var(--well); }
+.pxt > i { display:block; width:100%; height:100%; transition:opacity 90ms; }
+.pxt.lb > i { height:100%; width:auto; max-width:100%; aspect-ratio:4/3; }
+.proto {
+  position:fixed; left:50%; bottom:0; z-index:200;
+  font:500 11px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing:.06em; text-transform:uppercase;
+  background:oklch(0.205 0 0); border:1px solid oklch(0.30 0 0); border-bottom:0;
+  border-radius:8px 8px 0 0; color:oklch(0.565 0 0); overflow:hidden; opacity:.45; transition:opacity 120ms;
+  transform:translateX(-50%); display:flex; flex-direction:column-reverse;
+}
+.proto:hover { opacity:1; }
+.proto > b { display:block; padding:3px 12px 4px; font-size:9px; font-weight:600; cursor:default; }
+.proto > div { display:none; flex-direction:column; padding:6px 0 0; }
+.proto:hover > div { display:flex; }
+.proto button {
+  font:inherit; text-align:left; background:none; border:0; color:oklch(0.730 0 0);
+  padding:7px 16px; cursor:pointer; white-space:nowrap;
+}
+.proto button:hover { background:oklch(0.248 0 0); color:oklch(0.950 0 0); }
+.proto button[aria-current="true"] { color:oklch(0.950 0 0); box-shadow:inset 2px 0 0 oklch(0.680 0.072 248); }
+</style>
+</helmet>
+
+<div id="app">
+  <header id="topbar" hidden="{{ topbarHidden }}">
+    <div class="topbar-left">
+      <span id="topbar-title">Photournament</span>
+      <span id="topbar-context" class="muted">{{ context }}</span>
+    </div>
+    <div class="topbar-right">
+      <span id="topbar-counters" class="counters">
+        <sc-for list="{{ counters }}" as="c" hint-placeholder-count="4"><span>{{ c.label }} <b>{{ c.value }}</b></span></sc-for>
+      </span>
+      <button id="topbar-stop" class="btn btn-quiet" hidden="{{ stopHidden }}">Stop early</button>
+    </div>
+  </header>
+
+  <main id="screen">
+
+    <sc-if value="{{ isWelcome }}" hint-placeholder-val="{{ true }}">
+      <div class="screen screen-welcome">
+        <div class="card">
+          <div class="pt-mark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <h1>Photournament</h1>
+          <p class="muted">Point it at a folder of photos. It cuts the field down with quota-enforced grid passes, then ranks what survives head to head.</p>
+        </div>
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone-inner">
+            <div class="drop-title">Drop a folder here</div>
+            <div class="muted small">or</div>
+            <button class="btn btn-primary" id="pick-folder" onClick="{{ goIngest }}">Choose a folder</button>
+          </div>
+        </div>
+        <div class="row small">
+          <button class="btn btn-quiet btn-sm" id="pick-files">Pick individual files instead</button>
+        </div>
+        <div class="small dim" id="entry-diag">opened from file  ·  folder picker available  ·  10 cores</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isIngest }}" hint-placeholder-val="{{ true }}">
+      <div class="screen screen-ingest">
+        <div class="card">
+          <div class="row" style="justify-content:space-between;align-items:flex-start">
+            <div>
+              <h1>Reading photos</h1>
+              <div class="ingest-count nums">{{ ingestDone }} <span class="dim">/ {{ ingestTotal }}</span></div>
+              <div class="muted">Building thumbnails<span class="dim"> · ~{{ ingestLeft }} left</span></div>
+            </div>
+            <div class="pt-mark pt-mark-live"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="bar"><i style="{{ ingestBarStyle }}"></i></div>
+          <div id="ingest-summary">
+            <div class="row"><b>746 photos</b><span class="muted">JPEG 601 · HEIC 137 · PNG 3 · WebP 3 · GIF 2</span></div>
+            <div class="notice notice-note small">175 video files skipped. Photournament does not cull video or RAW; they are left exactly where they are.</div>
+            <div class="small dim">921 files seen in total.</div>
+            <div class="small dim">Cached thumbnails and previews: 188 MB of 1.0 GB available</div>
+          </div>
+          <div class="row" id="ingest-actions">
+            <button class="btn btn-primary" onClick="{{ goTree }}">Set finalist counts →</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTree }}" hint-placeholder-val="{{ true }}">
+      <div class="screen screen-tree">
+        <h1>How many photos do you want to KEEP from each folder?</h1>
+        <div class="tree-help">The number is how many photos <b>survive</b> — the keepers, not the ones thrown away. Type <b>5</b> and you end up with 5 photos from that folder.</div>
+        <details class="tree-help">
+          <summary>Blank, zero and no-limit</summary>
+          <div>Use <b>0</b> to skip a folder entirely, <b>*</b> (or the ∞ button) to cull with no fixed target, or leave it blank to let a folder compete with its blank siblings for whatever its parent has left over.</div>
+        </details>
+
+        <div class="card" id="tree-host">
+          <div class="tree-row tree-head">
+            <span class="tree-name">Folder</span>
+            <span class="tree-count">has</span>
+            <span class="tree-alloc">keep</span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <sc-for list="{{ treeRows }}" as="row" hint-placeholder-count="5">
+            <label class="tree-row {{ row.stateCls }}" style="{{ row.depthStyle }}">
+              <span class="tree-name">{{ row.name }}</span>
+              <span class="tree-count">{{ row.countLabel }}</span>
+              <input class="tree-alloc" type="text" inputmode="numeric" maxlength="4" placeholder="—" value="{{ row.alloc }}" onChange="{{ row.onChange }}">
+              <button class="btn btn-sm tree-inf {{ row.infCls }}" title="Cull until satisfied, with no target" onClick="{{ row.onInf }}">∞</button>
+              <span class="tree-bar" style="{{ row.barStyle }}"><i></i></span>
+              <span class="tree-state">{{ row.state }}</span>
+              <span>{{ row.splitEl }}</span>
+            </label>
+          </sc-for>
+        </div>
+
+        <div class="tree-issues" id="tree-issues">{{ treeIssueEl }}</div>
+
+        <div class="card row" id="tree-footer">
+          <div class="totals">
+            <span class="muted small">Photos you will keep</span>
+            <b>{{ treeTotal }}</b>
+            <span class="muted small">from {{ treeUnits }} tournaments</span>
+          </div>
+          <span class="spacer"></span>
+          <label class="check small"><input type="checkbox"><span>Also run a best-of-the-best round across all winners</span></label>
+          <button class="btn btn-primary" onClick="{{ goConfig }}">Start culling →</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isConfig }}" hint-placeholder-val="{{ true }}">
+      <div class="screen screen-grid">
+        <div class="pt-wrap screen-narrow">
+          <div class="pt-title">
+            <h1>{{ unit }}</h1>
+            <span class="muted small">14 in the pool · 0 cut · target 3</span>
+          </div>
+          <div class="notice notice-note">14 left against a target of 3. Two grid passes at this quota should bring the field close enough to run a bracket.</div>
+          <div class="card card-tight pt-config">
+            <label class="f">Grid <select data-t="cfg-grid"><option>9 per screen</option></select></label>
+            <label class="f">Quota <select data-t="cfg-quota"><option>Keep up to half</option></select></label>
+            <label class="f">Shuffle <input type="checkbox" data-t="cfg-shuffle" checked="{{ shuffleOn }}"></label>
+            <label class="f">Low cull floor % <input type="number" data-t="cfg-floor" value="25"></label>
+          </div>
+          <p class="muted small">The quota locks the moment the pass starts. That commitment is the whole mechanism: you decide how brutal to be before you have seen a single photograph.</p>
+          <div class="row">
+            <button class="btn btn-primary" data-t="start-pass" onClick="{{ goPass }}">Start pass 1 · Keep up to half · 9 per screen</button>
+            <button class="btn" data-t="cutpile" disabled="{{ trueVal }}">Review cut pile (0)</button>
+            <button class="btn" data-t="tobracket" onClick="{{ goBracket }}">Move on to the bracket</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isPass }}" hint-placeholder-val="{{ true }}">
+      <div class="screen screen-grid">
+        <div class="pt-wrap">
+          <div class="card card-tight pt-config locked">
+            <label class="f">Grid <select data-t="cfg-grid" disabled="{{ trueVal }}"><option>9 per screen</option></select></label>
+            <label class="f">Quota <select data-t="cfg-quota" disabled="{{ trueVal }}"><option>Keep up to half</option></select></label>
+            <label class="f">Shuffle <input type="checkbox" data-t="cfg-shuffle" disabled="{{ trueVal }}" checked="{{ shuffleOn }}"></label>
+            <span class="pt-lock" data-t="lock-badge">Locked for pass 1 · Keep up to half</span>
+            <span class="small dim" data-t="lock-note">The quota is locked until this pass ends. Changes take effect on the next pass.</span>
+          </div>
+
+          <div class="grid pt-grid grid-9" data-t="grid">
+            <sc-for list="{{ cells }}" as="cell" hint-placeholder-count="9">
+              <div class="photo-cell {{ cell.keptCls }}" onClick="{{ cell.onClick }}">
+                <div class="pxt"><i class="thumb" style="{{ cell.bg }}"></i></div>
+                <span class="idx">{{ cell.pos }}</span>
+                <span class="pt-cell-name">{{ cell.name }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div class="row pt-actions">
+            <button class="btn" data-t="back" disabled="{{ trueVal }}">Back</button>
+            <button class="btn" data-t="undo" onClick="{{ onUndo }}">Undo</button>
+            <span class="muted small nums" data-t="progress">{{ progress }}</span>
+            <sc-if value="{{ isOver }}" hint-placeholder-val="{{ false }}"><span class="pt-hint" data-t="hint">{{ hint }}</span></sc-if>
+            <span class="spacer"></span>
+            <span class="muted small"><kbd>1</kbd>–<kbd>9</kbd> select · <kbd>0</kbd> tenth · <kbd>Enter</kbd> advance · <kbd>U</kbd> undo · <kbd>←</kbd> back</span>
+            <button class="btn btn-primary" data-t="advance" disabled="{{ advanceDisabled }}" onClick="{{ onAdvance }}">{{ advanceLabel }}</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isBracket }}" hint-placeholder-val="{{ true }}">
+      <div class="screen screen-bracket">
+        <div class="bk">
+          <div class="bk-sub">
+            <span class="bk-tag">Main bracket · round 1</span>
+            <span>{{ bkPairings }}</span>
+          </div>
+          <div class="bk-stage">
+            <div class="bk-pane" onClick="{{ bkPickLeft }}">
+              <div class="bk-vp"><div class="pxt lb"><i style="{{ bkLeftBg }}"></i></div></div>
+              <div class="bk-cap"><kbd>←</kbd><span class="nm">{{ bkLeftName }}</span><span class="spacer"></span><span class="dim px">480×360</span></div>
+            </div>
+            <div class="bk-pane" onClick="{{ bkPickRight }}">
+              <div class="bk-vp"><div class="pxt lb"><i style="{{ bkRightBg }}"></i></div></div>
+              <div class="bk-cap"><kbd>→</kbd><span class="nm">{{ bkRightName }}</span><span class="spacer"></span><span class="dim px">480×360</span></div>
+            </div>
+          </div>
+          <div class="bk-bar">
+            <button class="btn" id="bk-defer">Too close to call <kbd>D</kbd></button>
+            <button class="btn" id="bk-undo">Undo <kbd>U</kbd></button>
+            <span class="spacer"></span>
+            <button class="btn btn-sm" id="bk-zoomout">−</button>
+            <span class="bk-zoom">100%</span>
+            <button class="btn btn-sm" id="bk-zoomin">+</button>
+            <button class="btn btn-sm" id="bk-fit">Fit</button>
+            <button class="btn btn-sm" id="bk-1to1">1:1</button>
+            <span class="small dim">scroll to zoom · drag to pan · both photos move together</span>
+            <button class="btn btn-primary btn-sm" onClick="{{ goDupes }}">Next: check for duplicates</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isDupes }}" hint-placeholder-val="{{ true }}">
+      <div class="screen screen-runoff">
+        <div class="bk">
+          <div class="bk-sub">
+            <span>2 of your keepers have near-identical shots alongside it. Open one to compare them side by side, including frames that were cut earlier, and pick whichever you actually want.</span>
+          </div>
+          <div class="bk-results" id="ro-list">{{ dupeEl }}</div>
+          <div class="bk-bar">
+            <span class="small dim">Every choice here is reversible until you continue.</span>
+            <span class="spacer"></span>
+            <button class="btn btn-primary" id="ro-continue" onClick="{{ goExport }}">Continue</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isExport }}" hint-placeholder-val="{{ true }}">
+      <div class="screen">
+        <h1>Export review</h1>
+        <div class="card row">
+          <label class="check small"><input type="checkbox" checked="{{ prefixOn }}" onChange="{{ onPrefixToggle }}"><span>Numbered prefixes</span></label>
+          <select><option>Mirror the source folders</option><option>Flatten into one folder</option></select>
+          <span class="spacer"></span>
+          <span class="small dim" id="exp-total">8 files, about 3.5 MB to write</span>
+        </div>
+        <div>{{ exportEl }}</div>
+        <div class="card row">
+          <button class="btn btn-primary">Write finalists to disk</button>
+          <button class="btn">Save all to a folder…</button>
+          <button class="btn">Download as one .zip</button>
+          <button class="btn">Copy filename list</button>
+          <button class="btn btn-quiet">Decision JSON</button>
+          <span class="spacer"></span>
+          <span class="small dim" id="exp-status"></span>
+        </div>
+      </div>
+    </sc-if>
+
+  </main>
+
+  <div id="toasts" aria-live="polite"></div>
+</div>
+
+<nav class="proto">
+  <b>Prototype · {{ screenLabel }}</b>
+  <div>
+    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="8">
+      <button aria-current="{{ n.current }}" onClick="{{ n.go }}">{{ n.label }}</button>
+    </sc-for>
+  </div>
+</nav>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'pass',
+    allocs: { root: '', trip: '8', day1: '3', day2: '3', misc: '' },
+    inf: {},
+    sel: ['p3', 'p6'],
+    dupeOpen: { g1: true },
+    dupeKeep: { g1: ['p12'], g2: ['p19'] },
+    labels: {},
+    prefixes: true,
+    bkIndex: 0
+  };
+
+  /* ---------------------------------------------------------------- data */
+
+  photo(i) {
+    const h1 = (i * 53 + 17) % 360;
+    const h2 = (h1 + 60 + (i * 29) % 130) % 360;
+    const ang = 100 + (i * 41) % 160;
+    return {
+      id: 'p' + i,
+      name: 'IMG_' + (1000 + i) + '.png',
+      bg: `background:linear-gradient(${ang}deg, oklch(0.42 0.15 ${h1}), oklch(0.80 0.12 ${h2}))`
+    };
+  }
+
+  UNIT = 'Vestrahorn';
+
+  TREE = [
+    { key: 'root', name: 'pt-shot-1785225707439', d: 0, has: 36 },
+    { key: 'trip', name: 'Iceland', d: 1, has: 36, split: true },
+    { key: 'day1', name: 'Vestrahorn', d: 2, has: 14 },
+    { key: 'day2', name: 'Reykjavik', d: 2, has: 14 },
+    { key: 'misc', name: 'Roadside', d: 2, has: 8 }
+  ];
+
+  NAV = [
+    ['welcome', 'Entry'], ['ingest', 'Ingest'], ['tree', 'Folder tree'],
+    ['config', 'Pass config'], ['pass', 'Grid pass'], ['bracket', 'Bracket'],
+    ['dupes', 'Duplicates'], ['export', 'Export review']
+  ];
+
+  BK = [
+    [12, 0, 'IMG_1012.png', 'IMG_1000.png'],
+    [4, 22, 'IMG_1004.png', 'IMG_1022.png'],
+    [19, 16, 'IMG_1019.png', 'IMG_1016.png']
+  ];
+
+  /* ----------------------------------------------------------- lifecycle */
+
+  componentDidMount() {
+    this.onKey = (e) => {
+      if (this.state.screen !== 'pass') return;
+      const t = e.target && e.target.tagName;
+      if (t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA') return;
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        const pos = e.key === '0' ? 10 : parseInt(e.key, 10);
+        const cell = this.gridIds()[pos - 1];
+        if (cell) this.toggle(cell);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!this.over()) this.setState({ sel: [] });
+      } else if (e.key === 'u' || e.key === 'U') {
+        e.preventDefault();
+        this.setState((s) => ({ sel: s.sel.slice(0, -1) }));
+      }
+    };
+    document.addEventListener('keydown', this.onKey);
+  }
+
+  componentWillUnmount() { document.removeEventListener('keydown', this.onKey); }
+
+  /* --------------------------------------------------------- grid helpers */
+
+  gridIds() { return [12, 7, 2, 4, 9, 11, 3, 6, 1].map((n) => 'p' + n); }
+  quota() { return 4; }
+  over() { return Math.max(0, this.state.sel.length - this.quota()); }
+
+  toggle(id) {
+    this.setState((s) => ({
+      sel: s.sel.indexOf(id) >= 0 ? s.sel.filter((x) => x !== id) : s.sel.concat([id])
+    }));
+  }
+
+  /* --------------------------------------------------------- tree helpers */
+
+  parse(v) {
+    if (v === '' || v == null) return null;
+    if (v === '*') return Infinity;
+    const n = parseInt(v, 10);
+    return isNaN(n) ? null : n;
+  }
+
+  treeTotal() {
+    const a = this.state.allocs;
+    const trip = this.parse(a.trip);
+    if (trip === Infinity || trip == null) return '—';
+    return String(trip);
+  }
+
+  /* -------------------------------------------------------------- export */
+
+  slug(s) {
+    return String(s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48);
+  }
+
+  EXPORT_SETS = [
+    { label: 'Vestrahorn', folder: '_finalists_Vestrahorn/', dir: 'pt-shot-1785225707439/Iceland/Vestrahorn', ids: [3, 4, 12] },
+    { label: 'Reykjavik', folder: '_finalists_Reykjavik/', dir: 'pt-shot-1785225707439/Iceland/Reykjavik', ids: [19, 22, 16] },
+    { label: 'pooled under Iceland', folder: '_finalists_pooled/', dir: 'pt-shot-1785225707439/Iceland/Roadside', ids: [29, 35] }
+  ];
+
+  exportEl() {
+    const R = React.createElement;
+    return this.EXPORT_SETS.map((set) =>
+      R('div', { className: 'card exp-set', key: set.label }, [
+        R('div', { className: 'row', key: 'h' }, [
+          R('h2', { key: 'a' }, set.label),
+          R('span', { className: 'muted small mono', key: 'b' }, set.folder),
+          R('span', { className: 'spacer', key: 'c' }),
+          R('span', { className: 'muted small', key: 'd' }, set.ids.length + ' finalists')
+        ]),
+        ...set.ids.map((n, i) => {
+          const p = this.photo(n);
+          const lab = this.slug(this.state.labels[p.id]);
+          const prefix = this.state.prefixes ? String(i + 1).padStart(2, '0') + '_' : '';
+          return R('div', { className: 'exp-row', key: p.id }, [
+            R('span', { className: 'exp-rank', key: 'r' }, String(i + 1)),
+            R('div', { className: 'exp-thumb', style: { position: 'relative' }, key: 't' },
+              R('div', { className: 'pxt' }, R('i', { style: this.styleOf(p.bg) }))),
+            R('div', { key: 'n' }, [
+              R('div', { className: 'exp-name', key: 'a' }, p.name),
+              R('div', { className: 'small dim', key: 'b' }, set.dir)
+            ]),
+            R('div', { key: 'l' }, [
+              R('input', {
+                key: 'i', type: 'text', placeholder: 'why this one won, or how it will be used',
+                value: this.state.labels[p.id] || '',
+                onChange: (e) => {
+                  const v = e.target.value;
+                  this.setState((s) => ({ labels: Object.assign({}, s.labels, { [p.id]: v }) }));
+                }
+              }),
+              R('div', { className: 'exp-dest', key: 'd' }, [
+                prefix,
+                R('span', { className: 'exp-slug', key: 's' }, lab ? lab + '_' : ''),
+                p.name
+              ])
+            ])
+          ]);
+        })
+      ])
+    );
+  }
+
+  /* ---------------------------------------------------------- duplicates */
+
+  DUPES = [
+    { key: 'g1', rank: 1, orig: 12, group: [12, 13, 14, 15], sharpest: 13 },
+    { key: 'g2', rank: 4, orig: 19, group: [19, 20, 21], sharpest: 19 }
+  ];
+
+  styleOf(css) {
+    const out = {};
+    css.split(';').forEach((bit) => {
+      const i = bit.indexOf(':');
+      if (i < 0) return;
+      const k = bit.slice(0, i).trim().replace(/-([a-z])/g, (m, c) => c.toUpperCase());
+      out[k] = bit.slice(i + 1).trim();
+    });
+    return out;
+  }
+
+  dupeEl() {
+    const R = React.createElement;
+    return this.DUPES.map((g) => {
+      const kept = this.state.dupeKeep[g.key] || [];
+      const open = !!this.state.dupeOpen[g.key];
+      const picked = this.photo(parseInt(kept[0].slice(1), 10));
+      const head = R('div', { className: 'ro-head', key: 'h' }, [
+        R('span', { className: 'bk-rank', key: 'r' }, '#' + g.rank),
+        R('div', { className: 'ro-head-thumb', style: { position: 'relative', width: '118px', height: '78px', flex: 'none' }, key: 't' },
+          R('img', { alt: '', style: Object.assign({ width: '118px', height: '78px' }, this.styleOf(picked.bg)) })),
+        R('span', { className: 'bk-name', key: 'n' }, [
+          R('div', { key: 'a' }, picked.name),
+          R('div', { className: 'small dim', key: 'b' },
+            g.group.length + ' look like duplicates of this' + (kept.length > 1 ? ' · keeping ' + kept.length + ' of them' : ''))
+        ]),
+        R('button', {
+          className: 'btn btn-sm', key: 'e',
+          onClick: () => this.setState((s) => ({ dupeOpen: Object.assign({}, s.dupeOpen, { [g.key]: !open }) }))
+        }, open ? 'Close' : 'Show duplicates')
+      ]);
+
+      const children = [head];
+      if (open) {
+        const cls = g.group.length <= 6 ? 'grid-6' : 'grid-12';
+        children.push(R('div', { className: 'ro-body', key: 'b' }, [
+          R('div', { className: 'small dim', key: 'n' },
+            'Click the ones worth keeping. Usually that is just the sharpest, marked below — but if these are not really duplicates, keep as many as you want. Each extra one adds to your final count.'),
+          R('div', { className: 'grid ' + cls, key: 'g' }, g.group.map((n, i) => {
+            const p = this.photo(n);
+            const isKept = kept.indexOf(p.id) >= 0;
+            const dead = !isKept && n === g.group[g.group.length - 1] && g.key === 'g1';
+            const tags = [];
+            if (p.id === kept[0]) tags.push('keeping');
+            else if (isKept) tags.push('also keeping');
+            if (n === g.sharpest) tags.push('sharpest');
+            if (dead) tags.push('already a finalist');
+            return R('div', {
+              key: p.id,
+              className: 'photo-cell ro-cell' + (isKept ? ' kept' : '') + (dead ? ' dead' : ''),
+              onClick: dead ? null : () => this.setState((s) => {
+                const list = (s.dupeKeep[g.key] || []).slice();
+                const at = list.indexOf(p.id);
+                if (at >= 0) { if (list.length === 1) return null; list.splice(at, 1); }
+                else list.push(p.id);
+                return { dupeKeep: Object.assign({}, s.dupeKeep, { [g.key]: list }) };
+              })
+            }, [
+              R('div', { className: 'pxt', key: 'i' }, R('i', { className: 'thumb', style: this.styleOf(p.bg) })),
+              tags.length ? R('span', { className: 'tag', key: 't' }, tags.join(' · ')) : null
+            ]);
+          }))
+        ]));
+      }
+      return R('div', { className: 'ro-group', key: g.key }, children);
+    });
+  }
+
+  treeIssueEl() {
+    const R = React.createElement;
+    const a = this.state.allocs;
+    const kids = (this.parse(a.day1) || 0) + (this.parse(a.day2) || 0);
+    const trip = this.parse(a.trip);
+    if (trip == null || trip === Infinity || kids <= trip) return null;
+    return R('div', { className: 'notice notice-error' }, [
+      R('b', { key: 'a' }, 'Trip: '),
+      R('span', { key: 'b' }, 'Children are fixed at ' + kids + ', which is more than this folder\u2019s ' + trip + '.')
+    ]);
+  }
+
+  /* ------------------------------------------------------------ counters */
+
+  countersFor(screen) {
+    if (screen === 'pass') {
+      const kept = this.state.sel.length;
+      return [
+        { label: 'remaining', value: '14' },
+        { label: 'screens left', value: '2' },
+        { label: 'field', value: (kept + 5) + ' / 3' },
+        { label: 'cut this pass', value: Math.round((1 - kept / 9) * 100) + '%' }
+      ];
+    }
+    if (screen === 'bracket') {
+      return [
+        { label: 'target', value: '3' }, { label: 'remaining', value: '3' },
+        { label: 'comparisons', value: String(this.state.bkIndex + 1) }, { label: 'est. left', value: '~8' }
+      ];
+    }
+    if (screen === 'config') {
+      return [
+        { label: 'pool', value: '14' }, { label: 'cut', value: '0' },
+        { label: 'target', value: '3' }, { label: 'passes', value: '0' }
+      ];
+    }
+    if (screen === 'dupes') {
+      return [{ label: 'keeping', value: '3 / 3' }, { label: 'with duplicates', value: '2' }, { label: 'swapped', value: '0' }];
+    }
+    return [];
+  }
+
+  contextFor(screen) {
+    if (screen === 'pass') return this.UNIT + ' · pass 1 · Keep up to half';
+    if (screen === 'config') return this.UNIT + ' · Stage A';
+    if (screen === 'bracket') return this.UNIT + ' · Stage B bracket';
+    if (screen === 'dupes') return this.UNIT + ' · choose the best of duplicates';
+    return 'pt-shot-1785225707439';
+  }
+
+  /* ---------------------------------------------------------- renderVals */
+
+  renderVals() {
+    const s = this.state;
+    const screen = s.screen;
+    const go = (n) => () => this.setState({ screen: n });
+    const sel = s.sel;
+    const over = this.over();
+    const bk = this.BK[s.bkIndex % this.BK.length];
+
+    const treeRows = this.TREE.map((row) => {
+      const raw = s.allocs[row.key];
+      const isInf = raw === '*';
+      const n = this.parse(raw);
+      const state = isInf ? 'uncapped' : n === 0 ? 'skipped' : n == null ? 'pooled' : 'fixed';
+      const p = n != null && n !== Infinity && row.has ? Math.min(1, n / row.has) : 0;
+      return {
+        name: row.name,
+        countLabel: row.has + ' photos',
+        state: state,
+        alloc: raw,
+        depthStyle: '--d:' + row.d,
+        barStyle: '--p:' + (isInf ? 1 : p),
+        stateCls: n === 0 ? 'excluded' : '',
+        infCls: isInf ? 'on' : '',
+        onChange: (e) => {
+          const v = e.target.value;
+          this.setState((st) => ({ allocs: Object.assign({}, st.allocs, { [row.key]: v }) }));
+        },
+        onInf: (e) => {
+          e.preventDefault();
+          this.setState((st) => ({
+            allocs: Object.assign({}, st.allocs, { [row.key]: st.allocs[row.key] === '*' ? '' : '*' })
+          }));
+        },
+        splitEl: row.split
+          ? React.createElement('button', { className: 'btn btn-sm btn-quiet', onClick: (e) => e.preventDefault() }, 'split')
+          : null
+      };
+    });
+
+    return {
+      trueVal: true,
+      unit: this.UNIT,
+      screenLabel: (this.NAV.find((n) => n[0] === screen) || ['', ''])[1],
+      nav: this.NAV.map(([k, label]) => ({ label: label, current: k === screen ? 'true' : 'false', go: go(k) })),
+
+      isWelcome: screen === 'welcome', isIngest: screen === 'ingest', isTree: screen === 'tree',
+      isConfig: screen === 'config', isPass: screen === 'pass', isBracket: screen === 'bracket',
+      isDupes: screen === 'dupes', isExport: screen === 'export',
+
+      topbarHidden: screen === 'welcome',
+      stopHidden: !(screen === 'pass' || screen === 'bracket'),
+      context: this.contextFor(screen),
+      counters: this.countersFor(screen),
+
+      goIngest: go('ingest'), goTree: go('tree'), goConfig: go('config'), goPass: go('pass'),
+      goBracket: go('bracket'), goDupes: go('dupes'), goExport: go('export'),
+
+      ingestDone: 247, ingestTotal: 746, ingestLeft: '1m 20s',
+      ingestBarStyle: 'width:33%',
+      shuffleOn: true,
+
+      treeRows: treeRows,
+      treeTotal: this.treeTotal(),
+      treeUnits: 3,
+      treeIssueEl: this.treeIssueEl(),
+
+      cells: this.gridIds().map((id, i) => {
+        const p = this.photo(parseInt(id.slice(1), 10));
+        return {
+          name: p.name, bg: p.bg,
+          pos: i === 9 ? '0' : String(i + 1),
+          keptCls: sel.indexOf(id) >= 0 ? 'kept' : '',
+          onClick: () => this.toggle(id)
+        };
+      }),
+      progress: 'screen 1 of 2 · ' + sel.length + ' selected · keep at most ' + this.quota(),
+      isOver: over > 0,
+      hint: 'keep at most ' + this.quota() + ' — deselect ' + over,
+      advanceDisabled: over > 0,
+      advanceLabel: over > 0 ? 'keep at most ' + this.quota() : 'Keep ' + sel.length + ' · continue',
+      onAdvance: () => { if (!this.over()) this.setState({ sel: [] }); },
+      onUndo: () => this.setState((st) => ({ sel: st.sel.slice(0, -1) })),
+
+      bkPairings: (this.BK.length - s.bkIndex) + ' pairings still to judge of ' + this.BK.length + ' this round',
+      bkLeftName: bk[2], bkRightName: bk[3],
+      bkLeftBg: this.photo(bk[0]).bg, bkRightBg: this.photo(bk[1]).bg,
+      bkPickLeft: () => this.setState((st) => ({ bkIndex: (st.bkIndex + 1) % this.BK.length })),
+      bkPickRight: () => this.setState((st) => ({ bkIndex: (st.bkIndex + 1) % this.BK.length })),
+
+      dupeEl: this.dupeEl(),
+      exportEl: this.exportEl(),
+      prefixOn: s.prefixes,
+      onPrefixToggle: () => this.setState((st) => ({ prefixes: !st.prefixes }))
+    };
+  }
+}
+</script>
+</body>
+</html>

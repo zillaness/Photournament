@@ -1,6 +1,6 @@
 /**
  * @file 50_screen_tree.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -25,6 +25,10 @@
     if (document.getElementById(STYLE_ID)) return;
     var css =
       '.tree-row{display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:6px}' +
+      '.tree-head{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute);' +
+        'border-bottom:1px solid var(--line);margin-bottom:4px;padding-bottom:6px}' +
+      '.tree-head:hover{background:none}' +
+      '.tree-head .tree-alloc{border:none;background:none;text-align:center}' +
       '.tree-row:hover{background:var(--surface-2)}' +
       '.tree-row.excluded .tree-name{text-decoration:line-through;opacity:.45}' +
       '.tree-row.has-error{box-shadow:inset 0 0 0 1px #5c2f2b}' +
@@ -53,13 +57,15 @@
       }
 
       root.appendChild(el('div', { class: 'row' }, [
-        el('h1', { text: 'How many finalists from each folder?' })
+        el('h1', { text: 'How many photos do you want to KEEP from each folder?' })
       ]));
 
       root.appendChild(el('div', { class: 'muted small', html:
-        'Type a number for a guaranteed count, <b>0</b> to skip a folder entirely, ' +
-        '<b>*</b> (or the ∞ button) to cull without a target, or leave it blank to let a folder ' +
-        'compete with its blank siblings for whatever its parent has left over.' }));
+        'The number is how many photos <b>survive</b> — the keepers, not the ones thrown away. ' +
+        'Type <b>5</b> and you end up with 5 photos from that folder.<br>' +
+        'Use <b>0</b> to skip a folder entirely, <b>*</b> (or the ∞ button) to cull with no fixed ' +
+        'target, or leave it blank to let a folder compete with its blank siblings for whatever ' +
+        'its parent has left over.' }));
 
       var treeHost = el('div', { class: 'card', id: 'tree-host' });
       var issuesHost = el('div', { class: 'tree-issues', id: 'tree-issues' });
@@ -76,7 +82,17 @@
         var res = PT.tree.resolve(s.tree, s.session.allocs);
         s.resolution = res;
 
+        // Re-rendering destroys and recreates every input, which silently steals
+        // focus and the caret from whichever field is being typed into. The
+        // symptom is that only the first digit of a two-digit number ever lands.
+        // Remember where the cursor was and put it back afterwards.
+        var active = document.activeElement;
+        var focusPath = active && active.classList && active.classList.contains('tree-alloc')
+          ? active.dataset.path : null;
+        var caret = focusPath ? active.selectionStart : null;
+
         PT.dom.clear(treeHost);
+        treeHost.appendChild(headerRow());
         s.tree.order.forEach(function (path) {
           var node = res.nodes[path];
           if (!node) return;
@@ -88,6 +104,26 @@
 
         renderIssues(res);
         renderFooter(res);
+
+        if (focusPath !== null) {
+          var again = treeHost.querySelector('.tree-alloc[data-path="' + cssEscape(focusPath) + '"]');
+          if (again) {
+            again.focus();
+            try { again.setSelectionRange(caret, caret); } catch (e) { /* not a text input */ }
+          }
+        }
+      }
+
+      function cssEscape(s) { return String(s).replace(/(["\\])/g, '\\$1'); }
+
+      function headerRow() {
+        return el('div', { class: 'tree-row tree-head' }, [
+          el('span', { class: 'tree-name', text: 'Folder' }),
+          el('span', { class: 'tree-count', text: 'has' }),
+          el('span', { class: 'tree-state', text: '' }),
+          el('span', { class: 'tree-alloc', text: 'keep' }),
+          el('span', { style: 'width:30px' })
+        ]);
       }
 
       function rowFor(s, res, path, node) {
@@ -96,10 +132,14 @@
 
         var input = el('input', {
           type: 'text',
+          inputmode: 'numeric',
+          maxlength: '4',
           class: 'tree-alloc' + (hasError ? ' invalid' : ''),
           value: PT.tree.allocToInput(node.alloc),
           placeholder: '—',
-          title: 'number, 0 to skip, * for uncapped, or blank to pool'
+          dataset: { path: path },
+          title: 'How many photos from this folder you want to KEEP. ' +
+                 '0 skips the folder, * means no limit, blank shares the parent\u2019s leftovers.'
         });
 
         input.addEventListener('input', function () {
@@ -220,7 +260,7 @@
         var s = PT.store.get();
 
         footer.appendChild(el('div', { class: 'totals' }, [
-          el('span', { class: 'muted small', text: 'Finalists' }),
+          el('span', { class: 'muted small', text: 'Photos you will keep' }),
           el('b', { text: res.projectedTotal === null ? '—' : String(res.projectedTotal) }),
           el('span', { class: 'muted small', text:
             res.projectedTotal === null
@@ -281,4 +321,8 @@
  *   typed * and the toggle entry paths, live re-resolution on every keystroke,
  *   ranked issue list, weighted and even distribution with an editable preview,
  *   projected total, Stage D opt-in, and unit creation.
- */
+  * v1.1 (2026-07-28): Fixed two-digit entry. Re-rendering on every keystroke
+ *   recreated the input and stole focus, so only the first digit of a number ever
+ *   landed; focus and caret are now restored after render. Reworded throughout to
+ *   say the number is how many photos you KEEP, and added a column header.
+*/

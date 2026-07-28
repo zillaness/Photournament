@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -39,12 +39,23 @@
     mount: function (root) {
       PT.dom.$('#topbar').hidden = true;
 
-      var card = el('div', { class: 'card' }, [
+      root.appendChild(el('div', { class: 'card' }, [
         el('h1', { text: 'Photournament' }),
         el('p', { class: 'muted', text:
           'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
           'passes, then ranks what survives head to head.' })
-      ]);
+      ]));
+
+      // The webkitdirectory input is the workhorse. It preserves the folder tree,
+      // works on every Chromium build and on a file:// origin, and needs no
+      // permission grant. showDirectoryPicker is strictly an upgrade on top for
+      // writing results back to disk — never a prerequisite for getting started.
+      var dirInput = el('input', { type: 'file', id: 'dir-files', multiple: true, style: 'display:none' });
+      dirInput.setAttribute('webkitdirectory', '');
+
+      var looseInput = el('input', {
+        type: 'file', id: 'loose-files', multiple: true, accept: 'image/*', style: 'display:none'
+      });
 
       var drop = el('div', { class: 'dropzone', id: 'dropzone' }, [
         el('div', { class: 'dropzone-inner' }, [
@@ -55,57 +66,62 @@
         ])
       ]);
 
-      // A webkitdirectory input yields webkitRelativePath on every file, so the
-      // folder tree survives even without the File System Access API. It cannot
-      // write results back to disk, but it is a far better fallback than a flat
-      // file list: the whole allocation model in PRD 4 depends on structure.
-      var dirInput = el('input', {
-        type: 'file', id: 'dir-files', multiple: true, style: 'display:none'
-      });
-      dirInput.setAttribute('webkitdirectory', '');
-
-      var loose = el('div', { class: 'row small' }, [
-        dirInput,
-        el('input', { type: 'file', id: 'loose-files', multiple: true, accept: 'image/*', style: 'display:none' }),
+      var extras = el('div', { class: 'row small' }, [
+        dirInput, looseInput,
         el('button', {
-          class: 'btn btn-quiet btn-sm', text: 'Choose a folder without disk output',
-          title: 'Keeps the folder structure, but results must be downloaded rather than written back',
-          onclick: function () { dirInput.click(); }
-        }),
-        el('button', {
-          class: 'btn btn-quiet btn-sm', text: 'Pick individual files',
-          onclick: function () { PT.dom.$('#loose-files').click(); }
+          class: 'btn btn-quiet btn-sm', id: 'pick-files', text: 'Pick individual files instead',
+          onclick: function () { looseInput.click(); }
         })
       ]);
 
-      root.appendChild(card);
       root.appendChild(drop);
-      root.appendChild(loose);
+      root.appendChild(extras);
       root.appendChild(el('div', { id: 'entry-msg' }));
+      root.appendChild(el('div', { class: 'small dim', id: 'entry-diag', style: 'margin-top:14px' }));
 
-      // PRD 8: state the degraded mode plainly rather than failing quietly.
-      var note = PT.dom.$('#fallback-note');
-      if (!PT.env.hasFSA) {
-        note.appendChild(el('div', { class: 'notice notice-warn', html:
-          '<b>This browser cannot write results to disk or resume a session.</b><br>' +
-          'The File System Access API is Chromium-only. In Chrome, Edge, Brave or Opera you get ' +
-          'resume and disk output. Here you can still cull, but results must be downloaded ' +
-          'and the session ends when you close the tab.' }));
-        PT.dom.$('#pick-folder').disabled = true;
-      }
-
+      /**
+       * One button that always works. It reaches for the File System Access API
+       * first because that is what unlocks writing finalists back to disk, but
+       * ANY failure other than the user cancelling falls straight through to the
+       * directory input rather than dead-ending on an error message.
+       */
       PT.dom.$('#pick-folder').addEventListener('click', function () {
-        // Must be inside the user gesture. AbortError is a cancelled dialog,
-        // which is an ordinary outcome, not a failure (probe 01).
-        window.showDirectoryPicker({ mode: 'readwrite' })
+        if (!PT.env.hasFSA || typeof window.showDirectoryPicker !== 'function') {
+          dirInput.click();
+          return;
+        }
+        var p;
+        try {
+          p = window.showDirectoryPicker({ mode: 'readwrite' });
+        } catch (e) {
+          fallbackToInput(e);
+          return;
+        }
+        Promise.resolve(p)
           .then(function (handle) { beginFromHandle(handle); })
           .catch(function (e) {
+            // A cancelled dialog is an ordinary outcome, not a failure.
             if (e && e.name === 'AbortError') return;
-            showEntryError(e);
+            fallbackToInput(e);
           });
       });
 
-      PT.dom.$('#loose-files').addEventListener('change', function (ev) {
+      function fallbackToInput(e) {
+        var name = (e && e.name) || 'Error';
+        var msg = (e && e.message) || String(e);
+        PT.dom.clear(PT.dom.$('#entry-msg')).appendChild(
+          el('div', { class: 'notice notice-warn small', html:
+            '<b>This browser would not open its folder picker here (' + name + ').</b><br>' +
+            'Opening the ordinary folder chooser instead. Everything works the same, except ' +
+            'finalists have to be downloaded rather than written back into the folder.' +
+            '<br><span class="dim">' + escapeHtml(msg) + '</span>' })
+        );
+        PT.env.fsaBlocked = true;
+        renderDiag();
+        dirInput.click();
+      }
+
+      looseInput.addEventListener('change', function (ev) {
         var files = Array.prototype.slice.call(ev.target.files || []);
         if (files.length) beginFromFiles(files);
       });
@@ -119,7 +135,21 @@
         beginFromFiles(files, first.split('/')[0] || 'photos');
       });
 
+      renderDiag();
       wireDragDrop(drop);
+
+      /** Visible environment readout, so a failure here is diagnosable rather than mysterious. */
+      function renderDiag() {
+        var host = PT.dom.$('#entry-diag');
+        if (!host) return;
+        var bits = [
+          'opened from ' + location.protocol.replace(':', ''),
+          (PT.env.hasFSA ? 'folder picker available' : 'no folder picker in this browser'),
+          (PT.env.fsaBlocked ? 'picker blocked here — using the fallback' : null),
+          navigator.hardwareConcurrency ? navigator.hardwareConcurrency + ' cores' : null
+        ].filter(Boolean);
+        host.textContent = bits.join('  ·  ');
+      }
     },
 
     unmount: function () {
@@ -128,10 +158,16 @@
     }
   });
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>]/g, function (c) {
+      return c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;';
+    });
+  }
+
   function swallow(e) { e.preventDefault(); }
 
   function wireDragDrop(drop) {
-    // Without these, dropping anywhere navigates the tab to the file.
+    // Without these, dropping anywhere navigates the tab to the dropped file.
     window.addEventListener('dragover', swallow);
     window.addEventListener('drop', swallow);
 
@@ -141,26 +177,103 @@
     drop.addEventListener('drop', function (e) {
       e.preventDefault();
       drop.classList.remove('over');
-      var items = Array.prototype.slice.call(e.dataTransfer.items || []);
 
-      // A dragged folder yields a real directory handle in Chromium, which is
-      // what makes resume and disk-write possible. Prefer it over a file list.
-      var first = items[0];
-      if (first && typeof first.getAsFileSystemHandle === 'function') {
-        Promise.all(items.map(function (it) { return it.getAsFileSystemHandle(); }))
-          .then(function (handles) {
-            var dir = handles.filter(Boolean).filter(function (h) { return h.kind === 'directory'; })[0];
-            if (dir) return beginFromHandle(dir);
-            var files = Array.prototype.slice.call(e.dataTransfer.files || []);
-            if (files.length) return beginFromFiles(files);
-            showEntryError(new Error('Drop a folder, not a shortcut or a link.'));
-          })
-          .catch(showEntryError);
-        return;
-      }
-      var files = Array.prototype.slice.call(e.dataTransfer.files || []);
-      if (files.length) beginFromFiles(files);
+      // DataTransfer is only valid synchronously during the event, so everything
+      // needed later has to be pulled out of it right now.
+      var dt = e.dataTransfer;
+      var items = Array.prototype.slice.call(dt.items || []);
+      var files = Array.prototype.slice.call(dt.files || []);
+
+      var handlePromises = items.map(function (it) {
+        return typeof it.getAsFileSystemHandle === 'function'
+          ? it.getAsFileSystemHandle().catch(function () { return null; })
+          : Promise.resolve(null);
+      });
+      var entries = items.map(function (it) {
+        return typeof it.webkitGetAsEntry === 'function' ? it.webkitGetAsEntry() : null;
+      }).filter(Boolean);
+
+      PT.dom.clear(PT.dom.$('#entry-msg'));
+
+      Promise.all(handlePromises).then(function (handles) {
+        var dir = handles.filter(Boolean).filter(function (h) { return h.kind === 'directory'; })[0];
+        if (dir) return beginFromHandle(dir);
+
+        // THE FALLBACK THAT MATTERS. When the File System Access API is missing
+        // or blocked, dataTransfer.files is EMPTY for a dropped folder, so
+        // falling back to it can never work — which is exactly why dropping a
+        // folder appeared to do nothing. webkitGetAsEntry is the older Chrome
+        // API that does expose a dropped directory.
+        var dirEntry = entries.filter(function (en) { return en && en.isDirectory; })[0];
+        if (dirEntry) {
+          var out = [];
+          return walkEntry(dirEntry, out, 0).then(function () {
+            if (!out.length) {
+              showEntryError(new Error('That folder had no readable files in it.'));
+              return;
+            }
+            beginFromEntries(out, dirEntry.name || 'photos');
+          });
+        }
+
+        if (files.length) return beginFromFiles(files);
+
+        showEntryError(new Error(
+          'Nothing readable was dropped. Use the "Choose a folder" button instead — some ' +
+          'browsers will not hand a dropped folder to a page that was opened from a file.'
+        ));
+      }).catch(showEntryError);
     });
+  }
+
+  /**
+   * Recursively reads a dropped directory through the legacy entry API.
+   * readEntries returns at most 100 children per call and signals the end with an
+   * empty batch, so it must be drained in a loop rather than called once. An
+   * unreadable entry resolves rather than rejecting: one bad file must never
+   * stall the whole import.
+   */
+  function walkEntry(entry, out, depth) {
+    depth = depth || 0;
+    if (!entry || depth > 32) return Promise.resolve(out);
+
+    if (entry.isFile) {
+      return new Promise(function (resolve) {
+        entry.file(function (f) {
+          var rel = String(entry.fullPath || ('/' + f.name)).replace(/^\//, '');
+          var i = rel.lastIndexOf('/');
+          out.push({ name: f.name, path: rel, dir: i < 0 ? '' : rel.slice(0, i), file: f });
+          resolve(out);
+        }, function () { resolve(out); });
+      });
+    }
+
+    if (entry.isDirectory) {
+      // Never re-ingest our own output on a second run.
+      if (/^_(finalists|sidecars)/.test(entry.name) || entry.name.charAt(0) === '.') {
+        return Promise.resolve(out);
+      }
+      var reader = entry.createReader();
+      var kids = [];
+      return new Promise(function (resolve) {
+        (function drain() {
+          reader.readEntries(function (batch) {
+            if (!batch || !batch.length) {
+              var chain = Promise.resolve();
+              kids.forEach(function (k) {
+                chain = chain.then(function () { return walkEntry(k, out, depth + 1); });
+              });
+              chain.then(function () { resolve(out); });
+              return;
+            }
+            kids = kids.concat(Array.prototype.slice.call(batch));
+            drain();
+          }, function () { resolve(out); });
+        })();
+      });
+    }
+
+    return Promise.resolve(out);
   }
 
   function showEntryError(e) {
@@ -183,9 +296,20 @@
   }
 
   function beginFromFiles(files, rootName) {
-    var session = PT.session.newSession(rootName || 'dropped files', 'files');
+    var session = PT.session.newSession(rootName || 'selected photos', 'files');
     PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
     PT.router.go('ingest', { source: { type: 'files', files: files } });
+  }
+
+  /**
+   * Entry point for a folder dropped without a File System Access handle. The
+   * entries already carry their source-relative paths from walkEntry, so the
+   * folder tree survives even though there is no directory handle to write into.
+   */
+  function beginFromEntries(entries, rootName) {
+    var session = PT.session.newSession(rootName || 'dropped folder', 'files');
+    PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
+    PT.router.go('ingest', { source: { type: 'entries', entries: entries } });
   }
 
   /**
@@ -273,7 +397,9 @@
         ? walkHandle(params.source.handle, '', [], 0, function (n) {
             status.textContent = 'Reading the folder… ' + n + ' files';
           })
-        : Promise.resolve(fromFileList(params.source.files));
+        : params.source.type === 'entries'
+          ? Promise.resolve(params.source.entries)
+          : Promise.resolve(fromFileList(params.source.files));
 
       scan
         .then(function (entries) {
@@ -453,4 +579,10 @@
  *   stated loose-file fallback, recursive scan at uncapped depth, format triage
  *   separating out-of-scope video and RAW from genuinely unrecognised files,
  *   worker-pool processing with progress and time estimate, and cache reporting.
- */
+  * v1.1 (2026-07-28): Reworked entry after both folder paths failed for a real
+ *   user. The Choose-a-folder button now falls through to the webkitdirectory
+ *   input on any picker failure instead of dead-ending on an error, and drag-drop
+ *   falls back to webkitGetAsEntry, because dataTransfer.files is EMPTY for a
+ *   dropped folder and the old fallback therefore could never work. Added a
+ *   visible environment readout so a failure here is diagnosable.
+*/

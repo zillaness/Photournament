@@ -194,6 +194,38 @@ check('projected total is 20', resolved.total === 20, resolved.total);
 check('pooled remainder is 10', resolved.pooled === 10, resolved.pooled);
 check('no allocation errors', resolved.errors === false, resolved.errors);
 
+// Typing a two-digit number must actually land. The tree re-renders on every
+// keystroke, and if that re-render steals focus from the field being typed into,
+// only the first digit survives — which is invisible in code review and obvious
+// the moment a person types "12".
+await page.evaluate(() => {
+  const row = Array.from(document.querySelectorAll('#tree-host .tree-row'))
+    .find((r) => (r.querySelector('.tree-name') || {}).textContent?.trim() === 'Day3');
+  row.querySelector('.tree-alloc').focus();
+});
+await page.keyboard.type('12', { delay: 40 });
+const twoDigit = await page.evaluate(() => {
+  const row = Array.from(document.querySelectorAll('#tree-host .tree-row'))
+    .find((r) => (r.querySelector('.tree-name') || {}).textContent?.trim() === 'Day3');
+  const inp = row.querySelector('.tree-alloc');
+  const s = window.PT.store.get();
+  // The path is whatever the chosen root was called, so read it off the field
+  // rather than assuming it.
+  return { field: inp.value, path: inp.dataset.path, stored: s.session.allocs[inp.dataset.path] };
+});
+check('a two-digit number can be typed into the tree', twoDigit.field === '12', twoDigit.field);
+check('the two-digit value reaches the store', (twoDigit.stored || {}).value === 12,
+  JSON.stringify(twoDigit.stored));
+
+// Put it back so the assertions below still describe the PRD 4.3 example.
+await page.evaluate(() => {
+  const row = Array.from(document.querySelectorAll('#tree-host .tree-row'))
+    .find((r) => (r.querySelector('.tree-name') || {}).textContent?.trim() === 'Day3');
+  const i = row.querySelector('.tree-alloc');
+  i.value = '';
+  i.dispatchEvent(new Event('input', { bubbles: true }));
+});
+
 const startEnabled = await page.evaluate(() => {
   const b = Array.from(document.querySelectorAll('#tree-footer button'))
     .find((x) => /Start culling/.test(x.textContent));

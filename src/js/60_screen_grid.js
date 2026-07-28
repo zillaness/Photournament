@@ -1,6 +1,6 @@
 /**
  * @file 60_screen_grid.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -47,39 +47,9 @@
   var el = dom.el;
   var S = PT.session;
 
-  var STYLE_ID = 'pt-grid-style';
 
   /* ------------------------------------------------------------------ style */
 
-  function injectStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    var css = [
-      '.pt-wrap{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;}',
-      '.pt-config{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 12px;}',
-      '.pt-config .f{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);}',
-      '.pt-config select,.pt-config input[type="number"]{padding:3px 6px;font-size:13px;}',
-      '.pt-config input[type="number"]{width:72px;}',
-      '.pt-config.locked{opacity:.8;}',
-      '.pt-lock{font-size:12px;border:1px solid var(--warn);color:var(--warn);border-radius:4px;padding:2px 8px;white-space:nowrap;}',
-      // The viewport cap is not cosmetic. #app is min-height:100%, so a tall grid
-      // grows the document instead of scrolling inside its own box — which would
-      // put every cut-pile thumbnail permanently "in view" and defeat the
-      // IntersectionObserver that keeps object URLs bounded. Measured: without the
-      // cap, all 40 pile thumbnails held URLs at once.
-      '.pt-grid{flex:1 1 auto;min-height:0;max-height:calc(100vh - 210px);overflow-y:auto;align-content:start;}',
-      '.pt-pile{flex:1 1 auto;min-height:0;max-height:calc(100vh - 250px);overflow-y:auto;align-content:start;}',
-      '.pt-cell-name{position:absolute;left:0;right:0;bottom:0;font-size:11px;padding:3px 6px;' +
-        'background:linear-gradient(transparent,rgba(0,0,0,.85));color:var(--text-dim);' +
-        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}',
-      '.pt-missing{display:flex;align-items:center;justify-content:center;height:100%;' +
-        'color:var(--text-mute);font-size:11px;text-align:center;padding:8px;}',
-      '.pt-actions{position:sticky;bottom:0;background:var(--bg);padding-top:8px;}',
-      '.pt-hint{color:var(--warn);font-size:13px;}',
-      '.pt-sum b{color:var(--text);}',
-      '.pt-title{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}'
-    ].join('\n');
-    document.head.appendChild(el('style', { id: STYLE_ID, text: css }));
-  }
 
   /* ---------------------------------------------------------------- helpers */
 
@@ -771,7 +741,6 @@
 
   PT.router.register('grid', {
     mount: function (root, params) {
-      injectStyle();
       var s = st();
       if (!s || !s.session) {
         root.appendChild(el('div', { class: 'error-box', text: 'No session loaded.' }));
@@ -1029,7 +998,6 @@
 
   PT.router.register('rescue', {
     mount: function (root, params) {
-      injectStyle();
       var s = st();
       if (!s || !s.session) {
         root.appendChild(el('div', { class: 'error-box', text: 'No session loaded.' }));
@@ -1070,4 +1038,6 @@
  *   persisted currentPass, the PRD 7.2 low cull rate offer with a true pool and
  *   cut-pile rollback, and the PRD 7.5 cut pile rescue screen with a pre-committed
  *   locked limit and viewport-bounded thumbnail attachment.
- */
+  * v1.1 (2026-07-28): Adopted photournament_ui_v2.0.css; removed the injected
+ *   style block.
+*/

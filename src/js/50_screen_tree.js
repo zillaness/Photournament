@@ -1,6 +1,6 @@
 /**
  * @file 50_screen_tree.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -19,34 +19,10 @@
   var PT = (window.PT = window.PT || {});
   var el = PT.dom.el;
 
-  var STYLE_ID = 'pt-tree-style';
 
-  function injectStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    var css =
-      '.tree-row{display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:6px}' +
-      '.tree-head{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute);' +
-        'border-bottom:1px solid var(--line);margin-bottom:4px;padding-bottom:6px}' +
-      '.tree-head:hover{background:none}' +
-      '.tree-head .tree-alloc{border:none;background:none;text-align:center}' +
-      '.tree-row:hover{background:var(--surface-2)}' +
-      '.tree-row.excluded .tree-name{text-decoration:line-through;opacity:.45}' +
-      '.tree-row.has-error{box-shadow:inset 0 0 0 1px #5c2f2b}' +
-      '.tree-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-      '.tree-count{color:var(--text-mute);font-size:12px;font-variant-numeric:tabular-nums;min-width:62px;text-align:right}' +
-      '.tree-alloc{width:62px;text-align:center;font-variant-numeric:tabular-nums}' +
-      '.tree-state{font-size:11px;min-width:74px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.4px}' +
-      '.tree-inf{padding:2px 7px;font-size:13px;line-height:1.3}' +
-      '.tree-inf.on{background:var(--accent);border-color:var(--accent);color:#0b0b0c}' +
-      '.tree-issues{display:flex;flex-direction:column;gap:6px;margin-top:10px}' +
-      '.totals{display:flex;gap:18px;align-items:baseline;font-variant-numeric:tabular-nums}' +
-      '.totals b{font-size:22px}';
-    document.head.appendChild(el('style', { id: STYLE_ID, text: css }));
-  }
 
   PT.router.register('tree', {
     mount: function (root) {
-      injectStyle();
       var st = PT.store.get();
       PT.dom.$('#topbar').hidden = false;
       PT.dom.$('#topbar-context').textContent = st.session.rootName;
@@ -60,12 +36,20 @@
         el('h1', { text: 'How many photos do you want to KEEP from each folder?' })
       ]));
 
-      root.appendChild(el('div', { class: 'muted small', html:
+      root.classList.add('screen-tree');
+
+      root.appendChild(el('div', { class: 'tree-help', html:
         'The number is how many photos <b>survive</b> — the keepers, not the ones thrown away. ' +
-        'Type <b>5</b> and you end up with 5 photos from that folder.<br>' +
-        'Use <b>0</b> to skip a folder entirely, <b>*</b> (or the ∞ button) to cull with no fixed ' +
-        'target, or leave it blank to let a folder compete with its blank siblings for whatever ' +
-        'its parent has left over.' }));
+        'Type <b>5</b> and you end up with 5 photos from that folder.' }));
+
+      var help = el('details', { class: 'tree-help' }, [
+        el('summary', { text: 'Blank, zero and no-limit' }),
+        el('div', { html:
+          'Use <b>0</b> to skip a folder entirely, <b>*</b> (or the ∞ button) to cull with no fixed ' +
+          'target, or leave it blank to let a folder compete with its blank siblings for whatever ' +
+          'its parent has left over.' })
+      ]);
+      root.appendChild(help);
 
       var treeHost = el('div', { class: 'card', id: 'tree-host' });
       var issuesHost = el('div', { class: 'tree-issues', id: 'tree-issues' });
@@ -117,12 +101,12 @@
       function cssEscape(s) { return String(s).replace(/(["\\])/g, '\\$1'); }
 
       function headerRow() {
+        // Must mirror rowFor()'s child order exactly or the columns drift.
         return el('div', { class: 'tree-row tree-head' }, [
           el('span', { class: 'tree-name', text: 'Folder' }),
           el('span', { class: 'tree-count', text: 'has' }),
-          el('span', { class: 'tree-state', text: '' }),
           el('span', { class: 'tree-alloc', text: 'keep' }),
-          el('span', { style: 'width:30px' })
+          el('span', {}), el('span', {}), el('span', {}), el('span', {})
         ]);
       }
 
@@ -164,15 +148,27 @@
           : node.alloc.mode === 'fixed' ? (node.clamped ? 'clamped ' + node.target : 'fixed')
           : node.unitId ? 'pooled' : 'pooled';
 
-        var row = el('div', {
-          class: 'tree-row' + (node.excluded ? ' excluded' : '') + (hasError ? ' has-error' : '')
+        // How brutal this cut is, as a fraction. Uncapped reads as full.
+        var p = node.uncapped ? 1
+          : (node.target != null && node.subtreeCount) ? node.target / node.subtreeCount
+          : 0;
+        var bar = el('span', { class: 'tree-bar', style: '--p:' + Math.max(0, Math.min(1, p)) },
+                     [el('i')]);
+
+        // A <label> so clicking anywhere on the row — the folder name especially —
+        // lands in that row's keep field. Depth moves to a custom property so CSS
+        // owns both the indent and the hierarchy rails.
+        var row = el('label', {
+          class: 'tree-row' + (node.excluded ? ' excluded' : '') + (hasError ? ' has-error' : ''),
+          style: '--d:' + depth
         }, [
-          el('span', { class: 'tree-name', style: 'padding-left:' + depth * 16 + 'px',
+          el('span', { class: 'tree-name',
                        text: (path === '' ? s.session.rootName : node.name) }),
           el('span', { class: 'tree-count', text: node.subtreeCount + ' photo' + (node.subtreeCount === 1 ? '' : 's') }),
-          el('span', { class: 'tree-state', text: stateWord }),
           input,
-          inf
+          inf,
+          bar,
+          el('span', { class: 'tree-state', text: stateWord })
         ]);
 
         // Offer top-down distribution only where it is meaningful (PRD 4.4).
@@ -325,4 +321,10 @@
  *   recreated the input and stole focus, so only the first digit of a number ever
  *   landed; focus and caret are now restored after render. Reworded throughout to
  *   say the number is how many photos you KEEP, and added a column header.
+ * v1.2 (2026-07-28): Adopted photournament_ui_v2.0.css. Removed the injected
+ *   style block. The row is now a <label> ordered name / count / keep / infinity /
+ *   proportion bar / state, so it reads as the sentence the screen asks — "Trip
+ *   has 36, keep 8" — instead of stranding the field at the far right. Depth moved
+ *   to a --d custom property so CSS owns the indent and hierarchy rails, and the
+ *   second paragraph of help became a disclosure.
 */

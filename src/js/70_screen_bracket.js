@@ -1,6 +1,6 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.2
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -512,48 +512,6 @@
    * 2. Styles — injected once, since src/css is owned elsewhere.
    * ==================================================================== */
 
-  var STYLE_ID = 'pt-bracket-style';
-  function injectStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    var s = document.createElement('style');
-    s.id = STYLE_ID;
-    s.textContent = [
-      '.bk{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}',
-      '.bk-sub{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text-dim);flex-wrap:wrap}',
-      '.bk-tag{border:1px solid var(--line-2);border-radius:4px;padding:1px 7px;font-size:12px}',
-      '.bk-tag-rep{border-color:var(--accent-dim);color:var(--accent)}',
-      '.bk-tag-warn{border-color:#5c4f22;color:#f0e0b0}',
-      '.bk-stage{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}',
-      '.bk-pane{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;',
-      'background:#000;border:2px solid var(--line);border-radius:var(--r);overflow:hidden}',
-      '.bk-pane:hover{border-color:var(--line-2)}',
-      '.bk-pane.chosen{border-color:var(--accent)}',
-      '.bk-vp{position:relative;flex:1;min-height:0;overflow:hidden;cursor:pointer;touch-action:none}',
-      '.bk-vp img{position:absolute;top:0;left:0;transform-origin:0 0;-webkit-user-drag:none;user-select:none;pointer-events:none}',
-      '.bk-vp.grab{cursor:grabbing}',
-      '.bk-cap{display:flex;align-items:center;gap:8px;padding:5px 9px;font-size:12px;',
-      'background:var(--surface);color:var(--text-dim);border-top:1px solid var(--line);',
-      'white-space:nowrap;overflow:hidden}',
-      '.bk-cap .nm{overflow:hidden;text-overflow:ellipsis}',
-      '.bk-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}',
-      '.bk-zoom{font-variant-numeric:tabular-nums;min-width:56px;text-align:center;font-size:13px;color:var(--text-dim)}',
-      '.bk-miss{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-mute);font-size:13px}',
-      '.bk-results{overflow:auto;min-height:0;flex:1}',
-      '.bk-row{display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--line)}',
-      '.bk-row img{width:104px;height:70px;object-fit:contain;background:#000;border-radius:4px;flex:none}',
-      '.bk-rank{width:36px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text-dim);flex:none}',
-      '.bk-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}',
-      '.ro-group{border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:10px;background:var(--surface)}',
-      '.ro-head{display:flex;align-items:center;gap:10px}',
-      '.ro-head img{width:104px;height:70px;object-fit:contain;background:#000;border-radius:4px;flex:none}',
-      '.ro-body{margin-top:10px}',
-      '.ro-cell .tag{position:absolute;bottom:4px;left:4px;right:4px;font-size:11px;text-align:center;',
-      'background:rgba(0,0,0,0.7);border-radius:3px;padding:1px 3px;color:var(--text-dim)}',
-      '.ro-cell.dead{cursor:not-allowed;opacity:0.45}',
-      '@media(max-width:720px){.bk-stage{grid-template-columns:1fr}}'
-    ].join('\n');
-    document.head.appendChild(s);
-  }
 
   /* ======================================================================
    * 3. Shared helpers
@@ -686,7 +644,6 @@
   }
 
   function mountBracket(root, params) {
-    injectStyle();
     var unitId = params && params.unitId;
     var u = ensureBracket(unitId);
 
@@ -1215,7 +1172,6 @@
   }
 
   function mountRunoff(root, params) {
-    injectStyle();
     var unitId = params && params.unitId;
     var u = unitOf(unitId);
     if (!u) {
@@ -1507,4 +1463,6 @@
  *   the winners and are reported as "over target" so passing the quota stays a
  *   visible, deliberate act. Replaced the "burst runoff" jargon throughout with
  *   plain language about choosing the best of duplicates.
+ * v1.3 (2026-07-28): Adopted photournament_ui_v2.0.css; removed the injected
+ *   style block.
 */

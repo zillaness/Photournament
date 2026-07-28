@@ -1,6 +1,6 @@
 /**
  * @file 80_screen_export.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -18,22 +18,7 @@
 
   var PT = (window.PT = window.PT || {});
   var el = PT.dom.el;
-  var STYLE_ID = 'pt-export-style';
 
-  function injectStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    document.head.appendChild(el('style', { id: STYLE_ID, text:
-      '.exp-row{display:grid;grid-template-columns:34px 76px 1fr 1.4fr;gap:10px;align-items:center;' +
-        'padding:6px;border-radius:6px}' +
-      '.exp-row:hover{background:var(--surface-2)}' +
-      '.exp-rank{font-variant-numeric:tabular-nums;color:var(--text-mute);text-align:right}' +
-      '.exp-thumb{width:76px;height:52px;object-fit:contain;background:#000;border-radius:4px}' +
-      '.exp-name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-      '.exp-dest{font-family:var(--mono);font-size:11px;color:var(--text-dim);' +
-        'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-      '.exp-set{margin-bottom:18px}'
-    }));
-  }
 
   /** PRD 7.8: labels are optional, and become part of the filename. */
   function slugLabel(s) {
@@ -74,7 +59,6 @@
 
   PT.router.register('export', {
     mount: function (root) {
-      injectStyle();
       var st = PT.store.get();
       var session = st.session;
       PT.dom.$('#topbar').hidden = false;
@@ -164,8 +148,18 @@
               type: 'text', placeholder: 'why this one won, or how it will be used',
               value: s.session.labels[id] || ''
             });
+            // Built as three children rather than one string so the stylesheet can
+            // brighten the part the user typed, making it visible that what they
+            // write becomes part of what gets written to disk.
             var refresh = function () {
-              dest.textContent = destName(photo, i + 1, set.ids.length, s.session.settings, labelInput.value);
+              PT.dom.clear(dest);
+              var slug = slugLabel(labelInput.value);
+              if (s.session.settings.prefixes) {
+                dest.appendChild(document.createTextNode(
+                  PT.fmt.ordinal(i + 1, set.ids.length) + '_'));
+              }
+              if (slug) dest.appendChild(el('span', { class: 'exp-slug', text: slug + '_' }));
+              dest.appendChild(document.createTextNode(photo.name));
             };
             labelInput.addEventListener('input', function () {
               PT.store.dispatch('export:label', function (ss) { ss.session.labels[id] = labelInput.value; });
@@ -620,4 +614,7 @@
  *   picked destination even when the session came from dropped files, and
  *   "Download as one .zip", a dependency-free STORED zip (photographs are already
  *   compressed, so deflating them would buy nothing).
+ * v1.2 (2026-07-28): Adopted photournament_ui_v2.0.css. Removed the injected
+ *   style block and split the destination filename into three nodes so the part
+ *   the user typed can be highlighted as it becomes part of the written name.
 */

@@ -55,7 +55,11 @@ const r = await page.evaluate(async () => {
     // should never pay for it.
     heicPayloadBytes: heicEl ? heicEl.textContent.length : 0,
     heicNotExecuted: typeof window.libheif === 'undefined',
-    styledDark: getComputedStyle(document.body).backgroundColor,
+    // Colour-space agnostic: the stylesheet may express colours as rgb, oklch or
+    // anything else, so assert that a design token resolved and that the page is
+    // actually painted rather than matching one literal value.
+    bgToken: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+    bodyBg: getComputedStyle(document.body).backgroundColor,
     // No stray build tokens survived into the artifact.
     tokensLeft: (document.documentElement.innerHTML.match(/BUILD:(CSS|JS|LIBHEIF)/g) || []).length
   };
@@ -92,7 +96,8 @@ check('loads from file:// origin', r.origin === 'file:', r.origin);
 check('PT.VERSION present', !!r.version, r.version);
 check('all modules registered', r.modules.length === 9, r.modules.join(','));
 check('screen host exists', r.screenHost);
-check('stylesheet applied', r.styledDark === 'rgb(13, 13, 14)', r.styledDark);
+check('design tokens resolved', r.bgToken.length > 0, r.bgToken || '(none)');
+check('page background is painted', r.bodyBg && r.bodyBg !== 'rgba(0, 0, 0, 0)', r.bodyBg);
 check('no build tokens left in output', r.tokensLeft === 0, r.tokensLeft);
 check('libheif payload embedded', r.heicPayloadBytes > 1000000, (r.heicPayloadBytes / 1048576).toFixed(2) + ' MB');
 check('libheif NOT executed at boot', r.heicNotExecuted === true, r.heicNotExecuted);

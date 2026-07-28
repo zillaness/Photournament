@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -33,6 +33,13 @@
 
   var PREVIEW_PX = 1280;
 
+  /** Nine cells with one marked. Purely decorative; drawn entirely in CSS. */
+  function mark(live) {
+    var cells = [];
+    for (var i = 0; i < 9; i++) cells.push(el('i'));
+    return el('div', { class: 'pt-mark' + (live ? ' pt-mark-live' : '') }, cells);
+  }
+
   /* ------------------------------------------------------------- entry ---- */
 
   PT.router.register('welcome', {
@@ -40,6 +47,7 @@
       PT.dom.$('#topbar').hidden = true;
 
       root.appendChild(el('div', { class: 'card' }, [
+        mark(false),
         el('h1', { text: 'Photournament' }),
         el('p', { class: 'muted', text:
           'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
@@ -378,19 +386,24 @@
       topbar.hidden = false;
       PT.dom.$('#topbar-context').textContent = PT.store.get().session.rootName;
 
+      root.classList.add('screen-ingest');
+
       var status = el('div', { class: 'muted', text: 'Reading the folder…' });
       var bar = el('div', { class: 'bar' }, [el('i', { style: 'width:0%' })]);
-      var detail = el('div', { class: 'small dim nums' });
+      var count = el('div', { class: 'ingest-count nums' });
+      var detail = el('div', { class: 'small dim' });
       var summary = el('div', { id: 'ingest-summary' });
       var actions = el('div', { class: 'row', id: 'ingest-actions' });
 
       root.appendChild(el('div', { class: 'card screen-narrow' }, [
-        el('h1', { text: 'Reading photos' }), status, bar, detail, summary, actions
+        el('div', { class: 'row' }, [mark(true), el('h1', { text: 'Reading photos' })]),
+        status, count, bar, detail, summary, actions
       ]));
 
       var setProgress = function (done, total, note) {
         bar.firstChild.style.width = (total ? (done / total) * 100 : 0) + '%';
-        detail.textContent = done + ' / ' + total + (note ? '   ' + note : '');
+        count.textContent = done + ' / ' + total;
+        detail.textContent = note || '';
       };
 
       var scan = params.source.type === 'handle'
@@ -585,4 +598,7 @@
  *   falls back to webkitGetAsEntry, because dataTransfer.files is EMPTY for a
  *   dropped folder and the old fallback therefore could never work. Added a
  *   visible environment readout so a failure here is diagnosable.
+ * v1.2 (2026-07-28): Adopted photournament_ui_v2.0.css. Removed the injected
+ *   style block, split the ingest count from its time estimate so the count can
+ *   carry display size, and added the CSS-drawn nine-square mark.
 */

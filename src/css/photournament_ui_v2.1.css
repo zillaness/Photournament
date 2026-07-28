@@ -510,6 +510,20 @@ input.invalid, input.invalid:focus {
 }
 select { cursor: pointer; padding-right: 8px; }
 
+/*
+ * The dropdown LIST is UA chrome, and on Windows Chromium/Brave it ignores the
+ * page's color-scheme and draws the OS-light popup under both themes — which in
+ * the dark surround meant the page's near-white option text landed on a white
+ * list. Options do honour author background/color inside the popup, so paint
+ * them from the same tokens as the field they fall out of; the list then
+ * follows the theme no matter what the popup chrome decides.
+ */
+select option {
+  background: var(--field);
+  color: var(--text);
+}
+select option:disabled { color: var(--text-mute); }
+
 input[type="checkbox"] {
   appearance: none;
   width: 18px; height: 18px;
@@ -738,7 +752,14 @@ kbd {
   max-width: 640px;
   margin: 0 auto;
   width: 100%;
-  justify-content: center;
+  /*
+   * safe center, not center. Plain centring overflows in BOTH directions once
+   * the content is taller than the viewport, putting the top of the screen —
+   * here the lockup — at a negative offset that cannot be scrolled to. Measured
+   * at y = -32 on an 820x560 viewport. safe falls back to flex-start when there
+   * is not enough room, which is the only behaviour that is ever useful.
+   */
+  justify-content: safe center;
   gap: 24px;
 }
 .screen-welcome .card {
@@ -926,7 +947,7 @@ kbd {
     252px   /* folder name, truncating */
     86px    /* has */
     66px    /* keep field */
-    34px    /* infinity toggle */
+    64px    /* unit toggles: % and infinity */
     64px    /* keep : has proportion */
     86px    /* resolved state */
     minmax(48px, auto);  /* split */
@@ -1030,8 +1051,13 @@ kbd {
 }
 #app .tree-alloc::placeholder { color: var(--text-mute); }
 
-/* The infinity toggle. Cryptic on its own, so it carries a hover label. */
-#app .tree-inf {
+/*
+ * The unit toggles. % and infinity both answer "what does this number mean",
+ * not "what is it", so they sit together in one column beside the field they
+ * modify. Cryptic on their own, so both carry a hover label.
+ */
+#app .tree-units { display: flex; gap: 4px; }
+#app .tree-unit {
   padding: 0;
   width: 30px; height: 30px;
   justify-content: center;
@@ -1041,8 +1067,8 @@ kbd {
   background: transparent;
   border-color: var(--line);
 }
-#app .tree-inf:hover:not(:disabled) { color: var(--text); border-color: var(--line-2); background: var(--surface-3); }
-#app .tree-inf.on {
+#app .tree-unit:hover:not(:disabled) { color: var(--text); border-color: var(--line-2); background: var(--surface-3); }
+#app .tree-unit.on {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
@@ -1940,23 +1966,16 @@ kbd {
    ==========================================================================
    The recursive identity mark, referenced from the sprite in the shell.
 
-   It carries its OWN ground rather than sitting on --surface, and that is not
-   an oversight. The mark's palette is fixed by the identity spec (#171717
-   ground, #474747 cells, #F3F3F3 selected) and its selected cell is the whole
-   concept — but #F3F3F3 against the light theme's page measures 1.45:1, which
-   is invisible. Giving it the ground the identity already specifies keeps the
-   mark identical in both themes instead of letting the surround eat it. The
-   identity README says as much: "use the dark-background logo as the primary
-   lockup".
+   It is painted from the DESIGN SYSTEM's neutrals, not the identity package's
+   own palette. The mark was designed against its own #171717 background, and
+   dropping that palette in unchanged made the logo read as a lighter black
+   square on a --bg page and made its selected cell vanish entirely on the light
+   surround (1.45:1). Ground follows --bg, cells follow --line-2, the selected
+   frame follows --text — so the mark inverts with the surround exactly like the
+   rest of the interface, and there is no second black in the product.
 
-   The ground is composed into the sprite rather than applied as CSS padding,
-   because percentage padding resolves against the PARENT's width, not the
-   element's — 12.5% became 74px and blew the box out. Proportions taken from
-   the app icon: inset 8/64 = 12.5%, corner radius 14/64 = 21.9%.
-
-   These literals are the LOGO's colours, not UI tokens. They are deliberately
-   not themed, for the same reason the mark is not: a logo that changes with
-   the surround is not a logo.
+   In the dark surround this lands within a couple of values of the identity's
+   own colours anyway; it is the light surround that needed it.
    ========================================================================== */
 
 #app .pt-brandmark {
@@ -1966,8 +1985,155 @@ kbd {
   flex: none;
 }
 
-#app .screen-welcome .pt-brandmark { width: 60px; height: 60px; margin-bottom: 4px; }
+/*
+ * THE PLATE FOLLOWS ITS SURFACE.
+ *
+ * The mark carries its own rounded ground, and that ground has to be the colour
+ * of whatever it is sitting on or it reads as a slightly-off square floating
+ * over the panel. Three surfaces exist in this app and the mark appears on all
+ * three: the page (--bg) on the entry screen, whose card is transparent; the
+ * card (--surface) on the ingest screen; and the topbar (--surface).
+ *
+ * Declared as a custom property rather than a fill on each call site because the
+ * mark is a <use> of a shared symbol — nothing outside can style into that
+ * shadow tree, but inherited custom properties cross into it.
+ */
+#app { --mark-plate: var(--bg); }
+#app .card,
+#app #topbar { --mark-plate: var(--surface); }
+/* The entry card paints nothing, so the mark meets the page there. */
+#app .screen-welcome .card { --mark-plate: var(--bg); }
+
+#app .pt-lockup { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+#app .pt-lockup h1 { margin: 0; }
+
+/*
+ * The wordmark, not a heading that happens to say the product name. Same
+ * treatment as #topbar-title — uppercase, 650, 0.09em — because they are the
+ * same object at two sizes. Full --text here rather than --text-dim: in the
+ * topbar the wordmark is a label beside the work, on the entry screen it is
+ * the thing itself.
+ */
+#app .pt-wordmark {
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+#app .screen-welcome .pt-brandmark { width: 46px; height: 46px; }
+
+/*
+ * In the topbar it sits beside the wordmark, sized to that text's cap height.
+ * The gap is tighter than the bar's default: a mark and the word it belongs to
+ * are one lockup.
+ */
+#app .pt-brandmark-bar { width: 22px; height: 22px; }
+
+/* --------------------------------------------------------------------------
+   THE MARK, WORKING
+   --------------------------------------------------------------------------
+   On the ingest screen the mark has a job: it has to show that something is
+   happening. It used to be swapped out for a separate nine-cell throbber and
+   swapped back at the end, which meant the identity blinked out of existence
+   for the length of the ingest and blinked back — two objects pretending to be
+   one.
+
+   They are now genuinely one object in one slot. The nine walking cells are an
+   overlay laid out on the SPRITE'S OWN GEOMETRY — 24% cells at 12.5%, 38% and
+   63.5%, the same numbers the symbol uses — so each cell covers the mark's
+   corresponding square exactly. Fading that overlay in flattens the logo into
+   the plain nine-square grid and starts it walking; fading it out lets the
+   recursion bloom back through. Nothing moves, nothing resizes, and at every
+   frame of the transition the thing on screen is still the mark.
+
+   The cells borrow the mark's own two colours, so the throbber IS the basic
+   nine-cell version of the logo rather than a differently-coloured spinner.
+   -------------------------------------------------------------------------- */
+
+#app .pt-markslot {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+#app .pt-markslot .pt-brandmark { width: 100%; height: 100%; }
+
+#app .pt-markcells {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  /* Slower out than in: the logo resolving is the payoff, and it should not be
+     over before the eye has arrived. */
+  transition: opacity 260ms ease-out;
+}
+#app .pt-markslot[data-state="live"] .pt-markcells { opacity: 1; }
+#app .pt-markslot[data-state="rest"] .pt-markcells {
+  opacity: 0;
+  transition: opacity 520ms ease-in;
+}
+
+#app .pt-markcells i {
+  position: absolute;
+  width: 24%;
+  height: 24%;
+  /* rx 3 in the symbol's 100-unit space, scaled by the 0.75 plate inset, as a
+     fraction of the cell: 2.25 / 24. */
+  border-radius: 9.4%;
+  background: var(--line-2);
+  animation: pt-markcell 3.6s steps(1, end) infinite;
+}
+#app .pt-markcells i:nth-child(3n+1) { left: 12.5%; }
+#app .pt-markcells i:nth-child(3n+2) { left: 38%; }
+#app .pt-markcells i:nth-child(3n+3) { left: 63.5%; }
+#app .pt-markcells i:nth-child(-n+3) { top: 12.5%; }
+#app .pt-markcells i:nth-child(n+4):nth-child(-n+6) { top: 38%; }
+#app .pt-markcells i:nth-child(n+7) { top: 63.5%; }
+
+#app .pt-markcells i:nth-child(1) { animation-delay: 0.0s; }
+#app .pt-markcells i:nth-child(2) { animation-delay: 0.4s; }
+#app .pt-markcells i:nth-child(3) { animation-delay: 0.8s; }
+#app .pt-markcells i:nth-child(6) { animation-delay: 1.2s; }
+#app .pt-markcells i:nth-child(9) { animation-delay: 1.6s; }
+#app .pt-markcells i:nth-child(8) { animation-delay: 2.0s; }
+#app .pt-markcells i:nth-child(7) { animation-delay: 2.4s; }
+#app .pt-markcells i:nth-child(4) { animation-delay: 2.8s; }
+/* The centre goes last, so the walk lands on the one cell the mark itself keeps
+   lit — the highlight arrives home just as the overlay starts to clear. */
+#app .pt-markcells i:nth-child(5) { animation-delay: 3.2s; }
+
+@keyframes pt-markcell {
+  0%, 11%   { background: var(--text); }
+  12%, 100% { background: var(--line-2); }
+}
+
+/* The recursion coming back is worth a beat of its own: a small settle, not a
+   bounce. Only on the way back — starting work should be quiet. */
+#app .pt-markslot[data-state="rest"] .pt-brandmark {
+  animation: pt-mark-resolve 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes pt-mark-resolve {
+  0%   { transform: scale(0.955); }
+  55%  { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
+
+/*
+ * Reduced motion keeps the STATE and drops the MOTION. The overlay still
+ * appears and disappears, so "working" and "done" remain distinguishable — it
+ * just does so without a walk, a fade or a settle.
+ */
+@media (prefers-reduced-motion: reduce) {
+  #app .pt-markcells,
+  #app .pt-markslot[data-state="rest"] .pt-markcells { transition: none; }
+  #app .pt-markcells i { animation: none; }
+  #app .pt-markslot[data-state="rest"] .pt-brandmark { animation: none; }
+}
+
+#app .topbar-left { gap: 9px; }
 
 @media (max-width: 720px) {
   #app .pt-brandmark { width: 38px; height: 38px; }
+  #app .pt-brandmark-bar { width: 19px; height: 19px; }
+  #app .pt-markslot { width: 38px; height: 38px; }
 }

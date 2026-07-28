@@ -1,6 +1,6 @@
 /**
  * @file 30_tree.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -36,7 +36,13 @@
   var LOOSE = '__loose__';
   var LOOSE_LABEL = '(loose files)';
 
-  var MODE = { FIXED: 'fixed', EXCLUDED: 'excluded', POOLED: 'pooled', UNCAPPED: 'uncapped' };
+  var MODE = {
+    FIXED: 'fixed',
+    EXCLUDED: 'excluded',
+    POOLED: 'pooled',
+    UNCAPPED: 'uncapped',
+    PERCENT: 'percent'
+  };
 
   /* ------------------------------------------------------------------ build */
 
@@ -113,6 +119,17 @@
 
   /**
    * Parses what the user typed into an allocation state.
+   *
+   * "5%" is a fifth state, and it has to be its own mode rather than being turned
+   * into a number here: this function is called on every keystroke and knows
+   * nothing about how many photos the folder holds. Resolving it early would also
+   * mean the field rewrote itself to "37" the instant you typed the % — the value
+   * you asked for replaced by the value it happened to mean.
+   *
+   * A percentage of nothing is nothing, so 0% is the same statement as 0: skip it.
+   * Above 100% is rejected rather than clamped, because there is no reading of
+   * "keep 150% of this folder" that the user meant.
+   *
    * @param {string|number|null} raw
    * @returns {{mode:string, value:number|null}|null}  null means the input is invalid
    */
@@ -121,6 +138,15 @@
     var s = String(raw).trim();
     if (s === '') return { mode: MODE.POOLED, value: null };
     if (s === '*' || s === '∞' || s.toLowerCase() === 'inf') return { mode: MODE.UNCAPPED, value: null };
+
+    var pct = /^(\d{1,3}(?:\.\d+)?)\s*%$/.exec(s);
+    if (pct) {
+      var p = parseFloat(pct[1]);
+      if (!isFinite(p) || p < 0 || p > 100) return null;
+      if (p === 0) return { mode: MODE.EXCLUDED, value: 0 };
+      return { mode: MODE.PERCENT, value: p };
+    }
+
     if (!/^\d+$/.test(s)) return null;
     var n = parseInt(s, 10);
     if (n === 0) return { mode: MODE.EXCLUDED, value: 0 };
@@ -131,8 +157,24 @@
     if (!alloc) return '';
     if (alloc.mode === MODE.UNCAPPED) return '*';
     if (alloc.mode === MODE.EXCLUDED) return '0';
+    if (alloc.mode === MODE.PERCENT) return alloc.value + '%';
     if (alloc.mode === MODE.FIXED) return String(alloc.value);
     return '';
+  }
+
+  /**
+   * A percentage against a real photo count. Rounds to nearest, but never down to
+   * zero while the folder still holds something: 5% of 12 is 0.6, and answering
+   * "keep 5%" with "keep none" would be a silent exclusion — 0 is a state the user
+   * has to ask for by name.
+   *
+   * @param {number} percent  1..100
+   * @param {number} count    photos available
+   * @returns {number}
+   */
+  function percentToCount(percent, count) {
+    if (!(count > 0) || !(percent > 0)) return 0;
+    return Math.max(1, Math.min(count, Math.round((percent / 100) * count)));
   }
 
   /* ---------------------------------------------------------------- resolve */
@@ -182,7 +224,7 @@
       for (var i = 0; i < kids.length; i++) {
         var c = kids[i];
         if (out[c].excluded) continue;
-        var m = out[c].alloc.mode;
+        var m = out[c].eff.mode;
         if (m === MODE.FIXED || m === MODE.UNCAPPED) return true;
         if (hasAllocatedDescendant(c)) return true;
       }
@@ -199,7 +241,12 @@
       out[path] = {
         path: path,
         name: n.name,
+        // What the user typed, kept verbatim so the field can render it back.
         alloc: allocOf(path),
+        // What that means once the counts are known. The two differ only for a
+        // percentage; everything downstream reads `eff` and never has to care.
+        eff: allocOf(path),
+        percentCount: null,
         excluded: self || isExcluded(path),
         ownCount: self ? 0 : n.photoIds.length,
         subtreeCount: total,
@@ -214,6 +261,23 @@
       return total;
     })(tree.rootPath);
 
+    // Pass 1b: turn percentages into counts, now that the counts exist and before
+    // anything reads them. A percentage is a way of SAYING a fixed number, not a
+    // fifth kind of arithmetic — folding it in here means the allocation rules
+    // below stay exactly the four states the PRD describes, rather than growing a
+    // percentage branch in each of them.
+    //
+    // The percentage is always of the folder's OWN subtree, never of the parent's
+    // remainder. "Keep 10% of Day 3" has to mean the same thing wherever Day 3
+    // happens to sit, or the number on screen stops being checkable by hand.
+    Object.keys(out).forEach(function (path) {
+      var o = out[path];
+      if (o.alloc.mode !== MODE.PERCENT) return;
+      var want = percentToCount(o.alloc.value, o.subtreeCount);
+      o.percentCount = want;
+      o.eff = { mode: MODE.FIXED, value: want };
+    });
+
     // Pass 2, top-down: resolve targets. A node's meaning depends on its parent's
     // state (PRD 4.4), so this cannot be folded into the bottom-up pass.
     var units = [];
@@ -221,7 +285,7 @@
     (function assign(path) {
       var n = nodes[path];
       var o = out[path];
-      var a = o.alloc;
+      var a = o.eff;
 
       if (o.excluded) {
         o.target = 0;
@@ -258,9 +322,9 @@
       // --- parent -------------------------------------------------------
       kids.forEach(assign);
 
-      var fixedKids  = kids.filter(function (c) { return out[c].alloc.mode === MODE.FIXED; });
-      var uncapKids  = kids.filter(function (c) { return out[c].alloc.mode === MODE.UNCAPPED; });
-      var pooledKids = kids.filter(function (c) { return out[c].alloc.mode === MODE.POOLED; });
+      var fixedKids  = kids.filter(function (c) { return out[c].eff.mode === MODE.FIXED; });
+      var uncapKids  = kids.filter(function (c) { return out[c].eff.mode === MODE.UNCAPPED; });
+      var pooledKids = kids.filter(function (c) { return out[c].eff.mode === MODE.POOLED; });
 
       var fixedSum = fixedKids.reduce(function (s, c) { return s + (out[c].target || 0); }, 0);
 
@@ -345,7 +409,7 @@
     // Root special case: a pooled root has no parent to allocate it, so treat it
     // as one pool over everything — PRD 4.2's "all children pooled: pure best-of".
     var rootOut = out[tree.rootPath];
-    if (!rootOut.excluded && rootOut.alloc.mode === MODE.POOLED && !units.length && rootOut.subtreeCount > 0) {
+    if (!rootOut.excluded && rootOut.eff.mode === MODE.POOLED && !units.length && rootOut.subtreeCount > 0) {
       issues.push({
         path: tree.rootPath, level: 'note', code: 'root-unallocated',
         message: 'Nothing is allocated yet. Give the top folder a number, or a count to at least one subfolder.'
@@ -452,6 +516,7 @@
     build: build,
     parseAlloc: parseAlloc,
     allocToInput: allocToInput,
+    percentToCount: percentToCount,
     resolve: resolve,
     distribute: distribute
   };
@@ -462,4 +527,8 @@
  *   loose files, allocation parsing for all four states, two-pass resolution with
  *   clamping and dead-state detection, tournament unit derivation, and
  *   largest-remainder weighted distribution.
- */
+  * v1.1 (2026-07-28): Percentages. "5%" is a fifth input state resolved against
+ *   the folder's own subtree count in a pass between counting and allocation, so
+ *   the four PRD states stay untouched — everything downstream reads the derived
+ *   `eff` alloc and `percentCount`. Rounds to nearest, never silently to zero.
+*/

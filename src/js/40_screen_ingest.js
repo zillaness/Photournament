@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.6
+ * @version 1.7
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -34,13 +34,8 @@
   var PREVIEW_PX = 1280;
 
   /**
-   * Two different objects that happen to look alike, deliberately kept apart:
-   *
-   * - The BRAND MARK is the real recursive identity, referenced from the sprite
-   *   defined once in the shell. Identity, so it is the identity artwork.
-   * - The ACTIVITY INDICATOR is nine CSS cells that walk on a keyframe loop while
-   *   ingest runs. It has a job the static mark cannot do, and animating the
-   *   recursive artwork would turn a logo into a spinner.
+   * The BRAND MARK is the real recursive identity, referenced from the sprite
+   * defined once in the shell. Identity, so it is the identity artwork.
    */
   function brandMark() {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -54,10 +49,34 @@
     return svg;
   }
 
-  function activityMark() {
+  /**
+   * The mark, plus an overlay of nine cells laid out on the mark's own geometry.
+   * Not a second object: fading the overlay in flattens the recursion into the
+   * plain nine-square grid and walks it, fading it out lets the recursion back
+   * through. The slot returns a `settle` so the caller can say "the work is
+   * done" without knowing anything about how that is drawn.
+   *
+   * The overlay starts hidden and is switched to `live` on the next frame — a
+   * transition needs two computed values to interpolate between, and an element
+   * that has never been laid out only has one.
+   */
+  function workingMark() {
     var cells = [];
     for (var i = 0; i < 9; i++) cells.push(el('i'));
-    return el('div', { class: 'pt-mark pt-mark-live' }, cells);
+
+    var slot = el('span', { class: 'pt-markslot' }, [
+      brandMark(),
+      el('span', { class: 'pt-markcells', 'aria-hidden': 'true' }, cells)
+    ]);
+
+    requestAnimationFrame(function () {
+      if (!slot.dataset.state) slot.dataset.state = 'live';
+    });
+
+    slot.settle = function () {
+      slot.dataset.state = 'rest';
+    };
+    return slot;
   }
 
   /* ------------------------------------------------------------- entry ---- */
@@ -67,8 +86,11 @@
       PT.dom.$('#topbar').hidden = true;
 
       root.appendChild(el('div', { class: 'card' }, [
-        brandMark(),
-        el('h1', { text: 'Photournament' }),
+        // Mark and wordmark are one lockup, not two stacked things.
+        el('div', { class: 'pt-lockup' }, [
+          brandMark(),
+          el('h1', { class: 'pt-wordmark', text: 'Photournament' })
+        ]),
         el('p', { class: 'muted', text:
           'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
           'passes, then ranks what survives head to head.' })
@@ -443,6 +465,12 @@
 
       root.classList.add('screen-ingest');
 
+      // The mark walks while work is happening and resolves back into itself
+      // when it stops, so the animation ending and the work ending are the same
+      // event rather than two things the user has to correlate.
+      var markSlot = workingMark();
+      var settleMark = function () { markSlot.settle(); };
+
       var status = el('div', { class: 'muted', text: 'Reading the folder…' });
       var bar = el('div', { class: 'bar' }, [el('i', { style: 'width:0%' })]);
       var count = el('div', { class: 'ingest-count nums' });
@@ -451,7 +479,7 @@
       var actions = el('div', { class: 'row', id: 'ingest-actions' });
 
       root.appendChild(el('div', { class: 'card screen-narrow' }, [
-        el('div', { class: 'row' }, [activityMark(), el('h1', { text: 'Reading photos' })]),
+        el('div', { class: 'row' }, [markSlot, el('h1', { text: 'Reading photos' })]),
         status, count, bar, detail, summary, actions
       ]));
 
@@ -476,6 +504,7 @@
 
           if (!t.images.length) {
             status.textContent = 'No photos found here.';
+            settleMark();
             actions.appendChild(el('button', {
               class: 'btn', text: 'Choose a different folder',
               onclick: function () { PT.router.go('welcome'); }
@@ -487,6 +516,7 @@
           return processAll(t.images, setProgress, status)
             .then(function () {
               status.textContent = 'Ready.';
+              settleMark();
               return reportCache(summary);
             })
             .then(function () {
@@ -502,6 +532,7 @@
         .catch(function (e) {
           PT.warn('ingest', e);
           status.textContent = '';
+          settleMark();
           summary.appendChild(el('div', { class: 'error-box', text: 'Ingest failed: ' + e.message }));
         });
     },
@@ -683,4 +714,8 @@
  * v1.6 (2026-07-28): Theme control on the entry screen, where the topbar is
  *   hidden, and the brand mark now uses the plated sprite so it keeps its own
  *   ground in both themes.
+ * v1.7 (2026-07-28): The throbber and the mark are one object. workingMark()
+ *   stacks the nine walking cells over the brand mark on the sprite's own
+ *   geometry and cross-fades between them, so the logo flattens into the
+ *   nine-cell grid while ingest runs and resolves back when it finishes.
 */

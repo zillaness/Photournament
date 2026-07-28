@@ -59,53 +59,53 @@
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
   <defs>
       <symbol id="ptm-r0" viewBox="0 0 100 100">
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="0" y="0" width="30" height="30" rx="3"/><rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
       <symbol id="ptm-r1" viewBox="0 0 100 100">
         <use href="#ptm-r0" x="0" y="0" width="30" height="30"/>
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
       <symbol id="ptm-r2" viewBox="0 0 100 100">
         <use href="#ptm-r1" x="0" y="0" width="30" height="30"/>
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
       <symbol id="ptm-r3" viewBox="0 0 100 100">
         <use href="#ptm-r2" x="0" y="0" width="30" height="30"/>
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
       <symbol id="ptm-r4" viewBox="0 0 100 100">
         <use href="#ptm-r3" x="0" y="0" width="30" height="30"/>
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
     </defs>
   <symbol id="ptm-mark" viewBox="0 0 100 100">
     <use href="#ptm-r4" x="0" y="0" width="32" height="32"/>
-      <g fill="#474747">
+      <g fill="var(--line-2)">
         <rect x="34" y="0" width="32" height="32" rx="3"/>
         <rect x="68" y="0" width="32" height="32" rx="3"/>
         <rect x="0" y="34" width="32" height="32" rx="3"/>
@@ -114,10 +114,17 @@
         <rect x="34" y="68" width="32" height="32" rx="3"/>
         <rect x="68" y="68" width="32" height="32" rx="3"/>
       </g>
-      <rect x="34" y="34" width="32" height="32" rx="3" fill="#F3F3F3"/>
+      <rect x="34" y="34" width="32" height="32" rx="3" fill="var(--text)"/>
   </symbol>
+  <!--
+    The plate is whatever the mark is sitting ON, not one fixed colour. The entry
+    screen's card is transparent so the mark meets --bg there, but the ingest card
+    and the topbar are --surface, and a --bg plate on top of those reads as a
+    slightly darker square floating over the panel. --mark-plate is declared per
+    context in the stylesheet; --bg is the fallback for anywhere that has not.
+  -->
   <symbol id="ptm-mark-plate" viewBox="0 0 100 100">
-    <rect width="100" height="100" rx="21.9" fill="#171717"/>
+    <rect width="100" height="100" rx="21.9" fill="var(--mark-plate, var(--bg))"/>
     <use href="#ptm-mark" x="12.5" y="12.5" width="75" height="75"/>
   </symbol>
 </svg>
@@ -125,6 +132,9 @@
 <div id="app">
   <header id="topbar" hidden>
     <div class="topbar-left">
+      <svg class="pt-brandmark pt-brandmark-bar" viewBox="0 0 100 100" role="img" aria-label="Photournament">
+        <use href="#ptm-mark-plate"></use>
+      </svg>
       <span id="topbar-title">Photournament</span>
       <span id="topbar-context" class="muted"></span>
     </div>

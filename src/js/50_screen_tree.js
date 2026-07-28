@@ -1,6 +1,6 @@
 /**
  * @file 50_screen_tree.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -117,12 +117,14 @@
         var input = el('input', {
           type: 'text',
           inputmode: 'numeric',
-          maxlength: '4',
+          // Long enough for "12.5%". A bare count never needs more than four.
+          maxlength: '6',
           class: 'tree-alloc' + (hasError ? ' invalid' : ''),
           value: PT.tree.allocToInput(node.alloc),
           placeholder: '—',
           dataset: { path: path },
           title: 'How many photos from this folder you want to KEEP. ' +
+                 'A count (12), or a share of what this folder holds (5%). ' +
                  '0 skips the folder, * means no limit, blank shares the parent\u2019s leftovers.'
         });
 
@@ -133,9 +135,35 @@
           setAlloc(path, parsed);
         });
 
+        // Both buttons change what the NUMBER MEANS rather than what it is, so
+        // they share one column instead of sitting apart.
+        var pctOn = node.alloc.mode === 'percent';
+        var pct = el('button', {
+          class: 'btn btn-sm tree-unit' + (pctOn ? ' on' : ''),
+          text: '%',
+          title: pctOn
+            ? 'Back to a fixed count (' + node.percentCount + ')'
+            : 'Keep a share of what this folder holds, rather than a fixed count',
+          onclick: function () {
+            // Flipping the unit keeps the meaning: whatever the row resolves to
+            // now is re-expressed the other way round, so the number on screen
+            // does not jump when you switch.
+            if (pctOn) {
+              setAlloc(path, node.percentCount > 0
+                ? { mode: 'fixed', value: node.percentCount }
+                : { mode: 'pooled', value: null });
+              return;
+            }
+            var share = (node.eff.mode === 'fixed' && node.subtreeCount > 0)
+              ? Math.max(1, Math.min(100, Math.round((node.eff.value / node.subtreeCount) * 100)))
+              : 10;
+            setAlloc(path, { mode: 'percent', value: share });
+          }
+        });
+
         var infOn = node.alloc.mode === 'uncapped';
         var inf = el('button', {
-          class: 'btn btn-sm tree-inf' + (infOn ? ' on' : ''),
+          class: 'btn btn-sm tree-unit tree-inf' + (infOn ? ' on' : ''),
           text: '∞',
           title: 'Cull until satisfied, with no target',
           onclick: function () {
@@ -143,9 +171,15 @@
           }
         });
 
+        var units = el('span', { class: 'tree-units' }, [pct, inf]);
+
+        // A percentage is a promise about a number the user cannot see, so the
+        // state column spends itself saying what it came to.
         var stateWord = node.excluded ? 'skipped'
           : node.alloc.mode === 'uncapped' ? 'uncapped'
-          : node.alloc.mode === 'fixed' ? (node.clamped ? 'clamped ' + node.target : 'fixed')
+          : node.alloc.mode === 'percent'
+            ? (node.clamped ? 'clamped ' + node.target : '= ' + node.percentCount)
+          : node.eff.mode === 'fixed' ? (node.clamped ? 'clamped ' + node.target : 'fixed')
           : node.unitId ? 'pooled' : 'pooled';
 
         // How brutal this cut is, as a fraction. Uncapped reads as full.
@@ -166,17 +200,17 @@
                        text: (path === '' ? s.session.rootName : node.name) }),
           el('span', { class: 'tree-count', text: node.subtreeCount + ' photo' + (node.subtreeCount === 1 ? '' : 's') }),
           input,
-          inf,
+          units,
           bar,
           el('span', { class: 'tree-state', text: stateWord })
         ]);
 
         // Offer top-down distribution only where it is meaningful (PRD 4.4).
-        if (node.alloc.mode === 'fixed' && s.tree.nodes[path].childPaths.length) {
+        if (node.eff.mode === 'fixed' && node.eff.value > 0 && s.tree.nodes[path].childPaths.length) {
           row.appendChild(el('button', {
             class: 'btn btn-sm btn-quiet', text: 'split',
-            title: 'Suggest a split of ' + node.alloc.value + ' across the subfolders',
-            onclick: function () { offerSplit(path, node.alloc.value); }
+            title: 'Suggest a split of ' + node.eff.value + ' across the subfolders',
+            onclick: function () { offerSplit(path, node.eff.value); }
           }));
         }
         return row;
@@ -357,4 +391,8 @@
  *   are created, when there is anything to review.
  * v1.4 (2026-07-28): Exposed stageDTarget beside its own toggle. It was the one
  *   PRD 12 setting with no UI at all — the round could be enabled but not sized.
+ * v1.5 (2026-07-28): Percentage quotas. The keep field accepts "10%", the new %
+ *   toggle flips a row between count and share re-expressing the same resolved
+ *   number, and the state column shows what a percentage came to ("= 37").
+ *   Split and the state word now read the derived eff alloc.
 */

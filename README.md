@@ -36,7 +36,7 @@ browser profile.
 ```
 npm install
 npm run build     # -> dist/photournament_v1.0.html  (and a slim, no-HEIC build)
-npm test          # unit tests, artifact smoke, and five end-to-end runs
+npm test          # unit tests, artifact smoke, and eight end-to-end runs
 ```
 
 The build concatenates `src/` into one self-contained HTML file. That is not a
@@ -52,14 +52,16 @@ for the measured constraint table.
    builds thumbnails off the main thread. Video and RAW are counted and skipped,
    never treated as errors.
 2. **Allocation** — say how many photos you want to keep from each folder. Fixed
-   counts, `0` to skip, `*` for no limit, or blank to compete with sibling
-   folders for whatever the parent has left over.
+   counts, a share of the folder (`5%`), `0` to skip, `*` for no limit, or blank
+   to compete with sibling folders for whatever the parent has left over.
 3. **Duplicates** — near-identical shots are grouped so a burst costs one
    decision rather than several. Split, merge and remove by hand when the
    grouping is wrong.
 4. **Grid passes** — a screen of photos at a time, keeping at most the quota you
    committed to before the pass started. The cap does not move mid-pass; that is
-   the entire point.
+   the entire point. **Stop early** in the top bar ends the folder whenever you
+   are already happy: everything still standing — kept or simply not yet shown —
+   becomes a finalist, and only the photos you actively passed over stay cut.
 5. **Bracket** — survivors go head to head, with a second-chance round so a
    strong photo is not lost to an unlucky early draw.
 6. **Export** — review every finalist, label it in its own words, and write the

@@ -62,7 +62,7 @@ const snap = () => page.evaluate(() => {
 });
 
 await page.goto('file://' + ARTIFACT);
-await page.waitForSelector('.pt-brandmark');
+await page.waitForSelector('.pt-lockup .pt-brandmark');
 
 const d0 = await snap();
 check('dark is the default', d0.theme === 'dark', d0.theme);

@@ -84,7 +84,9 @@ const r = await page.evaluate(async () => {
     // The mark is a <use> of a sprite symbol; an unresolved reference lays out
     // as a zero-sized box, so measuring it proves the reference actually bound.
     brandMark: (function () {
-      var m = document.querySelector('.pt-brandmark');
+      // Two marks exist now — the topbar one is first in the DOM and hidden on
+      // the entry screen, so measuring it would always read 0.
+      var m = document.querySelector('.pt-lockup .pt-brandmark');
       if (!m) return false;
       var b = m.getBoundingClientRect();
       return b.width > 8 && b.height > 8 && !!document.getElementById('ptm-mark');

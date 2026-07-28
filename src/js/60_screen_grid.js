@@ -1,6 +1,6 @@
 /**
  * @file 60_screen_grid.js
- * @version 1.1
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -110,7 +110,7 @@
     }
   }
 
-  function setTopbar(contextText, counterNodes) {
+  function setTopbar(contextText, counterNodes, showStop) {
     var bar = document.getElementById('topbar');
     if (bar) bar.hidden = false;
     var ctx = document.getElementById('topbar-context');
@@ -120,6 +120,10 @@
       dom.clear(cnt);
       (counterNodes || []).forEach(function (n) { cnt.appendChild(n); });
     }
+    // The shell's #topbar-stop already forwards clicks onto the bus as
+    // 'stage:stop-early'; this screen only decides whether the button shows.
+    var stop = document.getElementById('topbar-stop');
+    if (stop) stop.hidden = !showStop;
   }
 
   function clearTopbar() {
@@ -127,6 +131,8 @@
     if (ctx) ctx.textContent = '';
     var cnt = document.getElementById('topbar-counters');
     if (cnt) dom.clear(cnt);
+    var stop = document.getElementById('topbar-stop');
+    if (stop) stop.hidden = true;
   }
 
   function counter(label, value) {
@@ -361,7 +367,7 @@
       counter('cut', unit.cut.length),
       counter('target', unit.target == null ? '—' : unit.target),
       counter('passes', unit.passes.length)
-    ]);
+    ], true);
 
     wrap.appendChild(el('div', { class: 'pt-title' }, [
       el('h1', { text: unit.label }),
@@ -455,6 +461,15 @@
             render();
           }
         }
+      }),
+      // The exit for "I'm already happy": no more passes, no ranking, keep
+      // every survivor. Without it the only ways out of a half-culled unit are
+      // to keep cutting below where you wanted to stop, or abandon the run.
+      el('button', {
+        class: 'btn btn-quiet', dataset: { t: 'finish-early' },
+        text: 'Finish here — keep all ' + unit.pool.length,
+        title: 'Stop culling this folder and take everything still standing as its finalists',
+        onclick: finishEarly
       })
     ]);
     wrap.appendChild(actions);
@@ -509,13 +524,20 @@
       G.els.progress,
       G.els.hint,
       el('span', { class: 'spacer' }),
-      el('span', { class: 'muted small' }, [
-        el('kbd', { text: '1' }), '–', el('kbd', { text: '9' }), ' select · ',
-        el('kbd', { text: '0' }), ' tenth · ',
-        el('kbd', { text: 'Enter' }), ' advance · ',
-        el('kbd', { text: 'U' }), ' undo · ',
-        el('kbd', { text: '←' }), ' back'
-      ]),
+      el('span', { class: 'muted small' }, (function () {
+        // The legend describes the keys THIS pass answers to. "0 tenth" on a
+        // nine-per-screen grid promises a photo that is not there.
+        var size = (unit.currentPass && unit.currentPass.gridSize) || 9;
+        var keys = [el('kbd', { text: '1' }), '–',
+                    el('kbd', { text: String(Math.min(size, 9)) }), ' select · '];
+        if (size >= 10) keys.push(el('kbd', { text: '0' }), ' tenth · ');
+        keys.push(
+          el('kbd', { text: 'Enter' }), ' advance · ',
+          el('kbd', { text: 'U' }), ' undo · ',
+          el('kbd', { text: '←' }), ' back'
+        );
+        return keys;
+      })()),
       G.els.advance
     ]));
 
@@ -582,7 +604,7 @@
       counter('screens left', c.screensLeft),
       counter('field', c.field + (c.target == null ? ' (uncapped)' : ' / ' + c.target)),
       counter('cut this pass', PT.fmt.pct(c.cutPct))
-    ]);
+    ], true);
   }
 
   /**
@@ -671,6 +693,86 @@
     render();
   }
 
+  /* ---------------------------------------------------------- finish early */
+
+  /**
+   * Everything that has not been cut. Mid-pass that is more than the pool
+   * suggests: photos passed over on screens already advanced are implicitly
+   * out, but a photo on a screen the user never reached has not been judged
+   * at all — stopping early must not cost it its place.
+   */
+  function standingIds(unit) {
+    var p = unit.currentPass;
+    if (!p) return unit.pool.slice();
+    // Kept first, then the unjudged remainder in dealt order, so what the user
+    // actively chose outranks what merely was not reached.
+    return p.kept.concat(p.order.slice(p.index * p.gridSize));
+  }
+
+  /**
+   * The exit the flow was missing: end this unit NOW and keep everything still
+   * standing, quota and bracket be damned. Without it, a user who is happy at
+   * 17 remaining has to either keep culling below where they wanted to stop, or
+   * abandon the session — both of which lose photos that earned their place.
+   *
+   * Deliberately a modal rather than an instant action: it is the one button on
+   * the pass screen that ends the whole unit, sitting in a bar the user is
+   * hammering shortcuts at.
+   */
+  function finishEarly() {
+    var unit = getUnit(G.unitId);
+    if (!unit || unit.phase === 'done') return;
+    var standing = standingIds(unit);
+    if (!standing.length) return;
+
+    var p = unit.currentPass;
+    var judged = p ? p.kept.length : 0;
+    var unjudged = p ? standing.length - judged : 0;
+
+    var body = PT.dom.$('#modal-body');
+    PT.dom.clear(body);
+    body.appendChild(el('h2', { text: 'Stop here and keep what’s standing?' }));
+    body.appendChild(el('p', { class: 'muted', style: 'margin:10px 0', text:
+      p
+        ? standing.length + ' photos are still in — ' + judged + ' you kept this pass and ' +
+          unjudged + ' you haven’t been shown yet. Nothing unjudged is lost by stopping.'
+        : 'All ' + standing.length + ' photos still in the pool become this folder’s finalists.' }));
+    body.appendChild(el('p', { class: 'small dim', text:
+      'They are taken as they are, skipping the head-to-head ranking' +
+      (unit.target ? ' and the target of ' + unit.target : '') + '. The cut pile stays as it is.' }));
+    body.appendChild(el('div', { class: 'row', style: 'margin-top:16px' }, [
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn-quiet', text: 'Keep culling',
+        onclick: function () { PT.dom.$('#modal').close(); } }),
+      el('button', {
+        class: 'btn btn-primary', dataset: { t: 'finish-early-confirm' },
+        text: 'Keep ' + standing.length + ' and finish',
+        onclick: function () {
+          PT.dom.$('#modal').close();
+          editUnit(G.unitId, 'unit:finishEarly', function (u) {
+            var live = u.currentPass;
+            if (live) {
+              // Fold the part-finished pass in honestly: what was passed over
+              // on completed screens joins the cut pile, everything else stays.
+              var keep = Object.create(null);
+              standing.forEach(function (id) { keep[id] = 1; });
+              u.cut = u.cut.concat(u.pool.filter(function (id) { return !keep[id]; }));
+              u.currentPass = null;
+              u.lastPassSnapshot = null;
+              u.lastSummary = null;
+            }
+            u.pool = standing.slice();
+            u.winners = standing.slice();
+            u.phase = 'done';
+          });
+          releaseCells();
+          PT.advance();
+        }
+      })
+    ]));
+    PT.dom.$('#modal').showModal();
+  }
+
   /** PRD 7.2 re-run: restore the pre-pass state, then offer a tighter quota. */
   function rerunPass(tighter) {
     var unit = getUnit(G.unitId);
@@ -753,12 +855,18 @@
       }
       G.keyHandler = onKey;
       document.addEventListener('keydown', G.keyHandler);
+      // The shell turns a #topbar-stop click into this event; the button is
+      // only visible in the setup and pass views (setTopbar's third argument).
+      G.offStop = PT.bus.on('stage:stop-early', function () {
+        if (G && (G.mode === 'setup' || G.mode === 'pass')) finishEarly();
+      });
       render();
       if (u && u.currentPass) PT.log('grid', 'resumed mid-pass', { pass: u.currentPass.n, screen: u.currentPass.index + 1 });
     },
     unmount: function () {
       if (!G) return;
       document.removeEventListener('keydown', G.keyHandler);
+      if (G.offStop) G.offStop();
       releaseCells();
       clearTopbar();
       G = null;
@@ -1040,4 +1148,12 @@
  *   locked limit and viewport-bounded thumbnail attachment.
   * v1.1 (2026-07-28): Adopted photournament_ui_v2.0.css; removed the injected
  *   style block.
+ * v1.2 (2026-07-28): The key legend follows the pass's grid size — "0 tenth"
+ *   only appears when a tenth cell exists.
+ * v1.3 (2026-07-28): Finish early (the design's topbar "Stop early", now live
+ *   during Stage A). standingIds() keeps everything not yet cut — mid-pass that
+ *   includes every photo on screens the user never reached — folds the
+ *   part-finished pass into the cut pile honestly, sets winners, marks the unit
+ *   done and advances. Offered from the pass topbar and as an explicit
+ *   "Finish here" on the setup screen, behind a confirm modal.
 */

@@ -1,6 +1,6 @@
 /**
  * @file 45_screen_dupes.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -860,9 +860,16 @@
           ' removed from grouping by hand.' : '');
     }
 
+    // The whole list is rebuilt on every edit, and an emptied scroll container
+    // clamps its scrollTop to 0 — so confirming a group halfway down the page
+    // threw the user back to the top. Hold the reading position across the
+    // rebuild; the browser re-clamps it if the list got shorter.
+    var scroll = D.list.scrollTop;
+
     PT.dom.$$('img', D.list).forEach(function (img) { PT.dom.releaseImg(img); });
     PT.dom.clear(D.list);
     D.groups.forEach(function (gr) { D.list.appendChild(groupEl(gr, g)); });
+    D.list.scrollTop = scroll;
 
     if (!D.groups.length && removedCount) {
       D.list.appendChild(el('div', { class: 'notice notice-note', id: 'dupe-empty' }, [
@@ -1094,4 +1101,7 @@
  *   slider depends on does not hold for it, and threshold 14 is calibrated for
  *   the wrong hash family. The derived hashes are cached back onto the photo
  *   records as ptPhash / ptSharp.
- */
+  * v1.1 (2026-07-28): The list keeps its scroll position across the rebuild
+ *   every edit triggers — confirming a group halfway down no longer throws the
+ *   user back to the top.
+*/

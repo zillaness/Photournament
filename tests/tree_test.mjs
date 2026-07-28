@@ -54,6 +54,121 @@ test('parseAlloc covers all four states, and 0 is excluded not unlimited', () =>
   assert.equal(T.parseAlloc('2.5'), null);
 });
 
+/* ------------------------------------------------------------- percentages */
+
+test('a percentage is parsed as its own state, not coerced to a count', () => {
+  assert.deepEqual(T.parseAlloc('5%'), { mode: 'percent', value: 5 });
+  assert.deepEqual(T.parseAlloc('12.5%'), { mode: 'percent', value: 12.5 });
+  assert.deepEqual(T.parseAlloc('100%'), { mode: 'percent', value: 100 });
+  // Whitespace before the sign is how people actually type it.
+  assert.deepEqual(T.parseAlloc('5 %'), { mode: 'percent', value: 5 });
+  // The bug this fixes: "5%" used to fail the digits-only test, the field kept
+  // the last value it HAD accepted, and the row silently meant "keep 5".
+  assert.notDeepEqual(T.parseAlloc('5%'), T.parseAlloc('5'));
+  // A share of nothing is nothing, which is the same statement as 0.
+  assert.deepEqual(T.parseAlloc('0%'), { mode: 'excluded', value: 0 });
+  // No reading of "keep 150% of this folder" is what the user meant.
+  assert.equal(T.parseAlloc('101%'), null);
+  assert.equal(T.parseAlloc('%'), null);
+  assert.equal(T.parseAlloc('5%%'), null);
+});
+
+test('a percentage round-trips through the field it was typed into', () => {
+  for (const raw of ['5%', '12.5%', '100%', '7', '0', '*', '']) {
+    assert.equal(T.allocToInput(T.parseAlloc(raw)), raw);
+  }
+  // Normalised on the way back in, not preserved character for character.
+  assert.equal(T.allocToInput(T.parseAlloc('5 %')), '5%');
+});
+
+test('percentToCount rounds to nearest but never silently to zero', () => {
+  assert.equal(T.percentToCount(5, 746), 37);
+  assert.equal(T.percentToCount(50, 7), 4);      // 3.5 rounds up
+  assert.equal(T.percentToCount(100, 9), 9);
+  // 5% of 12 is 0.6. Rounding that to 0 would exclude the folder, and exclusion
+  // is a thing the user has to ask for by name.
+  assert.equal(T.percentToCount(5, 12), 1);
+  assert.equal(T.percentToCount(1, 3), 1);
+  // Nothing to take a share of.
+  assert.equal(T.percentToCount(5, 0), 0);
+});
+
+test('a percentage resolves against the folder’s own count', () => {
+  const tree = T.build([...photos('Trip/Day1', 200), ...photos('Trip/Day2', 50)]);
+  const res = T.resolve(tree, allocs({ 'Trip/Day1': '10%', 'Trip/Day2': '10%' }));
+
+  // Same percentage, different folders, different counts — which is the point.
+  assert.equal(res.nodes['Trip/Day1'].target, 20);
+  assert.equal(res.nodes['Trip/Day2'].target, 5);
+  assert.equal(res.projectedTotal, 25);
+  assert.equal(res.hasErrors, false);
+});
+
+test('a percentage keeps what the user typed and reports what it came to', () => {
+  const tree = T.build(photos('Trip/Day1', 40));
+  const n = T.resolve(tree, allocs({ 'Trip/Day1': '25%' })).nodes['Trip/Day1'];
+
+  // The field has to render "25%" back, so the typed state survives resolution.
+  assert.deepEqual(n.alloc, { mode: 'percent', value: 25 });
+  assert.equal(T.allocToInput(n.alloc), '25%');
+  // And everything downstream sees a plain fixed count.
+  assert.deepEqual(n.eff, { mode: 'fixed', value: 10 });
+  assert.equal(n.percentCount, 10);
+  assert.equal(n.target, 10);
+});
+
+test('a percentage behaves as a fixed count everywhere the rules look at one', () => {
+  const tree = T.build([
+    ...photos('Trip/Day1', 100),
+    ...photos('Trip/Day2', 100),
+    ...photos('Trip/Day3', 100)
+  ]);
+
+  // Under a fixed parent, a percentage child consumes the pool like any number:
+  // 10% of 100 is 10, leaving 30 - 10 = 20 for the two pooled siblings.
+  const res = T.resolve(tree, allocs({ 'Trip': '30', 'Trip/Day1': '10%' }));
+  assert.equal(res.nodes['Trip/Day1'].target, 10);
+
+  const pooled = res.units.find((u) => u.kind === 'pooled');
+  assert.equal(pooled.target, 20);
+  assert.deepEqual(pooled.memberPaths.sort(), ['Trip/Day2', 'Trip/Day3']);
+  assert.equal(res.projectedTotal, 30);
+  assert.equal(res.hasErrors, false);
+});
+
+test('percentage children can oversubscribe a fixed parent, and it is caught', () => {
+  const tree = T.build([...photos('Trip/Day1', 100), ...photos('Trip/Day2', 100)]);
+  // 60% + 60% of 100 each = 120, against a parent that only has 50 places.
+  const res = T.resolve(tree, allocs({ 'Trip': '50', 'Trip/Day1': '60%', 'Trip/Day2': '60%' }));
+  assert.equal(res.hasErrors, true);
+  assert.ok(res.issues.some((i) => i.code === 'oversubscribed'));
+});
+
+test('a percentage counts as an allocation for dead-pool detection', () => {
+  const tree = T.build([...photos('Trip/Day1', 40), ...photos('Trip/Day2', 40)]);
+  // Pooled under uncapped is normally a dead state, but Day1 asking for 25% is a
+  // real allocation, so only the genuinely-blank sibling is flagged.
+  const res = T.resolve(tree, allocs({ 'Trip': '*', 'Trip/Day1': '25%' }));
+  const dead = res.issues.filter((i) => i.code === 'dead-pool').map((i) => i.path);
+  assert.deepEqual(dead, ['Trip/Day2']);
+  assert.equal(res.nodes['Trip/Day1'].target, 10);
+});
+
+test('100% keeps everything, and a percentage of an empty folder keeps nothing', () => {
+  const tree = T.build(photos('Trip/Day1', 12));
+  const full = T.resolve(tree, allocs({ 'Trip/Day1': '100%' }));
+  assert.equal(full.nodes['Trip/Day1'].target, 12);
+  assert.equal(full.nodes['Trip/Day1'].clamped, false);
+
+  // An excluded sibling has no photos to take a share of, and must not warn
+  // about being clamped to zero.
+  const two = T.build([...photos('Trip/Day1', 12), ...photos('Trip/Day2', 6)]);
+  const res = T.resolve(two, allocs({ 'Trip/Day1': '50%', 'Trip/Day2': '0' }));
+  assert.equal(res.nodes['Trip/Day1'].target, 6);
+  assert.equal(res.nodes['Trip/Day2'].excluded, true);
+  assert.equal(res.issues.filter((i) => i.code === 'clamped').length, 0);
+});
+
 /* -------------------------------------------------- PRD 4.3 worked example */
 
 test('PRD 4.3 worked example resolves exactly as documented', () => {

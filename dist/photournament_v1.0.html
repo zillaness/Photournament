@@ -566,6 +566,20 @@ input.invalid, input.invalid:focus {
 }
 select { cursor: pointer; padding-right: 8px; }
 
+/*
+ * The dropdown LIST is UA chrome, and on Windows Chromium/Brave it ignores the
+ * page's color-scheme and draws the OS-light popup under both themes — which in
+ * the dark surround meant the page's near-white option text landed on a white
+ * list. Options do honour author background/color inside the popup, so paint
+ * them from the same tokens as the field they fall out of; the list then
+ * follows the theme no matter what the popup chrome decides.
+ */
+select option {
+  background: var(--field);
+  color: var(--text);
+}
+select option:disabled { color: var(--text-mute); }
+
 input[type="checkbox"] {
   appearance: none;
   width: 18px; height: 18px;
@@ -794,7 +808,14 @@ kbd {
   max-width: 640px;
   margin: 0 auto;
   width: 100%;
-  justify-content: center;
+  /*
+   * safe center, not center. Plain centring overflows in BOTH directions once
+   * the content is taller than the viewport, putting the top of the screen —
+   * here the lockup — at a negative offset that cannot be scrolled to. Measured
+   * at y = -32 on an 820x560 viewport. safe falls back to flex-start when there
+   * is not enough room, which is the only behaviour that is ever useful.
+   */
+  justify-content: safe center;
   gap: 24px;
 }
 .screen-welcome .card {
@@ -982,7 +1003,7 @@ kbd {
     252px   /* folder name, truncating */
     86px    /* has */
     66px    /* keep field */
-    34px    /* infinity toggle */
+    64px    /* unit toggles: % and infinity */
     64px    /* keep : has proportion */
     86px    /* resolved state */
     minmax(48px, auto);  /* split */
@@ -1086,8 +1107,13 @@ kbd {
 }
 #app .tree-alloc::placeholder { color: var(--text-mute); }
 
-/* The infinity toggle. Cryptic on its own, so it carries a hover label. */
-#app .tree-inf {
+/*
+ * The unit toggles. % and infinity both answer "what does this number mean",
+ * not "what is it", so they sit together in one column beside the field they
+ * modify. Cryptic on their own, so both carry a hover label.
+ */
+#app .tree-units { display: flex; gap: 4px; }
+#app .tree-unit {
   padding: 0;
   width: 30px; height: 30px;
   justify-content: center;
@@ -1097,8 +1123,8 @@ kbd {
   background: transparent;
   border-color: var(--line);
 }
-#app .tree-inf:hover:not(:disabled) { color: var(--text); border-color: var(--line-2); background: var(--surface-3); }
-#app .tree-inf.on {
+#app .tree-unit:hover:not(:disabled) { color: var(--text); border-color: var(--line-2); background: var(--surface-3); }
+#app .tree-unit.on {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
@@ -1996,23 +2022,16 @@ kbd {
    ==========================================================================
    The recursive identity mark, referenced from the sprite in the shell.
 
-   It carries its OWN ground rather than sitting on --surface, and that is not
-   an oversight. The mark's palette is fixed by the identity spec (#171717
-   ground, #474747 cells, #F3F3F3 selected) and its selected cell is the whole
-   concept — but #F3F3F3 against the light theme's page measures 1.45:1, which
-   is invisible. Giving it the ground the identity already specifies keeps the
-   mark identical in both themes instead of letting the surround eat it. The
-   identity README says as much: "use the dark-background logo as the primary
-   lockup".
+   It is painted from the DESIGN SYSTEM's neutrals, not the identity package's
+   own palette. The mark was designed against its own #171717 background, and
+   dropping that palette in unchanged made the logo read as a lighter black
+   square on a --bg page and made its selected cell vanish entirely on the light
+   surround (1.45:1). Ground follows --bg, cells follow --line-2, the selected
+   frame follows --text — so the mark inverts with the surround exactly like the
+   rest of the interface, and there is no second black in the product.
 
-   The ground is composed into the sprite rather than applied as CSS padding,
-   because percentage padding resolves against the PARENT's width, not the
-   element's — 12.5% became 74px and blew the box out. Proportions taken from
-   the app icon: inset 8/64 = 12.5%, corner radius 14/64 = 21.9%.
-
-   These literals are the LOGO's colours, not UI tokens. They are deliberately
-   not themed, for the same reason the mark is not: a logo that changes with
-   the surround is not a logo.
+   In the dark surround this lands within a couple of values of the identity's
+   own colours anyway; it is the light surround that needed it.
    ========================================================================== */
 
 #app .pt-brandmark {
@@ -2022,10 +2041,157 @@ kbd {
   flex: none;
 }
 
-#app .screen-welcome .pt-brandmark { width: 60px; height: 60px; margin-bottom: 4px; }
+/*
+ * THE PLATE FOLLOWS ITS SURFACE.
+ *
+ * The mark carries its own rounded ground, and that ground has to be the colour
+ * of whatever it is sitting on or it reads as a slightly-off square floating
+ * over the panel. Three surfaces exist in this app and the mark appears on all
+ * three: the page (--bg) on the entry screen, whose card is transparent; the
+ * card (--surface) on the ingest screen; and the topbar (--surface).
+ *
+ * Declared as a custom property rather than a fill on each call site because the
+ * mark is a <use> of a shared symbol — nothing outside can style into that
+ * shadow tree, but inherited custom properties cross into it.
+ */
+#app { --mark-plate: var(--bg); }
+#app .card,
+#app #topbar { --mark-plate: var(--surface); }
+/* The entry card paints nothing, so the mark meets the page there. */
+#app .screen-welcome .card { --mark-plate: var(--bg); }
+
+#app .pt-lockup { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+#app .pt-lockup h1 { margin: 0; }
+
+/*
+ * The wordmark, not a heading that happens to say the product name. Same
+ * treatment as #topbar-title — uppercase, 650, 0.09em — because they are the
+ * same object at two sizes. Full --text here rather than --text-dim: in the
+ * topbar the wordmark is a label beside the work, on the entry screen it is
+ * the thing itself.
+ */
+#app .pt-wordmark {
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+#app .screen-welcome .pt-brandmark { width: 46px; height: 46px; }
+
+/*
+ * In the topbar it sits beside the wordmark, sized to that text's cap height.
+ * The gap is tighter than the bar's default: a mark and the word it belongs to
+ * are one lockup.
+ */
+#app .pt-brandmark-bar { width: 22px; height: 22px; }
+
+/* --------------------------------------------------------------------------
+   THE MARK, WORKING
+   --------------------------------------------------------------------------
+   On the ingest screen the mark has a job: it has to show that something is
+   happening. It used to be swapped out for a separate nine-cell throbber and
+   swapped back at the end, which meant the identity blinked out of existence
+   for the length of the ingest and blinked back — two objects pretending to be
+   one.
+
+   They are now genuinely one object in one slot. The nine walking cells are an
+   overlay laid out on the SPRITE'S OWN GEOMETRY — 24% cells at 12.5%, 38% and
+   63.5%, the same numbers the symbol uses — so each cell covers the mark's
+   corresponding square exactly. Fading that overlay in flattens the logo into
+   the plain nine-square grid and starts it walking; fading it out lets the
+   recursion bloom back through. Nothing moves, nothing resizes, and at every
+   frame of the transition the thing on screen is still the mark.
+
+   The cells borrow the mark's own two colours, so the throbber IS the basic
+   nine-cell version of the logo rather than a differently-coloured spinner.
+   -------------------------------------------------------------------------- */
+
+#app .pt-markslot {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+#app .pt-markslot .pt-brandmark { width: 100%; height: 100%; }
+
+#app .pt-markcells {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  /* Slower out than in: the logo resolving is the payoff, and it should not be
+     over before the eye has arrived. */
+  transition: opacity 260ms ease-out;
+}
+#app .pt-markslot[data-state="live"] .pt-markcells { opacity: 1; }
+#app .pt-markslot[data-state="rest"] .pt-markcells {
+  opacity: 0;
+  transition: opacity 520ms ease-in;
+}
+
+#app .pt-markcells i {
+  position: absolute;
+  width: 24%;
+  height: 24%;
+  /* rx 3 in the symbol's 100-unit space, scaled by the 0.75 plate inset, as a
+     fraction of the cell: 2.25 / 24. */
+  border-radius: 9.4%;
+  background: var(--line-2);
+  animation: pt-markcell 3.6s steps(1, end) infinite;
+}
+#app .pt-markcells i:nth-child(3n+1) { left: 12.5%; }
+#app .pt-markcells i:nth-child(3n+2) { left: 38%; }
+#app .pt-markcells i:nth-child(3n+3) { left: 63.5%; }
+#app .pt-markcells i:nth-child(-n+3) { top: 12.5%; }
+#app .pt-markcells i:nth-child(n+4):nth-child(-n+6) { top: 38%; }
+#app .pt-markcells i:nth-child(n+7) { top: 63.5%; }
+
+#app .pt-markcells i:nth-child(1) { animation-delay: 0.0s; }
+#app .pt-markcells i:nth-child(2) { animation-delay: 0.4s; }
+#app .pt-markcells i:nth-child(3) { animation-delay: 0.8s; }
+#app .pt-markcells i:nth-child(6) { animation-delay: 1.2s; }
+#app .pt-markcells i:nth-child(9) { animation-delay: 1.6s; }
+#app .pt-markcells i:nth-child(8) { animation-delay: 2.0s; }
+#app .pt-markcells i:nth-child(7) { animation-delay: 2.4s; }
+#app .pt-markcells i:nth-child(4) { animation-delay: 2.8s; }
+/* The centre goes last, so the walk lands on the one cell the mark itself keeps
+   lit — the highlight arrives home just as the overlay starts to clear. */
+#app .pt-markcells i:nth-child(5) { animation-delay: 3.2s; }
+
+@keyframes pt-markcell {
+  0%, 11%   { background: var(--text); }
+  12%, 100% { background: var(--line-2); }
+}
+
+/* The recursion coming back is worth a beat of its own: a small settle, not a
+   bounce. Only on the way back — starting work should be quiet. */
+#app .pt-markslot[data-state="rest"] .pt-brandmark {
+  animation: pt-mark-resolve 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes pt-mark-resolve {
+  0%   { transform: scale(0.955); }
+  55%  { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
+
+/*
+ * Reduced motion keeps the STATE and drops the MOTION. The overlay still
+ * appears and disappears, so "working" and "done" remain distinguishable — it
+ * just does so without a walk, a fade or a settle.
+ */
+@media (prefers-reduced-motion: reduce) {
+  #app .pt-markcells,
+  #app .pt-markslot[data-state="rest"] .pt-markcells { transition: none; }
+  #app .pt-markcells i { animation: none; }
+  #app .pt-markslot[data-state="rest"] .pt-brandmark { animation: none; }
+}
+
+#app .topbar-left { gap: 9px; }
 
 @media (max-width: 720px) {
   #app .pt-brandmark { width: 38px; height: 38px; }
+  #app .pt-brandmark-bar { width: 19px; height: 19px; }
+  #app .pt-markslot { width: 38px; height: 38px; }
 }
 
 </style>
@@ -2040,53 +2206,53 @@ kbd {
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
   <defs>
       <symbol id="ptm-r0" viewBox="0 0 100 100">
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="0" y="0" width="30" height="30" rx="3"/><rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
       <symbol id="ptm-r1" viewBox="0 0 100 100">
         <use href="#ptm-r0" x="0" y="0" width="30" height="30"/>
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
       <symbol id="ptm-r2" viewBox="0 0 100 100">
         <use href="#ptm-r1" x="0" y="0" width="30" height="30"/>
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
       <symbol id="ptm-r3" viewBox="0 0 100 100">
         <use href="#ptm-r2" x="0" y="0" width="30" height="30"/>
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
       <symbol id="ptm-r4" viewBox="0 0 100 100">
         <use href="#ptm-r3" x="0" y="0" width="30" height="30"/>
-        <g fill="#474747">
+        <g fill="var(--line-2)">
           <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
           <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
           <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
         </g>
-        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="var(--text)"/>
       </symbol>
     </defs>
   <symbol id="ptm-mark" viewBox="0 0 100 100">
     <use href="#ptm-r4" x="0" y="0" width="32" height="32"/>
-      <g fill="#474747">
+      <g fill="var(--line-2)">
         <rect x="34" y="0" width="32" height="32" rx="3"/>
         <rect x="68" y="0" width="32" height="32" rx="3"/>
         <rect x="0" y="34" width="32" height="32" rx="3"/>
@@ -2095,10 +2261,17 @@ kbd {
         <rect x="34" y="68" width="32" height="32" rx="3"/>
         <rect x="68" y="68" width="32" height="32" rx="3"/>
       </g>
-      <rect x="34" y="34" width="32" height="32" rx="3" fill="#F3F3F3"/>
+      <rect x="34" y="34" width="32" height="32" rx="3" fill="var(--text)"/>
   </symbol>
+  <!--
+    The plate is whatever the mark is sitting ON, not one fixed colour. The entry
+    screen's card is transparent so the mark meets --bg there, but the ingest card
+    and the topbar are --surface, and a --bg plate on top of those reads as a
+    slightly darker square floating over the panel. --mark-plate is declared per
+    context in the stylesheet; --bg is the fallback for anywhere that has not.
+  -->
   <symbol id="ptm-mark-plate" viewBox="0 0 100 100">
-    <rect width="100" height="100" rx="21.9" fill="#171717"/>
+    <rect width="100" height="100" rx="21.9" fill="var(--mark-plate, var(--bg))"/>
     <use href="#ptm-mark" x="12.5" y="12.5" width="75" height="75"/>
   </symbol>
 </svg>
@@ -2106,6 +2279,9 @@ kbd {
 <div id="app">
   <header id="topbar" hidden>
     <div class="topbar-left">
+      <svg class="pt-brandmark pt-brandmark-bar" viewBox="0 0 100 100" role="img" aria-label="Photournament">
+        <use href="#ptm-mark-plate"></use>
+      </svg>
       <span id="topbar-title">Photournament</span>
       <span id="topbar-context" class="muted"></span>
     </div>
@@ -4240,6 +4416,19 @@ if (typeof exports === 'object' && typeof module === 'object') {
    * @param {function} [opts.lookup] (id, meta) => record|null|Promise. Non-null
    *   short-circuits decoding entirely, which is how resume skips known photos.
    */
+  /**
+   * Probe 02 measured scaling stopping dead at the core count on a 4-core box —
+   * 8 workers were no faster than 4 there. That measurement was read too
+   * narrowly as "cap at 4", which leaves most of a 16-core machine idle on a
+   * 742-photo ingest. Scale with the machine, leaving a core for the main
+   * thread, and cap at 8 because each worker holds its own ~72MB wasm arena
+   * once HEIC is involved.
+   */
+  function defaultPoolSize() {
+    var cores = navigator.hardwareConcurrency || 4;
+    return Math.max(2, Math.min(cores - 1, 8));
+  }
+
   ingest.createPool = function (opts) {
     opts = opts || {};
     var hw = (global.navigator && global.navigator.hardwareConcurrency) || 4;
@@ -5141,7 +5330,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 30_tree.js ===== */
 /**
  * @file 30_tree.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -5177,7 +5366,13 @@ v1.0 - 2026-07-28 - Samuel Cao
   var LOOSE = '__loose__';
   var LOOSE_LABEL = '(loose files)';
 
-  var MODE = { FIXED: 'fixed', EXCLUDED: 'excluded', POOLED: 'pooled', UNCAPPED: 'uncapped' };
+  var MODE = {
+    FIXED: 'fixed',
+    EXCLUDED: 'excluded',
+    POOLED: 'pooled',
+    UNCAPPED: 'uncapped',
+    PERCENT: 'percent'
+  };
 
   /* ------------------------------------------------------------------ build */
 
@@ -5254,6 +5449,17 @@ v1.0 - 2026-07-28 - Samuel Cao
 
   /**
    * Parses what the user typed into an allocation state.
+   *
+   * "5%" is a fifth state, and it has to be its own mode rather than being turned
+   * into a number here: this function is called on every keystroke and knows
+   * nothing about how many photos the folder holds. Resolving it early would also
+   * mean the field rewrote itself to "37" the instant you typed the % — the value
+   * you asked for replaced by the value it happened to mean.
+   *
+   * A percentage of nothing is nothing, so 0% is the same statement as 0: skip it.
+   * Above 100% is rejected rather than clamped, because there is no reading of
+   * "keep 150% of this folder" that the user meant.
+   *
    * @param {string|number|null} raw
    * @returns {{mode:string, value:number|null}|null}  null means the input is invalid
    */
@@ -5262,6 +5468,15 @@ v1.0 - 2026-07-28 - Samuel Cao
     var s = String(raw).trim();
     if (s === '') return { mode: MODE.POOLED, value: null };
     if (s === '*' || s === '∞' || s.toLowerCase() === 'inf') return { mode: MODE.UNCAPPED, value: null };
+
+    var pct = /^(\d{1,3}(?:\.\d+)?)\s*%$/.exec(s);
+    if (pct) {
+      var p = parseFloat(pct[1]);
+      if (!isFinite(p) || p < 0 || p > 100) return null;
+      if (p === 0) return { mode: MODE.EXCLUDED, value: 0 };
+      return { mode: MODE.PERCENT, value: p };
+    }
+
     if (!/^\d+$/.test(s)) return null;
     var n = parseInt(s, 10);
     if (n === 0) return { mode: MODE.EXCLUDED, value: 0 };
@@ -5272,8 +5487,24 @@ v1.0 - 2026-07-28 - Samuel Cao
     if (!alloc) return '';
     if (alloc.mode === MODE.UNCAPPED) return '*';
     if (alloc.mode === MODE.EXCLUDED) return '0';
+    if (alloc.mode === MODE.PERCENT) return alloc.value + '%';
     if (alloc.mode === MODE.FIXED) return String(alloc.value);
     return '';
+  }
+
+  /**
+   * A percentage against a real photo count. Rounds to nearest, but never down to
+   * zero while the folder still holds something: 5% of 12 is 0.6, and answering
+   * "keep 5%" with "keep none" would be a silent exclusion — 0 is a state the user
+   * has to ask for by name.
+   *
+   * @param {number} percent  1..100
+   * @param {number} count    photos available
+   * @returns {number}
+   */
+  function percentToCount(percent, count) {
+    if (!(count > 0) || !(percent > 0)) return 0;
+    return Math.max(1, Math.min(count, Math.round((percent / 100) * count)));
   }
 
   /* ---------------------------------------------------------------- resolve */
@@ -5323,7 +5554,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       for (var i = 0; i < kids.length; i++) {
         var c = kids[i];
         if (out[c].excluded) continue;
-        var m = out[c].alloc.mode;
+        var m = out[c].eff.mode;
         if (m === MODE.FIXED || m === MODE.UNCAPPED) return true;
         if (hasAllocatedDescendant(c)) return true;
       }
@@ -5340,7 +5571,12 @@ v1.0 - 2026-07-28 - Samuel Cao
       out[path] = {
         path: path,
         name: n.name,
+        // What the user typed, kept verbatim so the field can render it back.
         alloc: allocOf(path),
+        // What that means once the counts are known. The two differ only for a
+        // percentage; everything downstream reads `eff` and never has to care.
+        eff: allocOf(path),
+        percentCount: null,
         excluded: self || isExcluded(path),
         ownCount: self ? 0 : n.photoIds.length,
         subtreeCount: total,
@@ -5355,6 +5591,23 @@ v1.0 - 2026-07-28 - Samuel Cao
       return total;
     })(tree.rootPath);
 
+    // Pass 1b: turn percentages into counts, now that the counts exist and before
+    // anything reads them. A percentage is a way of SAYING a fixed number, not a
+    // fifth kind of arithmetic — folding it in here means the allocation rules
+    // below stay exactly the four states the PRD describes, rather than growing a
+    // percentage branch in each of them.
+    //
+    // The percentage is always of the folder's OWN subtree, never of the parent's
+    // remainder. "Keep 10% of Day 3" has to mean the same thing wherever Day 3
+    // happens to sit, or the number on screen stops being checkable by hand.
+    Object.keys(out).forEach(function (path) {
+      var o = out[path];
+      if (o.alloc.mode !== MODE.PERCENT) return;
+      var want = percentToCount(o.alloc.value, o.subtreeCount);
+      o.percentCount = want;
+      o.eff = { mode: MODE.FIXED, value: want };
+    });
+
     // Pass 2, top-down: resolve targets. A node's meaning depends on its parent's
     // state (PRD 4.4), so this cannot be folded into the bottom-up pass.
     var units = [];
@@ -5362,7 +5615,7 @@ v1.0 - 2026-07-28 - Samuel Cao
     (function assign(path) {
       var n = nodes[path];
       var o = out[path];
-      var a = o.alloc;
+      var a = o.eff;
 
       if (o.excluded) {
         o.target = 0;
@@ -5399,9 +5652,9 @@ v1.0 - 2026-07-28 - Samuel Cao
       // --- parent -------------------------------------------------------
       kids.forEach(assign);
 
-      var fixedKids  = kids.filter(function (c) { return out[c].alloc.mode === MODE.FIXED; });
-      var uncapKids  = kids.filter(function (c) { return out[c].alloc.mode === MODE.UNCAPPED; });
-      var pooledKids = kids.filter(function (c) { return out[c].alloc.mode === MODE.POOLED; });
+      var fixedKids  = kids.filter(function (c) { return out[c].eff.mode === MODE.FIXED; });
+      var uncapKids  = kids.filter(function (c) { return out[c].eff.mode === MODE.UNCAPPED; });
+      var pooledKids = kids.filter(function (c) { return out[c].eff.mode === MODE.POOLED; });
 
       var fixedSum = fixedKids.reduce(function (s, c) { return s + (out[c].target || 0); }, 0);
 
@@ -5486,7 +5739,7 @@ v1.0 - 2026-07-28 - Samuel Cao
     // Root special case: a pooled root has no parent to allocate it, so treat it
     // as one pool over everything — PRD 4.2's "all children pooled: pure best-of".
     var rootOut = out[tree.rootPath];
-    if (!rootOut.excluded && rootOut.alloc.mode === MODE.POOLED && !units.length && rootOut.subtreeCount > 0) {
+    if (!rootOut.excluded && rootOut.eff.mode === MODE.POOLED && !units.length && rootOut.subtreeCount > 0) {
       issues.push({
         path: tree.rootPath, level: 'note', code: 'root-unallocated',
         message: 'Nothing is allocated yet. Give the top folder a number, or a count to at least one subfolder.'
@@ -5593,6 +5846,7 @@ v1.0 - 2026-07-28 - Samuel Cao
     build: build,
     parseAlloc: parseAlloc,
     allocToInput: allocToInput,
+    percentToCount: percentToCount,
     resolve: resolve,
     distribute: distribute
   };
@@ -5603,7 +5857,11 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   loose files, allocation parsing for all four states, two-pass resolution with
  *   clamping and dead-state detection, tournament unit derivation, and
  *   largest-remainder weighted distribution.
- */
+  * v1.1 (2026-07-28): Percentages. "5%" is a fifth input state resolved against
+ *   the folder's own subtree count in a pass between counting and allocation, so
+ *   the four PRD states stay untouched — everything downstream reads the derived
+ *   `eff` alloc and `percentCount`. Rounds to nearest, never silently to zero.
+*/
 
 </script>
 <script>
@@ -5890,7 +6148,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 40_screen_ingest.js ===== */
 /**
  * @file 40_screen_ingest.js
- * @version 1.6
+ * @version 1.7
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -5924,13 +6182,8 @@ v1.0 - 2026-07-28 - Samuel Cao
   var PREVIEW_PX = 1280;
 
   /**
-   * Two different objects that happen to look alike, deliberately kept apart:
-   *
-   * - The BRAND MARK is the real recursive identity, referenced from the sprite
-   *   defined once in the shell. Identity, so it is the identity artwork.
-   * - The ACTIVITY INDICATOR is nine CSS cells that walk on a keyframe loop while
-   *   ingest runs. It has a job the static mark cannot do, and animating the
-   *   recursive artwork would turn a logo into a spinner.
+   * The BRAND MARK is the real recursive identity, referenced from the sprite
+   * defined once in the shell. Identity, so it is the identity artwork.
    */
   function brandMark() {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -5944,10 +6197,34 @@ v1.0 - 2026-07-28 - Samuel Cao
     return svg;
   }
 
-  function activityMark() {
+  /**
+   * The mark, plus an overlay of nine cells laid out on the mark's own geometry.
+   * Not a second object: fading the overlay in flattens the recursion into the
+   * plain nine-square grid and walks it, fading it out lets the recursion back
+   * through. The slot returns a `settle` so the caller can say "the work is
+   * done" without knowing anything about how that is drawn.
+   *
+   * The overlay starts hidden and is switched to `live` on the next frame — a
+   * transition needs two computed values to interpolate between, and an element
+   * that has never been laid out only has one.
+   */
+  function workingMark() {
     var cells = [];
     for (var i = 0; i < 9; i++) cells.push(el('i'));
-    return el('div', { class: 'pt-mark pt-mark-live' }, cells);
+
+    var slot = el('span', { class: 'pt-markslot' }, [
+      brandMark(),
+      el('span', { class: 'pt-markcells', 'aria-hidden': 'true' }, cells)
+    ]);
+
+    requestAnimationFrame(function () {
+      if (!slot.dataset.state) slot.dataset.state = 'live';
+    });
+
+    slot.settle = function () {
+      slot.dataset.state = 'rest';
+    };
+    return slot;
   }
 
   /* ------------------------------------------------------------- entry ---- */
@@ -5957,8 +6234,11 @@ v1.0 - 2026-07-28 - Samuel Cao
       PT.dom.$('#topbar').hidden = true;
 
       root.appendChild(el('div', { class: 'card' }, [
-        brandMark(),
-        el('h1', { text: 'Photournament' }),
+        // Mark and wordmark are one lockup, not two stacked things.
+        el('div', { class: 'pt-lockup' }, [
+          brandMark(),
+          el('h1', { class: 'pt-wordmark', text: 'Photournament' })
+        ]),
         el('p', { class: 'muted', text:
           'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
           'passes, then ranks what survives head to head.' })
@@ -6333,6 +6613,12 @@ v1.0 - 2026-07-28 - Samuel Cao
 
       root.classList.add('screen-ingest');
 
+      // The mark walks while work is happening and resolves back into itself
+      // when it stops, so the animation ending and the work ending are the same
+      // event rather than two things the user has to correlate.
+      var markSlot = workingMark();
+      var settleMark = function () { markSlot.settle(); };
+
       var status = el('div', { class: 'muted', text: 'Reading the folder…' });
       var bar = el('div', { class: 'bar' }, [el('i', { style: 'width:0%' })]);
       var count = el('div', { class: 'ingest-count nums' });
@@ -6341,7 +6627,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       var actions = el('div', { class: 'row', id: 'ingest-actions' });
 
       root.appendChild(el('div', { class: 'card screen-narrow' }, [
-        el('div', { class: 'row' }, [activityMark(), el('h1', { text: 'Reading photos' })]),
+        el('div', { class: 'row' }, [markSlot, el('h1', { text: 'Reading photos' })]),
         status, count, bar, detail, summary, actions
       ]));
 
@@ -6366,6 +6652,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 
           if (!t.images.length) {
             status.textContent = 'No photos found here.';
+            settleMark();
             actions.appendChild(el('button', {
               class: 'btn', text: 'Choose a different folder',
               onclick: function () { PT.router.go('welcome'); }
@@ -6377,6 +6664,7 @@ v1.0 - 2026-07-28 - Samuel Cao
           return processAll(t.images, setProgress, status)
             .then(function () {
               status.textContent = 'Ready.';
+              settleMark();
               return reportCache(summary);
             })
             .then(function () {
@@ -6392,6 +6680,7 @@ v1.0 - 2026-07-28 - Samuel Cao
         .catch(function (e) {
           PT.warn('ingest', e);
           status.textContent = '';
+          settleMark();
           summary.appendChild(el('div', { class: 'error-box', text: 'Ingest failed: ' + e.message }));
         });
     },
@@ -6573,6 +6862,10 @@ v1.0 - 2026-07-28 - Samuel Cao
  * v1.6 (2026-07-28): Theme control on the entry screen, where the topbar is
  *   hidden, and the brand mark now uses the plated sprite so it keeps its own
  *   ground in both themes.
+ * v1.7 (2026-07-28): The throbber and the mark are one object. workingMark()
+ *   stacks the nine walking cells over the brand mark on the sprite's own
+ *   geometry and cross-fades between them, so the logo flattens into the
+ *   nine-cell grid while ingest runs and resolves back when it finishes.
 */
 
 </script>
@@ -6580,7 +6873,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 45_screen_dupes.js ===== */
 /**
  * @file 45_screen_dupes.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -7440,9 +7733,16 @@ v1.0 - 2026-07-28 - Samuel Cao
           ' removed from grouping by hand.' : '');
     }
 
+    // The whole list is rebuilt on every edit, and an emptied scroll container
+    // clamps its scrollTop to 0 — so confirming a group halfway down the page
+    // threw the user back to the top. Hold the reading position across the
+    // rebuild; the browser re-clamps it if the list got shorter.
+    var scroll = D.list.scrollTop;
+
     PT.dom.$$('img', D.list).forEach(function (img) { PT.dom.releaseImg(img); });
     PT.dom.clear(D.list);
     D.groups.forEach(function (gr) { D.list.appendChild(groupEl(gr, g)); });
+    D.list.scrollTop = scroll;
 
     if (!D.groups.length && removedCount) {
       D.list.appendChild(el('div', { class: 'notice notice-note', id: 'dupe-empty' }, [
@@ -7674,14 +7974,17 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   slider depends on does not hold for it, and threshold 14 is calibrated for
  *   the wrong hash family. The derived hashes are cached back onto the photo
  *   records as ptPhash / ptSharp.
- */
+  * v1.1 (2026-07-28): The list keeps its scroll position across the rebuild
+ *   every edit triggers — confirming a group halfway down no longer throws the
+ *   user back to the top.
+*/
 
 </script>
 <script>
 /* ===== 50_screen_tree.js ===== */
 /**
  * @file 50_screen_tree.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -7798,12 +8101,14 @@ v1.0 - 2026-07-28 - Samuel Cao
         var input = el('input', {
           type: 'text',
           inputmode: 'numeric',
-          maxlength: '4',
+          // Long enough for "12.5%". A bare count never needs more than four.
+          maxlength: '6',
           class: 'tree-alloc' + (hasError ? ' invalid' : ''),
           value: PT.tree.allocToInput(node.alloc),
           placeholder: '—',
           dataset: { path: path },
           title: 'How many photos from this folder you want to KEEP. ' +
+                 'A count (12), or a share of what this folder holds (5%). ' +
                  '0 skips the folder, * means no limit, blank shares the parent\u2019s leftovers.'
         });
 
@@ -7814,9 +8119,35 @@ v1.0 - 2026-07-28 - Samuel Cao
           setAlloc(path, parsed);
         });
 
+        // Both buttons change what the NUMBER MEANS rather than what it is, so
+        // they share one column instead of sitting apart.
+        var pctOn = node.alloc.mode === 'percent';
+        var pct = el('button', {
+          class: 'btn btn-sm tree-unit' + (pctOn ? ' on' : ''),
+          text: '%',
+          title: pctOn
+            ? 'Back to a fixed count (' + node.percentCount + ')'
+            : 'Keep a share of what this folder holds, rather than a fixed count',
+          onclick: function () {
+            // Flipping the unit keeps the meaning: whatever the row resolves to
+            // now is re-expressed the other way round, so the number on screen
+            // does not jump when you switch.
+            if (pctOn) {
+              setAlloc(path, node.percentCount > 0
+                ? { mode: 'fixed', value: node.percentCount }
+                : { mode: 'pooled', value: null });
+              return;
+            }
+            var share = (node.eff.mode === 'fixed' && node.subtreeCount > 0)
+              ? Math.max(1, Math.min(100, Math.round((node.eff.value / node.subtreeCount) * 100)))
+              : 10;
+            setAlloc(path, { mode: 'percent', value: share });
+          }
+        });
+
         var infOn = node.alloc.mode === 'uncapped';
         var inf = el('button', {
-          class: 'btn btn-sm tree-inf' + (infOn ? ' on' : ''),
+          class: 'btn btn-sm tree-unit tree-inf' + (infOn ? ' on' : ''),
           text: '∞',
           title: 'Cull until satisfied, with no target',
           onclick: function () {
@@ -7824,9 +8155,15 @@ v1.0 - 2026-07-28 - Samuel Cao
           }
         });
 
+        var units = el('span', { class: 'tree-units' }, [pct, inf]);
+
+        // A percentage is a promise about a number the user cannot see, so the
+        // state column spends itself saying what it came to.
         var stateWord = node.excluded ? 'skipped'
           : node.alloc.mode === 'uncapped' ? 'uncapped'
-          : node.alloc.mode === 'fixed' ? (node.clamped ? 'clamped ' + node.target : 'fixed')
+          : node.alloc.mode === 'percent'
+            ? (node.clamped ? 'clamped ' + node.target : '= ' + node.percentCount)
+          : node.eff.mode === 'fixed' ? (node.clamped ? 'clamped ' + node.target : 'fixed')
           : node.unitId ? 'pooled' : 'pooled';
 
         // How brutal this cut is, as a fraction. Uncapped reads as full.
@@ -7847,17 +8184,17 @@ v1.0 - 2026-07-28 - Samuel Cao
                        text: (path === '' ? s.session.rootName : node.name) }),
           el('span', { class: 'tree-count', text: node.subtreeCount + ' photo' + (node.subtreeCount === 1 ? '' : 's') }),
           input,
-          inf,
+          units,
           bar,
           el('span', { class: 'tree-state', text: stateWord })
         ]);
 
         // Offer top-down distribution only where it is meaningful (PRD 4.4).
-        if (node.alloc.mode === 'fixed' && s.tree.nodes[path].childPaths.length) {
+        if (node.eff.mode === 'fixed' && node.eff.value > 0 && s.tree.nodes[path].childPaths.length) {
           row.appendChild(el('button', {
             class: 'btn btn-sm btn-quiet', text: 'split',
-            title: 'Suggest a split of ' + node.alloc.value + ' across the subfolders',
-            onclick: function () { offerSplit(path, node.alloc.value); }
+            title: 'Suggest a split of ' + node.eff.value + ' across the subfolders',
+            onclick: function () { offerSplit(path, node.eff.value); }
           }));
         }
         return row;
@@ -8038,6 +8375,10 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   are created, when there is anything to review.
  * v1.4 (2026-07-28): Exposed stageDTarget beside its own toggle. It was the one
  *   PRD 12 setting with no UI at all — the round could be enabled but not sized.
+ * v1.5 (2026-07-28): Percentage quotas. The keep field accepts "10%", the new %
+ *   toggle flips a row between count and share re-expressing the same resolved
+ *   number, and the state column shows what a percentage came to ("= 37").
+ *   Split and the state word now read the derived eff alloc.
 */
 
 </script>
@@ -8045,7 +8386,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 60_screen_grid.js ===== */
 /**
  * @file 60_screen_grid.js
- * @version 1.1
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -8155,7 +8496,7 @@ v1.0 - 2026-07-28 - Samuel Cao
     }
   }
 
-  function setTopbar(contextText, counterNodes) {
+  function setTopbar(contextText, counterNodes, showStop) {
     var bar = document.getElementById('topbar');
     if (bar) bar.hidden = false;
     var ctx = document.getElementById('topbar-context');
@@ -8165,6 +8506,10 @@ v1.0 - 2026-07-28 - Samuel Cao
       dom.clear(cnt);
       (counterNodes || []).forEach(function (n) { cnt.appendChild(n); });
     }
+    // The shell's #topbar-stop already forwards clicks onto the bus as
+    // 'stage:stop-early'; this screen only decides whether the button shows.
+    var stop = document.getElementById('topbar-stop');
+    if (stop) stop.hidden = !showStop;
   }
 
   function clearTopbar() {
@@ -8172,6 +8517,8 @@ v1.0 - 2026-07-28 - Samuel Cao
     if (ctx) ctx.textContent = '';
     var cnt = document.getElementById('topbar-counters');
     if (cnt) dom.clear(cnt);
+    var stop = document.getElementById('topbar-stop');
+    if (stop) stop.hidden = true;
   }
 
   function counter(label, value) {
@@ -8406,7 +8753,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       counter('cut', unit.cut.length),
       counter('target', unit.target == null ? '—' : unit.target),
       counter('passes', unit.passes.length)
-    ]);
+    ], true);
 
     wrap.appendChild(el('div', { class: 'pt-title' }, [
       el('h1', { text: unit.label }),
@@ -8500,6 +8847,15 @@ v1.0 - 2026-07-28 - Samuel Cao
             render();
           }
         }
+      }),
+      // The exit for "I'm already happy": no more passes, no ranking, keep
+      // every survivor. Without it the only ways out of a half-culled unit are
+      // to keep cutting below where you wanted to stop, or abandon the run.
+      el('button', {
+        class: 'btn btn-quiet', dataset: { t: 'finish-early' },
+        text: 'Finish here — keep all ' + unit.pool.length,
+        title: 'Stop culling this folder and take everything still standing as its finalists',
+        onclick: finishEarly
       })
     ]);
     wrap.appendChild(actions);
@@ -8554,13 +8910,20 @@ v1.0 - 2026-07-28 - Samuel Cao
       G.els.progress,
       G.els.hint,
       el('span', { class: 'spacer' }),
-      el('span', { class: 'muted small' }, [
-        el('kbd', { text: '1' }), '–', el('kbd', { text: '9' }), ' select · ',
-        el('kbd', { text: '0' }), ' tenth · ',
-        el('kbd', { text: 'Enter' }), ' advance · ',
-        el('kbd', { text: 'U' }), ' undo · ',
-        el('kbd', { text: '←' }), ' back'
-      ]),
+      el('span', { class: 'muted small' }, (function () {
+        // The legend describes the keys THIS pass answers to. "0 tenth" on a
+        // nine-per-screen grid promises a photo that is not there.
+        var size = (unit.currentPass && unit.currentPass.gridSize) || 9;
+        var keys = [el('kbd', { text: '1' }), '–',
+                    el('kbd', { text: String(Math.min(size, 9)) }), ' select · '];
+        if (size >= 10) keys.push(el('kbd', { text: '0' }), ' tenth · ');
+        keys.push(
+          el('kbd', { text: 'Enter' }), ' advance · ',
+          el('kbd', { text: 'U' }), ' undo · ',
+          el('kbd', { text: '←' }), ' back'
+        );
+        return keys;
+      })()),
       G.els.advance
     ]));
 
@@ -8627,7 +8990,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       counter('screens left', c.screensLeft),
       counter('field', c.field + (c.target == null ? ' (uncapped)' : ' / ' + c.target)),
       counter('cut this pass', PT.fmt.pct(c.cutPct))
-    ]);
+    ], true);
   }
 
   /**
@@ -8716,6 +9079,86 @@ v1.0 - 2026-07-28 - Samuel Cao
     render();
   }
 
+  /* ---------------------------------------------------------- finish early */
+
+  /**
+   * Everything that has not been cut. Mid-pass that is more than the pool
+   * suggests: photos passed over on screens already advanced are implicitly
+   * out, but a photo on a screen the user never reached has not been judged
+   * at all — stopping early must not cost it its place.
+   */
+  function standingIds(unit) {
+    var p = unit.currentPass;
+    if (!p) return unit.pool.slice();
+    // Kept first, then the unjudged remainder in dealt order, so what the user
+    // actively chose outranks what merely was not reached.
+    return p.kept.concat(p.order.slice(p.index * p.gridSize));
+  }
+
+  /**
+   * The exit the flow was missing: end this unit NOW and keep everything still
+   * standing, quota and bracket be damned. Without it, a user who is happy at
+   * 17 remaining has to either keep culling below where they wanted to stop, or
+   * abandon the session — both of which lose photos that earned their place.
+   *
+   * Deliberately a modal rather than an instant action: it is the one button on
+   * the pass screen that ends the whole unit, sitting in a bar the user is
+   * hammering shortcuts at.
+   */
+  function finishEarly() {
+    var unit = getUnit(G.unitId);
+    if (!unit || unit.phase === 'done') return;
+    var standing = standingIds(unit);
+    if (!standing.length) return;
+
+    var p = unit.currentPass;
+    var judged = p ? p.kept.length : 0;
+    var unjudged = p ? standing.length - judged : 0;
+
+    var body = PT.dom.$('#modal-body');
+    PT.dom.clear(body);
+    body.appendChild(el('h2', { text: 'Stop here and keep what’s standing?' }));
+    body.appendChild(el('p', { class: 'muted', style: 'margin:10px 0', text:
+      p
+        ? standing.length + ' photos are still in — ' + judged + ' you kept this pass and ' +
+          unjudged + ' you haven’t been shown yet. Nothing unjudged is lost by stopping.'
+        : 'All ' + standing.length + ' photos still in the pool become this folder’s finalists.' }));
+    body.appendChild(el('p', { class: 'small dim', text:
+      'They are taken as they are, skipping the head-to-head ranking' +
+      (unit.target ? ' and the target of ' + unit.target : '') + '. The cut pile stays as it is.' }));
+    body.appendChild(el('div', { class: 'row', style: 'margin-top:16px' }, [
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn-quiet', text: 'Keep culling',
+        onclick: function () { PT.dom.$('#modal').close(); } }),
+      el('button', {
+        class: 'btn btn-primary', dataset: { t: 'finish-early-confirm' },
+        text: 'Keep ' + standing.length + ' and finish',
+        onclick: function () {
+          PT.dom.$('#modal').close();
+          editUnit(G.unitId, 'unit:finishEarly', function (u) {
+            var live = u.currentPass;
+            if (live) {
+              // Fold the part-finished pass in honestly: what was passed over
+              // on completed screens joins the cut pile, everything else stays.
+              var keep = Object.create(null);
+              standing.forEach(function (id) { keep[id] = 1; });
+              u.cut = u.cut.concat(u.pool.filter(function (id) { return !keep[id]; }));
+              u.currentPass = null;
+              u.lastPassSnapshot = null;
+              u.lastSummary = null;
+            }
+            u.pool = standing.slice();
+            u.winners = standing.slice();
+            u.phase = 'done';
+          });
+          releaseCells();
+          PT.advance();
+        }
+      })
+    ]));
+    PT.dom.$('#modal').showModal();
+  }
+
   /** PRD 7.2 re-run: restore the pre-pass state, then offer a tighter quota. */
   function rerunPass(tighter) {
     var unit = getUnit(G.unitId);
@@ -8798,12 +9241,18 @@ v1.0 - 2026-07-28 - Samuel Cao
       }
       G.keyHandler = onKey;
       document.addEventListener('keydown', G.keyHandler);
+      // The shell turns a #topbar-stop click into this event; the button is
+      // only visible in the setup and pass views (setTopbar's third argument).
+      G.offStop = PT.bus.on('stage:stop-early', function () {
+        if (G && (G.mode === 'setup' || G.mode === 'pass')) finishEarly();
+      });
       render();
       if (u && u.currentPass) PT.log('grid', 'resumed mid-pass', { pass: u.currentPass.n, screen: u.currentPass.index + 1 });
     },
     unmount: function () {
       if (!G) return;
       document.removeEventListener('keydown', G.keyHandler);
+      if (G.offStop) G.offStop();
       releaseCells();
       clearTopbar();
       G = null;
@@ -9085,6 +9534,14 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   locked limit and viewport-bounded thumbnail attachment.
   * v1.1 (2026-07-28): Adopted photournament_ui_v2.0.css; removed the injected
  *   style block.
+ * v1.2 (2026-07-28): The key legend follows the pass's grid size — "0 tenth"
+ *   only appears when a tenth cell exists.
+ * v1.3 (2026-07-28): Finish early (the design's topbar "Stop early", now live
+ *   during Stage A). standingIds() keeps everything not yet cut — mid-pass that
+ *   includes every photo on screens the user never reached — folds the
+ *   part-finished pass into the cut pile honestly, sets winners, marks the unit
+ *   done and advances. Offered from the pass topbar and as an explicit
+ *   "Finish here" on the setup screen, behind a confirm modal.
 */
 
 </script>

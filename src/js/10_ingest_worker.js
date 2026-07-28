@@ -923,6 +923,19 @@
    * @param {function} [opts.lookup] (id, meta) => record|null|Promise. Non-null
    *   short-circuits decoding entirely, which is how resume skips known photos.
    */
+  /**
+   * Probe 02 measured scaling stopping dead at the core count on a 4-core box —
+   * 8 workers were no faster than 4 there. That measurement was read too
+   * narrowly as "cap at 4", which leaves most of a 16-core machine idle on a
+   * 742-photo ingest. Scale with the machine, leaving a core for the main
+   * thread, and cap at 8 because each worker holds its own ~72MB wasm arena
+   * once HEIC is involved.
+   */
+  function defaultPoolSize() {
+    var cores = navigator.hardwareConcurrency || 4;
+    return Math.max(2, Math.min(cores - 1, 8));
+  }
+
   ingest.createPool = function (opts) {
     opts = opts || {};
     var hw = (global.navigator && global.navigator.hardwareConcurrency) || 4;

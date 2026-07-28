@@ -1,6 +1,6 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -1149,7 +1149,7 @@
     }
     S.bar.appendChild(el('button', { class: 'btn', id: 'bk-undo', text: 'Undo last comparison', onclick: undo, disabled: !u.bracket.ops.length }));
     S.bar.appendChild(el('span', { class: 'spacer' }));
-    S.bar.appendChild(el('button', { class: 'btn btn-primary', id: 'bk-continue', text: 'Continue to burst runoff', onclick: continueToRunoff }));
+    S.bar.appendChild(el('button', { class: 'btn btn-primary', id: 'bk-continue', text: 'Next: check for duplicates', onclick: continueToRunoff }));
   }
 
   function unmountBracket(root) {
@@ -1228,7 +1228,10 @@
     if (!u.runoff) {
       PT.store.dispatch('runoff:init', function (s) {
         var unit = s.session.units[unitId];
-        unit.runoff = { orig: (unit.winners || []).slice(), picks: {}, done: false };
+        // keeps[origId] is an ARRAY. Its first entry holds the original rank; any
+      // further entries are extra photos kept out of the same group, which is
+      // what makes a mis-grouped set recoverable without leaving this screen.
+      unit.runoff = { orig: (unit.winners || []).slice(), picks: {}, keeps: {}, done: false };
       });
       u = unitOf(unitId);
     }
@@ -1251,9 +1254,29 @@
     return rows;
   }
 
+  function keepsFor(ro, id) {
+    var k = ro.keeps && ro.keeps[id];
+    if (k && k.length) return k.slice();
+    // Falls back to the older single-pick shape so a session saved before
+    // multi-keep existed still resolves.
+    return [(ro.picks && ro.picks[id]) || id];
+  }
+
   function currentWinners(u) {
-    var ro = u.runoff || { orig: u.winners || [], picks: {} };
-    return (ro.orig || []).map(function (id) { return ro.picks[id] || id; });
+    var ro = u.runoff || { orig: u.winners || [], picks: {}, keeps: {} };
+    var out = [];
+    (ro.orig || []).forEach(function (id) {
+      keepsFor(ro, id).forEach(function (k) {
+        if (out.indexOf(k) < 0) out.push(k);
+      });
+    });
+    return out;
+  }
+
+  /** How far the extra keeps have pushed this unit past the number it asked for. */
+  function overTarget(u) {
+    if (!u || u.target == null) return 0;
+    return Math.max(0, currentWinners(u).length - u.target);
   }
 
   function commitRunoff(name, mutate) {
@@ -1277,12 +1300,19 @@
     var swapped = Object.keys(u.runoff.picks).filter(function (k) { return u.runoff.picks[k] !== k; }).length;
 
     setTopbar(
-      (u.label || 'unit') + ' · Stage C burst runoff',
-      [
-        ['finalists', winners.length],
-        ['expandable', rows.length],
-        ['swapped', swapped]
-      ],
+      (u.label || 'unit') + ' · choose the best of duplicates',
+      (function () {
+        var over = overTarget(u);
+        var c = [
+          ['keeping', winners.length + (u.target != null ? ' / ' + u.target : '')],
+          ['with duplicates', rows.length],
+          ['swapped', swapped]
+        ];
+        // PRD 2 treats the quota as a commitment device, so going past it must be
+        // a visible, deliberate act rather than something that quietly drifts.
+        if (over) c.push(['over target', '+' + over]);
+        return c;
+      })(),
       null
     );
 
@@ -1296,7 +1326,7 @@
       // PRD 7.4: say so and move on rather than presenting an empty UI.
       R.body.appendChild(el('div', { class: 'notice notice-note', id: 'ro-none' }, [
         'None of these ' + winners.length + ' finalist' + (winners.length === 1 ? '' : 's') +
-        ' belongs to a near-duplicate group, so there is no burst to run off. Nothing to do here.'
+        ' looks like a duplicate of anything else. Nothing to choose between here.'
       ]));
       var bar0 = el('div', { class: 'bk-bar' }, [
         el('span', { class: 'spacer' }),
@@ -1307,8 +1337,10 @@
     }
 
     head.appendChild(el('span', {
-      text: rows.length + ' finalist' + (rows.length === 1 ? '' : 's') + ' came out of a burst. ' +
-            'Expanding one runs a Keep 1 pass over the whole burst, including frames cut earlier.'
+      text: rows.length + ' of your keepers ' + (rows.length === 1 ? 'has' : 'have') +
+            ' near-identical shots alongside it. Open one to compare them side by side, including ' +
+            'frames that were cut earlier, and pick whichever you actually want. Keep more than one ' +
+            'if they turn out not to be duplicates after all.'
     }));
 
     var list = el('div', { class: 'bk-results', id: 'ro-list' });
@@ -1323,7 +1355,9 @@
   }
 
   function runoffGroupEl(u, row, winners) {
-    var picked = u.runoff.picks[row.orig] || row.orig;
+    var kept = keepsFor(u.runoff, row.orig);
+    var picked = kept[0];
+    var extra = kept.length - 1;
     var open = !!R.open[row.orig];
     var meta = membersMeta(row.group);
     var nominee = PT.phash.nominate(meta);
@@ -1342,19 +1376,23 @@
         el('div', { text: nameOf(picked) }),
         el('div', {
           class: 'small dim',
-          text: row.group.length + ' near-identical frames' +
-                (picked !== row.orig ? ' · swapped in for ' + nameOf(row.orig) : '')
+          text: row.group.length + ' look like duplicates of this' +
+                (picked !== row.orig ? ' · swapped in for ' + nameOf(row.orig) : '') +
+                (extra ? ' · keeping ' + kept.length + ' of them' : '')
         })
       ]),
       el('button', {
         class: 'btn btn-sm', dataset: { expand: row.orig },
-        text: open ? 'Close' : 'Expand burst',
+        text: open ? 'Close' : 'Show duplicates',
         onclick: function () { R.open[row.orig] = !open; paintRunoff(); }
       }),
       picked !== row.orig ? el('button', {
         class: 'btn btn-sm btn-quiet', dataset: { revert: row.orig }, text: 'Revert',
         onclick: function () {
-          commitRunoff('runoff:revert', function (uu) { delete uu.runoff.picks[row.orig]; });
+          commitRunoff('runoff:revert', function (uu) {
+            delete uu.runoff.picks[row.orig];
+            delete uu.runoff.keeps[row.orig];
+          });
         }
       }) : null
     ]);
@@ -1364,15 +1402,28 @@
 
     var grid = el('div', { class: 'grid grid-' + (row.group.length <= 6 ? '6' : (row.group.length <= 12 ? '12' : '16')) });
     row.group.forEach(function (id) {
-      var taken = picked !== id && winners.indexOf(id) >= 0;
+      var isKept = kept.indexOf(id) >= 0;
+      var taken = !isKept && winners.indexOf(id) >= 0;
       var cell = el('div', {
-        class: 'photo-cell ro-cell' + (id === picked ? ' kept' : '') + (taken ? ' dead' : ''),
+        class: 'photo-cell ro-cell' + (isKept ? ' kept' : '') + (taken ? ' dead' : ''),
         dataset: { member: id, group: row.orig },
         title: taken ? 'Already a finalist in its own right' : nameOf(id),
         onclick: taken ? null : function () {
-          commitRunoff('runoff:keep1', function (uu) {
-            if (id === row.orig) delete uu.runoff.picks[row.orig];
-            else uu.runoff.picks[row.orig] = id;
+          commitRunoff('runoff:keep', function (uu) {
+            var list = keepsFor(uu.runoff, row.orig);
+            var at = list.indexOf(id);
+            if (at >= 0) {
+              // Never empty a group: something has to hold the original rank.
+              if (list.length === 1) return;
+              list.splice(at, 1);
+            } else {
+              list.push(id);
+            }
+            uu.runoff.keeps[row.orig] = list;
+            // Keep the legacy single-pick field consistent for anything still
+            // reading it, including an older saved session.
+            if (list[0] === row.orig) delete uu.runoff.picks[row.orig];
+            else uu.runoff.picks[row.orig] = list[0];
           });
         }
       });
@@ -1380,6 +1431,7 @@
       cell.appendChild(img);
       var tags = [];
       if (id === picked) tags.push('keeping');
+      else if (isKept) tags.push('also keeping');
       if (id === row.orig && id !== picked) tags.push('was #' + row.rank);
       if (id === nominee) tags.push('sharpest');
       if (taken) tags.push('already a finalist');
@@ -1394,7 +1446,10 @@
     });
 
     wrap.appendChild(el('div', { class: 'ro-body' }, [
-      el('div', { class: 'small dim', text: 'Keep 1: click the frame that survives. The suggestion is the sharpest at the highest resolution.' }),
+      el('div', { class: 'small dim', text:
+        'Click the ones worth keeping. Usually that is just the sharpest, marked below — ' +
+        'but if these are not really duplicates, keep as many as you want. Each extra one ' +
+        'adds to your final count.' }),
       grid
     ]));
     return wrap;
@@ -1445,4 +1500,11 @@
  *   brackets that did not contain the placed photo replay unchanged, and stopped
  *   re-asking any pairing the user had already judged. 712 comparisons for a
  *   500-photo top 20 against 1389 before, and 53 for a 32-photo top 8.
+ * v1.2 (2026-07-28): Stage C can now keep MORE THAN ONE photo out of a group,
+ *   because perceptual hashing sometimes groups shots that are not actually
+ *   duplicates and the user only discovers that while looking at them. keeps[] is
+ *   a per-group array whose first entry holds the original rank; extras append to
+ *   the winners and are reported as "over target" so passing the quota stays a
+ *   visible, deliberate act. Replaced the "burst runoff" jargon throughout with
+ *   plain language about choosing the best of duplicates.
 */

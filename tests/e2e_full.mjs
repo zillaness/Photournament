@@ -281,8 +281,9 @@ check('winners are distinct photos', result.distinct === result.winners.reduce((
 check('grid passes were recorded', result.passes.every((p) => p >= 1), result.passes.join(','));
 check('comparisons were recorded', result.comparisons > 0, result.comparisons);
 
+let exp = { rows: 0 };
 if (finalScreen === 'export') {
-  const exp = await page.evaluate(() => ({
+  exp = await page.evaluate(() => ({
     rows: document.querySelectorAll('.exp-row').length,
     dests: Array.from(document.querySelectorAll('.exp-dest')).slice(0, 3).map((e) => e.textContent),
     labelInputs: document.querySelectorAll('.exp-row input[type=text]').length
@@ -300,6 +301,44 @@ if (finalScreen === 'export') {
   const dest = await page.$eval('.exp-dest', (e) => e.textContent);
   check('label becomes part of the filename', /hero_for_cover/.test(dest), dest);
   check('original filename is retained', /IMG_\d+\.png$/.test(dest), dest);
+}
+
+// The zip is hand-rolled, so it has to be validated by something that is not
+// this code. The download is captured and handed to Python's zipfile.
+if (finalScreen === 'export') {
+  const dl = page.waitForEvent('download', { timeout: 30000 });
+  await clickText(/one \.zip/);
+  let zipPath = null;
+  try {
+    const d = await dl;
+    zipPath = path.join(os.tmpdir(), 'pt-export-' + Date.now() + '.zip');
+    await d.saveAs(zipPath);
+  } catch (e) {
+    check('zip download fired', false, e.message);
+  }
+  if (zipPath) {
+    check('zip download fired', true, path.basename(zipPath));
+    const { execFileSync } = await import('node:child_process');
+    const out = execFileSync('python3', ['-c', `
+import zipfile, json, sys
+z = zipfile.ZipFile(sys.argv[1])
+bad = z.testzip()
+names = z.namelist()
+print(json.dumps({
+  "ok": bad is None,
+  "count": len(names),
+  "foldered": all("/" in n for n in names),
+  "sizes_nonzero": all(z.getinfo(n).file_size > 0 for n in names),
+  "sample": names[:2]
+}))
+`, zipPath], { encoding: 'utf8' });
+    const z = JSON.parse(out.trim());
+    check('zip passes integrity check (CRCs valid)', z.ok === true, z.ok);
+    check('zip holds every finalist', z.count === exp.rows, z.count + ' entries');
+    check('zip entries keep their folders', z.foldered === true, z.sample.join(', '));
+    check('zip entries have real content', z.sizes_nonzero === true, z.sizes_nonzero);
+    rmSync(zipPath, { force: true });
+  }
 }
 
 check('zero console errors through the whole run', errors.length === 0,

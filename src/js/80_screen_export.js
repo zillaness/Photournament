@@ -1,6 +1,6 @@
 /**
  * @file 80_screen_export.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -210,8 +210,17 @@
       }
 
       actions.appendChild(writeBtn);
-      actions.appendChild(el('button', { class: 'btn', text: 'Download as files',
-        onclick: function () { doDownload(sets); } }));
+      actions.appendChild(el('button', {
+        class: 'btn', text: 'Save all to a folder…',
+        title: 'Pick one destination folder. Everything is written there in one go, with no ' +
+               'download prompts.',
+        onclick: function () { doSaveToFolder(sets); }
+      }));
+      actions.appendChild(el('button', {
+        class: 'btn', text: 'Download as one .zip',
+        title: 'A single download containing every finalist, foldered. Works in any browser.',
+        onclick: function () { doDownloadZip(sets); }
+      }));
       actions.appendChild(el('button', { class: 'btn', text: 'Copy filename list',
         onclick: function () { copyList(sets); } }));
       actions.appendChild(el('button', { class: 'btn btn-quiet', text: 'Decision JSON',
@@ -391,23 +400,166 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }
 
+  /* ------------------------------------------------------------- zip out -- */
+
+  var CRC_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(bytes) {
+    var c = 0xffffffff;
+    for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+  function u16(v) { return [v & 255, (v >>> 8) & 255]; }
+
   /**
-   * Downloads each finalist individually rather than zipping. A zip would need a
-   * compression library; Chromium prompts once for multiple downloads and the
-   * names already carry the folder in them.
+   * Builds a STORED (uncompressed) zip. Photographs are already compressed, so
+   * deflating them would cost CPU and save almost nothing — which is what makes
+   * a dependency-free zip writer worth having here. One download instead of N
+   * is the whole point: browsers prompt on multi-file downloads and some ask for
+   * a location per file.
+   *
+   * Bytes are read one file at a time, but every file ends up in the finished
+   * Blob, so peak memory is roughly the total export size.
    */
-  function doDownload(sets) {
+  function buildZip(items, onProgress) {
+    var parts = [];
+    var central = [];
+    var offset = 0;
+    var enc = new TextEncoder();
+    var done = 0;
+
+    var chain = Promise.resolve();
+    items.forEach(function (it) {
+      chain = chain.then(function () {
+        return originalBlob(it.id).then(function (blob) {
+          return blob.arrayBuffer();
+        }).then(function (ab) {
+          var bytes = new Uint8Array(ab);
+          var name = enc.encode(it.folder + '/' + it.name);
+          var crc = crc32(bytes);
+
+          var local = new Uint8Array([].concat(
+            u32(0x04034b50), u16(20), u16(0), u16(0),
+            u16(0), u16(0),                       // fixed timestamp: keeps output deterministic
+            u32(crc), u32(bytes.length), u32(bytes.length),
+            u16(name.length), u16(0)
+          ));
+          parts.push(local, name, bytes);
+          central.push({ name: name, crc: crc, size: bytes.length, offset: offset });
+          offset += local.length + name.length + bytes.length;
+
+          done++;
+          if (onProgress) onProgress(done, items.length);
+        }).catch(function (e) {
+          PT.warn('export', 'skipping ' + it.name + ': ' + e.message);
+        });
+      });
+    });
+
+    return chain.then(function () {
+      var dirStart = offset;
+      var dirSize = 0;
+      central.forEach(function (c) {
+        var head = new Uint8Array([].concat(
+          u32(0x02014b50), u16(20), u16(20), u16(0), u16(0),
+          u16(0), u16(0),
+          u32(c.crc), u32(c.size), u32(c.size),
+          u16(c.name.length), u16(0), u16(0), u16(0), u16(0),
+          u32(0), u32(c.offset)
+        ));
+        parts.push(head, c.name);
+        dirSize += head.length + c.name.length;
+      });
+      parts.push(new Uint8Array([].concat(
+        u32(0x06054b50), u16(0), u16(0),
+        u16(central.length), u16(central.length),
+        u32(dirSize), u32(dirStart), u16(0)
+      )));
+      return new Blob(parts, { type: 'application/zip' });
+    });
+  }
+
+  function doDownloadZip(sets) {
     var items = plan(sets);
-    var i = 0;
-    status('Downloading…');
-    (function next() {
-      if (i >= items.length) { status(items.length + ' files downloaded.'); return; }
-      var it = items[i++];
-      originalBlob(it.id)
-        .then(function (blob) { saveBlob(blob, it.folder + '__' + it.name); })
-        .catch(function () { /* a missing original must not stall the rest */ })
-        .then(function () { setTimeout(next, 120); });
-    })();
+    if (!items.length) return;
+    status('Building the zip…');
+    buildZip(items, function (n, total) { status('Packing ' + n + ' / ' + total + '…'); })
+      .then(function (blob) {
+        var s = PT.store.get();
+        var stamp = new Date().toISOString().slice(0, 10);
+        saveBlob(blob, slugLabel(s.session.rootName || 'photournament') + '_finalists_' + stamp + '.zip');
+        status(items.length + ' files in one zip, ' + PT.fmt.bytes(blob.size) + '.');
+      })
+      .catch(function (e) {
+        PT.warn('export', e);
+        status('');
+        PT.toast('Could not build the zip: ' + e.message);
+      });
+  }
+
+  /* --------------------------------------------------------- folder save -- */
+
+  /**
+   * Writes every finalist into ONE folder the user picks, creating the per-source
+   * subfolders inside it. This is the answer to a browser asking where to put
+   * each file: one dialog, one destination, no download prompts at all. It works
+   * even when the session came from dropped files, because the destination handle
+   * is independent of the source.
+   */
+  function doSaveToFolder(sets) {
+    if (typeof window.showDirectoryPicker !== 'function') {
+      PT.toast('This browser cannot pick an output folder. Use the zip instead.');
+      return;
+    }
+    var items = plan(sets);
+    var dir;
+    Promise.resolve(window.showDirectoryPicker({ mode: 'readwrite' }))
+      .then(function (d) {
+        dir = d;
+        return d.requestPermission ? d.requestPermission({ mode: 'readwrite' }) : 'granted';
+      })
+      .then(function (p) {
+        if (p !== 'granted') throw new Error('permission to write was not granted');
+        var written = 0;
+        var seq = Promise.resolve();
+        items.forEach(function (it) {
+          seq = seq.then(function () {
+            return dir.getDirectoryHandle(it.folder, { create: true })
+              .then(function (fh) {
+                return originalBlob(it.id).then(function (blob) {
+                  return fh.getFileHandle(it.name, { create: true })
+                    .then(function (f) { return f.createWritable(); })
+                    .then(function (w) { return w.write(blob).then(function () { return w.close(); }); });
+                });
+              })
+              .then(function () {
+                written++;
+                status('Saving… ' + written + ' / ' + items.length);
+              });
+          });
+        });
+        return seq.then(function () { return written; });
+      })
+      .then(function (written) {
+        status(written + ' files saved into ' + dir.name + '.');
+        PT.toast('Saved ' + written + ' finalists into ' + dir.name + '.');
+      })
+      .catch(function (e) {
+        if (e && e.name === 'AbortError') { status(''); return; }
+        PT.warn('export', e);
+        status('');
+        PT.toast('Could not save: ' + e.message);
+      });
   }
 
   function copyList(sets) {
@@ -462,4 +614,10 @@
  *   toggleable ordered prefixes, mirrored or flat output, per-source folder
  *   naming, disk writing with permission re-grant and collision prompts,
  *   individual downloads, clipboard list, and the decision JSON.
- */
+  * v1.1 (2026-07-28): Replaced the one-download-per-file export, which made
+ *   browsers ask for a location per photo, with two options that each need one
+ *   interaction: "Save all to a folder", which writes everything into a single
+ *   picked destination even when the session came from dropped files, and
+ *   "Download as one .zip", a dependency-free STORED zip (photographs are already
+ *   compressed, so deflating them would buy nothing).
+*/

@@ -5500,7 +5500,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 70_screen_bracket.js ===== */
 /**
  * @file 70_screen_bracket.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -6649,7 +6649,7 @@ v1.0 - 2026-07-28 - Samuel Cao
     }
     S.bar.appendChild(el('button', { class: 'btn', id: 'bk-undo', text: 'Undo last comparison', onclick: undo, disabled: !u.bracket.ops.length }));
     S.bar.appendChild(el('span', { class: 'spacer' }));
-    S.bar.appendChild(el('button', { class: 'btn btn-primary', id: 'bk-continue', text: 'Continue to burst runoff', onclick: continueToRunoff }));
+    S.bar.appendChild(el('button', { class: 'btn btn-primary', id: 'bk-continue', text: 'Next: check for duplicates', onclick: continueToRunoff }));
   }
 
   function unmountBracket(root) {
@@ -6728,7 +6728,10 @@ v1.0 - 2026-07-28 - Samuel Cao
     if (!u.runoff) {
       PT.store.dispatch('runoff:init', function (s) {
         var unit = s.session.units[unitId];
-        unit.runoff = { orig: (unit.winners || []).slice(), picks: {}, done: false };
+        // keeps[origId] is an ARRAY. Its first entry holds the original rank; any
+      // further entries are extra photos kept out of the same group, which is
+      // what makes a mis-grouped set recoverable without leaving this screen.
+      unit.runoff = { orig: (unit.winners || []).slice(), picks: {}, keeps: {}, done: false };
       });
       u = unitOf(unitId);
     }
@@ -6751,9 +6754,29 @@ v1.0 - 2026-07-28 - Samuel Cao
     return rows;
   }
 
+  function keepsFor(ro, id) {
+    var k = ro.keeps && ro.keeps[id];
+    if (k && k.length) return k.slice();
+    // Falls back to the older single-pick shape so a session saved before
+    // multi-keep existed still resolves.
+    return [(ro.picks && ro.picks[id]) || id];
+  }
+
   function currentWinners(u) {
-    var ro = u.runoff || { orig: u.winners || [], picks: {} };
-    return (ro.orig || []).map(function (id) { return ro.picks[id] || id; });
+    var ro = u.runoff || { orig: u.winners || [], picks: {}, keeps: {} };
+    var out = [];
+    (ro.orig || []).forEach(function (id) {
+      keepsFor(ro, id).forEach(function (k) {
+        if (out.indexOf(k) < 0) out.push(k);
+      });
+    });
+    return out;
+  }
+
+  /** How far the extra keeps have pushed this unit past the number it asked for. */
+  function overTarget(u) {
+    if (!u || u.target == null) return 0;
+    return Math.max(0, currentWinners(u).length - u.target);
   }
 
   function commitRunoff(name, mutate) {
@@ -6777,12 +6800,19 @@ v1.0 - 2026-07-28 - Samuel Cao
     var swapped = Object.keys(u.runoff.picks).filter(function (k) { return u.runoff.picks[k] !== k; }).length;
 
     setTopbar(
-      (u.label || 'unit') + ' · Stage C burst runoff',
-      [
-        ['finalists', winners.length],
-        ['expandable', rows.length],
-        ['swapped', swapped]
-      ],
+      (u.label || 'unit') + ' · choose the best of duplicates',
+      (function () {
+        var over = overTarget(u);
+        var c = [
+          ['keeping', winners.length + (u.target != null ? ' / ' + u.target : '')],
+          ['with duplicates', rows.length],
+          ['swapped', swapped]
+        ];
+        // PRD 2 treats the quota as a commitment device, so going past it must be
+        // a visible, deliberate act rather than something that quietly drifts.
+        if (over) c.push(['over target', '+' + over]);
+        return c;
+      })(),
       null
     );
 
@@ -6796,7 +6826,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       // PRD 7.4: say so and move on rather than presenting an empty UI.
       R.body.appendChild(el('div', { class: 'notice notice-note', id: 'ro-none' }, [
         'None of these ' + winners.length + ' finalist' + (winners.length === 1 ? '' : 's') +
-        ' belongs to a near-duplicate group, so there is no burst to run off. Nothing to do here.'
+        ' looks like a duplicate of anything else. Nothing to choose between here.'
       ]));
       var bar0 = el('div', { class: 'bk-bar' }, [
         el('span', { class: 'spacer' }),
@@ -6807,8 +6837,10 @@ v1.0 - 2026-07-28 - Samuel Cao
     }
 
     head.appendChild(el('span', {
-      text: rows.length + ' finalist' + (rows.length === 1 ? '' : 's') + ' came out of a burst. ' +
-            'Expanding one runs a Keep 1 pass over the whole burst, including frames cut earlier.'
+      text: rows.length + ' of your keepers ' + (rows.length === 1 ? 'has' : 'have') +
+            ' near-identical shots alongside it. Open one to compare them side by side, including ' +
+            'frames that were cut earlier, and pick whichever you actually want. Keep more than one ' +
+            'if they turn out not to be duplicates after all.'
     }));
 
     var list = el('div', { class: 'bk-results', id: 'ro-list' });
@@ -6823,7 +6855,9 @@ v1.0 - 2026-07-28 - Samuel Cao
   }
 
   function runoffGroupEl(u, row, winners) {
-    var picked = u.runoff.picks[row.orig] || row.orig;
+    var kept = keepsFor(u.runoff, row.orig);
+    var picked = kept[0];
+    var extra = kept.length - 1;
     var open = !!R.open[row.orig];
     var meta = membersMeta(row.group);
     var nominee = PT.phash.nominate(meta);
@@ -6842,19 +6876,23 @@ v1.0 - 2026-07-28 - Samuel Cao
         el('div', { text: nameOf(picked) }),
         el('div', {
           class: 'small dim',
-          text: row.group.length + ' near-identical frames' +
-                (picked !== row.orig ? ' · swapped in for ' + nameOf(row.orig) : '')
+          text: row.group.length + ' look like duplicates of this' +
+                (picked !== row.orig ? ' · swapped in for ' + nameOf(row.orig) : '') +
+                (extra ? ' · keeping ' + kept.length + ' of them' : '')
         })
       ]),
       el('button', {
         class: 'btn btn-sm', dataset: { expand: row.orig },
-        text: open ? 'Close' : 'Expand burst',
+        text: open ? 'Close' : 'Show duplicates',
         onclick: function () { R.open[row.orig] = !open; paintRunoff(); }
       }),
       picked !== row.orig ? el('button', {
         class: 'btn btn-sm btn-quiet', dataset: { revert: row.orig }, text: 'Revert',
         onclick: function () {
-          commitRunoff('runoff:revert', function (uu) { delete uu.runoff.picks[row.orig]; });
+          commitRunoff('runoff:revert', function (uu) {
+            delete uu.runoff.picks[row.orig];
+            delete uu.runoff.keeps[row.orig];
+          });
         }
       }) : null
     ]);
@@ -6864,15 +6902,28 @@ v1.0 - 2026-07-28 - Samuel Cao
 
     var grid = el('div', { class: 'grid grid-' + (row.group.length <= 6 ? '6' : (row.group.length <= 12 ? '12' : '16')) });
     row.group.forEach(function (id) {
-      var taken = picked !== id && winners.indexOf(id) >= 0;
+      var isKept = kept.indexOf(id) >= 0;
+      var taken = !isKept && winners.indexOf(id) >= 0;
       var cell = el('div', {
-        class: 'photo-cell ro-cell' + (id === picked ? ' kept' : '') + (taken ? ' dead' : ''),
+        class: 'photo-cell ro-cell' + (isKept ? ' kept' : '') + (taken ? ' dead' : ''),
         dataset: { member: id, group: row.orig },
         title: taken ? 'Already a finalist in its own right' : nameOf(id),
         onclick: taken ? null : function () {
-          commitRunoff('runoff:keep1', function (uu) {
-            if (id === row.orig) delete uu.runoff.picks[row.orig];
-            else uu.runoff.picks[row.orig] = id;
+          commitRunoff('runoff:keep', function (uu) {
+            var list = keepsFor(uu.runoff, row.orig);
+            var at = list.indexOf(id);
+            if (at >= 0) {
+              // Never empty a group: something has to hold the original rank.
+              if (list.length === 1) return;
+              list.splice(at, 1);
+            } else {
+              list.push(id);
+            }
+            uu.runoff.keeps[row.orig] = list;
+            // Keep the legacy single-pick field consistent for anything still
+            // reading it, including an older saved session.
+            if (list[0] === row.orig) delete uu.runoff.picks[row.orig];
+            else uu.runoff.picks[row.orig] = list[0];
           });
         }
       });
@@ -6880,6 +6931,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       cell.appendChild(img);
       var tags = [];
       if (id === picked) tags.push('keeping');
+      else if (isKept) tags.push('also keeping');
       if (id === row.orig && id !== picked) tags.push('was #' + row.rank);
       if (id === nominee) tags.push('sharpest');
       if (taken) tags.push('already a finalist');
@@ -6894,7 +6946,10 @@ v1.0 - 2026-07-28 - Samuel Cao
     });
 
     wrap.appendChild(el('div', { class: 'ro-body' }, [
-      el('div', { class: 'small dim', text: 'Keep 1: click the frame that survives. The suggestion is the sharpest at the highest resolution.' }),
+      el('div', { class: 'small dim', text:
+        'Click the ones worth keeping. Usually that is just the sharpest, marked below — ' +
+        'but if these are not really duplicates, keep as many as you want. Each extra one ' +
+        'adds to your final count.' }),
       grid
     ]));
     return wrap;
@@ -6945,6 +7000,13 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   brackets that did not contain the placed photo replay unchanged, and stopped
  *   re-asking any pairing the user had already judged. 712 comparisons for a
  *   500-photo top 20 against 1389 before, and 53 for a 32-photo top 8.
+ * v1.2 (2026-07-28): Stage C can now keep MORE THAN ONE photo out of a group,
+ *   because perceptual hashing sometimes groups shots that are not actually
+ *   duplicates and the user only discovers that while looking at them. keeps[] is
+ *   a per-group array whose first entry holds the original rank; extras append to
+ *   the winners and are reported as "over target" so passing the quota stays a
+ *   visible, deliberate act. Replaced the "burst runoff" jargon throughout with
+ *   plain language about choosing the best of duplicates.
 */
 
 </script>
@@ -6952,7 +7014,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 80_screen_export.js ===== */
 /**
  * @file 80_screen_export.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -7162,8 +7224,17 @@ v1.0 - 2026-07-28 - Samuel Cao
       }
 
       actions.appendChild(writeBtn);
-      actions.appendChild(el('button', { class: 'btn', text: 'Download as files',
-        onclick: function () { doDownload(sets); } }));
+      actions.appendChild(el('button', {
+        class: 'btn', text: 'Save all to a folder…',
+        title: 'Pick one destination folder. Everything is written there in one go, with no ' +
+               'download prompts.',
+        onclick: function () { doSaveToFolder(sets); }
+      }));
+      actions.appendChild(el('button', {
+        class: 'btn', text: 'Download as one .zip',
+        title: 'A single download containing every finalist, foldered. Works in any browser.',
+        onclick: function () { doDownloadZip(sets); }
+      }));
       actions.appendChild(el('button', { class: 'btn', text: 'Copy filename list',
         onclick: function () { copyList(sets); } }));
       actions.appendChild(el('button', { class: 'btn btn-quiet', text: 'Decision JSON',
@@ -7343,23 +7414,166 @@ v1.0 - 2026-07-28 - Samuel Cao
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }
 
+  /* ------------------------------------------------------------- zip out -- */
+
+  var CRC_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(bytes) {
+    var c = 0xffffffff;
+    for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+  function u16(v) { return [v & 255, (v >>> 8) & 255]; }
+
   /**
-   * Downloads each finalist individually rather than zipping. A zip would need a
-   * compression library; Chromium prompts once for multiple downloads and the
-   * names already carry the folder in them.
+   * Builds a STORED (uncompressed) zip. Photographs are already compressed, so
+   * deflating them would cost CPU and save almost nothing — which is what makes
+   * a dependency-free zip writer worth having here. One download instead of N
+   * is the whole point: browsers prompt on multi-file downloads and some ask for
+   * a location per file.
+   *
+   * Bytes are read one file at a time, but every file ends up in the finished
+   * Blob, so peak memory is roughly the total export size.
    */
-  function doDownload(sets) {
+  function buildZip(items, onProgress) {
+    var parts = [];
+    var central = [];
+    var offset = 0;
+    var enc = new TextEncoder();
+    var done = 0;
+
+    var chain = Promise.resolve();
+    items.forEach(function (it) {
+      chain = chain.then(function () {
+        return originalBlob(it.id).then(function (blob) {
+          return blob.arrayBuffer();
+        }).then(function (ab) {
+          var bytes = new Uint8Array(ab);
+          var name = enc.encode(it.folder + '/' + it.name);
+          var crc = crc32(bytes);
+
+          var local = new Uint8Array([].concat(
+            u32(0x04034b50), u16(20), u16(0), u16(0),
+            u16(0), u16(0),                       // fixed timestamp: keeps output deterministic
+            u32(crc), u32(bytes.length), u32(bytes.length),
+            u16(name.length), u16(0)
+          ));
+          parts.push(local, name, bytes);
+          central.push({ name: name, crc: crc, size: bytes.length, offset: offset });
+          offset += local.length + name.length + bytes.length;
+
+          done++;
+          if (onProgress) onProgress(done, items.length);
+        }).catch(function (e) {
+          PT.warn('export', 'skipping ' + it.name + ': ' + e.message);
+        });
+      });
+    });
+
+    return chain.then(function () {
+      var dirStart = offset;
+      var dirSize = 0;
+      central.forEach(function (c) {
+        var head = new Uint8Array([].concat(
+          u32(0x02014b50), u16(20), u16(20), u16(0), u16(0),
+          u16(0), u16(0),
+          u32(c.crc), u32(c.size), u32(c.size),
+          u16(c.name.length), u16(0), u16(0), u16(0), u16(0),
+          u32(0), u32(c.offset)
+        ));
+        parts.push(head, c.name);
+        dirSize += head.length + c.name.length;
+      });
+      parts.push(new Uint8Array([].concat(
+        u32(0x06054b50), u16(0), u16(0),
+        u16(central.length), u16(central.length),
+        u32(dirSize), u32(dirStart), u16(0)
+      )));
+      return new Blob(parts, { type: 'application/zip' });
+    });
+  }
+
+  function doDownloadZip(sets) {
     var items = plan(sets);
-    var i = 0;
-    status('Downloading…');
-    (function next() {
-      if (i >= items.length) { status(items.length + ' files downloaded.'); return; }
-      var it = items[i++];
-      originalBlob(it.id)
-        .then(function (blob) { saveBlob(blob, it.folder + '__' + it.name); })
-        .catch(function () { /* a missing original must not stall the rest */ })
-        .then(function () { setTimeout(next, 120); });
-    })();
+    if (!items.length) return;
+    status('Building the zip…');
+    buildZip(items, function (n, total) { status('Packing ' + n + ' / ' + total + '…'); })
+      .then(function (blob) {
+        var s = PT.store.get();
+        var stamp = new Date().toISOString().slice(0, 10);
+        saveBlob(blob, slugLabel(s.session.rootName || 'photournament') + '_finalists_' + stamp + '.zip');
+        status(items.length + ' files in one zip, ' + PT.fmt.bytes(blob.size) + '.');
+      })
+      .catch(function (e) {
+        PT.warn('export', e);
+        status('');
+        PT.toast('Could not build the zip: ' + e.message);
+      });
+  }
+
+  /* --------------------------------------------------------- folder save -- */
+
+  /**
+   * Writes every finalist into ONE folder the user picks, creating the per-source
+   * subfolders inside it. This is the answer to a browser asking where to put
+   * each file: one dialog, one destination, no download prompts at all. It works
+   * even when the session came from dropped files, because the destination handle
+   * is independent of the source.
+   */
+  function doSaveToFolder(sets) {
+    if (typeof window.showDirectoryPicker !== 'function') {
+      PT.toast('This browser cannot pick an output folder. Use the zip instead.');
+      return;
+    }
+    var items = plan(sets);
+    var dir;
+    Promise.resolve(window.showDirectoryPicker({ mode: 'readwrite' }))
+      .then(function (d) {
+        dir = d;
+        return d.requestPermission ? d.requestPermission({ mode: 'readwrite' }) : 'granted';
+      })
+      .then(function (p) {
+        if (p !== 'granted') throw new Error('permission to write was not granted');
+        var written = 0;
+        var seq = Promise.resolve();
+        items.forEach(function (it) {
+          seq = seq.then(function () {
+            return dir.getDirectoryHandle(it.folder, { create: true })
+              .then(function (fh) {
+                return originalBlob(it.id).then(function (blob) {
+                  return fh.getFileHandle(it.name, { create: true })
+                    .then(function (f) { return f.createWritable(); })
+                    .then(function (w) { return w.write(blob).then(function () { return w.close(); }); });
+                });
+              })
+              .then(function () {
+                written++;
+                status('Saving… ' + written + ' / ' + items.length);
+              });
+          });
+        });
+        return seq.then(function () { return written; });
+      })
+      .then(function (written) {
+        status(written + ' files saved into ' + dir.name + '.');
+        PT.toast('Saved ' + written + ' finalists into ' + dir.name + '.');
+      })
+      .catch(function (e) {
+        if (e && e.name === 'AbortError') { status(''); return; }
+        PT.warn('export', e);
+        status('');
+        PT.toast('Could not save: ' + e.message);
+      });
   }
 
   function copyList(sets) {
@@ -7414,7 +7628,13 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   toggleable ordered prefixes, mirrored or flat output, per-source folder
  *   naming, disk writing with permission re-grant and collision prompts,
  *   individual downloads, clipboard list, and the decision JSON.
- */
+  * v1.1 (2026-07-28): Replaced the one-download-per-file export, which made
+ *   browsers ask for a location per photo, with two options that each need one
+ *   interaction: "Save all to a folder", which writes everything into a single
+ *   picked destination even when the session came from dropped files, and
+ *   "Download as one .zip", a dependency-free STORED zip (photographs are already
+ *   compressed, so deflating them would buy nothing).
+*/
 
 </script>
 <script>

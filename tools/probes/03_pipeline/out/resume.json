@@ -1,0 +1,48 @@
+{
+ "pass1": {
+  "wallMs": 1426,
+  "ids": [
+   "c3ea1d7df5372081fe691be06e0804b540acbfc5a40eb40f298080263d22ab67",
+   "29302c0016915959109326184fcbdaec6b0761cd16f25c15331fdc8699fb3189",
+   "fe10d77e16180cb6ddd4eba006cdede2d76177365a53ad51981c1c276fd20522"
+  ],
+  "phash": [
+   "2a1e6bb3d89c29d5",
+   "716869ce3beef7e7",
+   "6860e88b6a6f776e"
+  ],
+  "fromCache": [
+   false,
+   false,
+   false
+  ]
+ },
+ "pass2": {
+  "wallMs": 27,
+  "ids": [
+   "c3ea1d7df5372081fe691be06e0804b540acbfc5a40eb40f298080263d22ab67",
+   "29302c0016915959109326184fcbdaec6b0761cd16f25c15331fdc8699fb3189",
+   "fe10d77e16180cb6ddd4eba006cdede2d76177365a53ad51981c1c276fd20522"
+  ],
+  "phash": [
+   "2a1e6bb3d89c29d5",
+   "716869ce3beef7e7",
+   "6860e88b6a6f776e"
+  ],
+  "fromCache": [
+   true,
+   true,
+   true
+  ]
+ },
+ "idsStable": true,
+ "mainThreadFingerprints": [
+  "c3ea1d7df5372081fe691be06e0804b540acbfc5a40eb40f298080263d22ab67",
+  "29302c0016915959109326184fcbdaec6b0761cd16f25c15331fdc8699fb3189",
+  "fe10d77e16180cb6ddd4eba006cdede2d76177365a53ad51981c1c276fd20522"
+ ],
+ "mainMatchesWorker": true,
+ "lookupHits": 3,
+ "speedup": 52.8,
+ "pageErrors": []
+}

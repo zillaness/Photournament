@@ -1,0 +1,40 @@
+{
+ "shape": {
+  "hardwareConcurrency": 4,
+  "hasWorkerSrc": true,
+  "workerSrcBytes": 34861,
+  "esmTokens": false,
+  "api": [
+   "WORKER_SRC=string",
+   "createPool=function",
+   "fingerprint=function",
+   "setLibheifSource=function",
+   "blankRecord=function"
+  ]
+ },
+ "defaultSize": 4,
+ "withHook": {
+  "phash": "deadbeefcafe1234",
+  "err": null
+ },
+ "withBadHook": {
+  "phash": "716869ce3beef7e7",
+  "err": null
+ },
+ "noLibheif": {
+  "kind": "heic",
+  "err": "libheif not configured (no libheifUrl and no injected source)",
+  "thumb": false
+ },
+ "withRealPhash": {
+  "phash": "065b0cd8f3a6f059",
+  "sharp": 0.32224798799760146,
+  "err": null
+ },
+ "withoutRealPhash": {
+  "phash": "716869ce3beef7e7",
+  "sharp": 700.72,
+  "err": null
+ },
+ "pageErrors": []
+}

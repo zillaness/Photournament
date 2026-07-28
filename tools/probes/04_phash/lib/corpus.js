@@ -63,6 +63,13 @@
 
   var BASE_SEED_OFF = 4007, CHAIN_SEED_OFF = 5011, MOVED_SEED_OFF = 6029;
 
+  // Each burst family gets its own terrain on top of the scale offset, so that
+  // "burst_tight/S0/wide" and "expression/S0/wide" are genuinely different
+  // scenes. Without this they share a seed and land at Hamming distance 0,
+  // which would be scored as a false positive when it is really correct
+  // behaviour on an ambiguously-labelled pair.
+  var FAMILY_SEED_OFF = { burst_tight: 0, burst_loose: 311, expression: 617 };
+
   function subjectY(scaleName, dy) {
     var sc = SCALES[scaleName];
     return sc.headY + 0.425 * sc.height + (dy || 0);
@@ -202,7 +209,7 @@
 
       // ---- burst families, one scene identity per (scene, scale) ----------
       BURST_SCALES.forEach(function (scaleName) {
-        var seed = scene.seed + SCALES[scaleName].seedOff;
+        var scaleSeed = scene.seed + SCALES[scaleName].seedOff;
         var sceneId = scene.name + '/' + scaleName;
 
         TIGHT.forEach(function (f, i) {
@@ -212,7 +219,7 @@
             family: 'burst_tight/' + sceneId, set: 'burst_tight/' + sceneId,
             role: 'f' + i, scale: scaleName,
             scene: {
-              seed: seed, camera: { panX: f.pan, panY: 0, zoom: 1 }, exposure: f.exp,
+              seed: scaleSeed + FAMILY_SEED_OFF.burst_tight, camera: { panX: f.pan, panY: 0, zoom: 1 }, exposure: f.exp,
               grainSeed: 5000 + si * 97 + i,
               subject: subjectFor(scene, scaleName, {
                 x: scene.x + f.dx, y: subjectY(scaleName, f.dy),
@@ -231,7 +238,7 @@
             family: 'burst_loose/' + sceneId, set: 'burst_loose/' + sceneId,
             role: 'f' + i, scale: scaleName,
             scene: {
-              seed: seed, camera: { panX: f.pan, panY: 0, zoom: f.zoom }, exposure: f.exp,
+              seed: scaleSeed + FAMILY_SEED_OFF.burst_loose, camera: { panX: f.pan, panY: 0, zoom: f.zoom }, exposure: f.exp,
               grainSeed: 6000 + si * 89 + i,
               subject: subjectFor(scene, scaleName, {
                 x: scene.x + f.dx, y: subjectY(scaleName, f.dy),
@@ -245,7 +252,7 @@
 
       // ---- expression-only: nothing moves but the face --------------------
       EXPR_SCALES.forEach(function (scaleName) {
-        var seed = scene.seed + SCALES[scaleName].seedOff;
+        var seed = scene.seed + SCALES[scaleName].seedOff + FAMILY_SEED_OFF.expression;
         var sceneId = scene.name + '/' + scaleName;
         EXPRS.forEach(function (e) {
           specs.push({

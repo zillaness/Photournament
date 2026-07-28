@@ -1,0 +1,58 @@
+{
+ "images": 40,
+ "workers": 4,
+ "wallMs": 9759,
+ "msPerImage": 244,
+ "idle": {
+  "raf": {
+   "frames": 180,
+   "median": 16.7,
+   "p95": 16.7,
+   "p99": 16.8,
+   "worst": 16.8,
+   "over50ms": 0,
+   "over100ms": 0
+  },
+  "lat": {
+   "samples": 454066,
+   "median": 0,
+   "p95": 0.1,
+   "p99": 0.1,
+   "worst": 17.5,
+   "over16ms": 1,
+   "over50ms": 0
+  }
+ },
+ "duringIngest": {
+  "raf": {
+   "frames": 584,
+   "median": 16.7,
+   "p95": 16.8,
+   "p99": 16.8,
+   "worst": 50,
+   "over50ms": 0,
+   "over100ms": 0
+  },
+  "lat": {
+   "samples": 1379817,
+   "median": 0,
+   "p95": 0.1,
+   "p99": 0.1,
+   "worst": 21.8,
+   "over16ms": 2,
+   "over50ms": 0
+  }
+ },
+ "headed": true,
+ "stats": {
+  "done": 40,
+  "failed": 0,
+  "skipped": 0,
+  "inFlight": 0,
+  "queued": 0,
+  "msPerImage": 250.6
+ },
+ "failedCount": 0,
+ "failedSample": [],
+ "pageErrors": []
+}

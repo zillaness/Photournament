@@ -1,0 +1,147 @@
+{
+  "checks": [
+    {
+      "name": "dhash is 16 lowercase hex",
+      "pass": true,
+      "detail": "9966669999666699"
+    },
+    {
+      "name": "phash is 16 lowercase hex",
+      "pass": true,
+      "detail": "57ad008d8daf84ad"
+    },
+    {
+      "name": "dhash deterministic",
+      "pass": true,
+      "detail": "9966669999666699 vs 9966669999666699"
+    },
+    {
+      "name": "phash deterministic",
+      "pass": true,
+      "detail": "57ad008d8daf84ad vs 57ad008d8daf84ad"
+    },
+    {
+      "name": "different images differ (dhash)",
+      "pass": true,
+      "detail": "9966669999666699 vs 33cc334d4d33cc33"
+    },
+    {
+      "name": "different images differ (phash)",
+      "pass": true,
+      "detail": "57ad008d8daf84ad vs 1df9a9469a0607b9"
+    },
+    {
+      "name": "hamming self = 0",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "hamming max = 64",
+      "pass": true,
+      "detail": 64
+    },
+    {
+      "name": "hamming symmetric",
+      "pass": true,
+      "detail": 32
+    },
+    {
+      "name": "hamming single bit = 1",
+      "pass": true
+    },
+    {
+      "name": "hamming counts across both words",
+      "pass": true
+    },
+    {
+      "name": "phash DC bit is zero",
+      "pass": true,
+      "detail": "5/1"
+    },
+    {
+      "name": "hamming obeys triangle inequality",
+      "pass": true
+    },
+    {
+      "name": "sharpness(sharp) > sharpness(blurred)",
+      "pass": true,
+      "detail": "0.166 vs 0.002"
+    },
+    {
+      "name": "sharpness >= 0",
+      "pass": true
+    },
+    {
+      "name": "cluster order-independent (union)",
+      "pass": true,
+      "detail": "[[\"a\",\"b\",\"z\"],[\"m\",\"q\"]]"
+    },
+    {
+      "name": "cluster order-independent (strict)",
+      "pass": true,
+      "detail": "[[\"a\",\"b\",\"z\"],[\"m\",\"q\"]]"
+    },
+    {
+      "name": "groups sorted by smallest id",
+      "pass": true,
+      "detail": "[\"a\",\"m\"]"
+    },
+    {
+      "name": "ids sorted inside groups",
+      "pass": true,
+      "detail": "[[\"a\",\"b\",\"z\"],[\"m\",\"q\"]]"
+    },
+    {
+      "name": "every id appears exactly once",
+      "pass": true,
+      "detail": "a,b,z,m,q"
+    },
+    {
+      "name": "singletons included",
+      "pass": true
+    },
+    {
+      "name": "empty input -> []",
+      "pass": true
+    },
+    {
+      "name": "union chains a 4-link chain into one group",
+      "pass": true,
+      "detail": "[[\"c0\",\"c1\",\"c2\",\"c3\"]]"
+    },
+    {
+      "name": "strict refuses to chain",
+      "pass": true,
+      "detail": "[[\"c0\",\"c1\"],[\"c2\",\"c3\"]]"
+    },
+    {
+      "name": "nominate picks max score",
+      "pass": true
+    },
+    {
+      "name": "nominate singleton",
+      "pass": true
+    },
+    {
+      "name": "nominate tie breaks on smallest id",
+      "pass": true
+    },
+    {
+      "name": "nominate tolerates null sharp",
+      "pass": true
+    },
+    {
+      "name": "dhash rejects non-ImageData",
+      "pass": true
+    },
+    {
+      "name": "hamming rejects wrong length",
+      "pass": true
+    },
+    {
+      "name": "cluster rejects unknown mode",
+      "pass": true
+    }
+  ],
+  "allPass": true
+}

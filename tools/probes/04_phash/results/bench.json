@@ -1,0 +1,142 @@
+{
+  "hash": [
+    {
+      "name": "320px thumbnail",
+      "w": 320,
+      "h": 240,
+      "mp": 0.08,
+      "reps": 200,
+      "dhashMs": 0.5485,
+      "phashMs": 0.6745,
+      "sharpMs": 1.25,
+      "bothHashesMs": 1.223,
+      "allThreeMs": 2.473
+    },
+    {
+      "name": "1600px preview",
+      "w": 1600,
+      "h": 1200,
+      "mp": 1.92,
+      "reps": 20,
+      "dhashMs": 13.055,
+      "phashMs": 13.245,
+      "sharpMs": 13.735,
+      "bothHashesMs": 26.3,
+      "allThreeMs": 40.035
+    },
+    {
+      "name": "12MP full decode",
+      "w": 3992,
+      "h": 2992,
+      "mp": 11.94,
+      "reps": 4,
+      "dhashMs": 75.75,
+      "phashMs": 76.925,
+      "sharpMs": 80.15,
+      "bothHashesMs": 152.675,
+      "allThreeMs": 232.825
+    }
+  ],
+  "hamming": {
+    "calls": 2000000,
+    "totalMs": 137.6,
+    "nsPerCall": 68.8,
+    "millionPerSec": 14.53,
+    "checksum": 53803233
+  },
+  "cluster": [
+    {
+      "n": 100,
+      "mode": "union",
+      "ms": 0.21,
+      "reps": 20,
+      "groups": 25,
+      "nonSingleton": 25,
+      "pairs": 4950
+    },
+    {
+      "n": 100,
+      "mode": "strict",
+      "ms": 0.04,
+      "reps": 20,
+      "groups": 25,
+      "nonSingleton": 25,
+      "pairs": 4950
+    },
+    {
+      "n": 250,
+      "mode": "union",
+      "ms": 0.41,
+      "reps": 20,
+      "groups": 63,
+      "nonSingleton": 63,
+      "pairs": 31125
+    },
+    {
+      "n": 250,
+      "mode": "strict",
+      "ms": 0.15,
+      "reps": 20,
+      "groups": 63,
+      "nonSingleton": 63,
+      "pairs": 31125
+    },
+    {
+      "n": 500,
+      "mode": "union",
+      "ms": 1.68,
+      "reps": 5,
+      "groups": 125,
+      "nonSingleton": 125,
+      "pairs": 124750
+    },
+    {
+      "n": 500,
+      "mode": "strict",
+      "ms": 0.44,
+      "reps": 5,
+      "groups": 125,
+      "nonSingleton": 125,
+      "pairs": 124750
+    }
+  ],
+  "clusterEdge": [
+    {
+      "kind": "allIdentical",
+      "n": 500,
+      "mode": "union",
+      "ms": 1.38,
+      "groups": 1,
+      "largest": 500
+    },
+    {
+      "kind": "allIdentical",
+      "n": 500,
+      "mode": "strict",
+      "ms": 0.56,
+      "groups": 1,
+      "largest": 500
+    },
+    {
+      "kind": "allDistinct",
+      "n": 500,
+      "mode": "union",
+      "ms": 0.96,
+      "groups": 4,
+      "largest": 125
+    },
+    {
+      "kind": "allDistinct",
+      "n": 500,
+      "mode": "strict",
+      "ms": 0.38,
+      "groups": 85,
+      "largest": 8
+    }
+  ],
+  "nominate": {
+    "ms": 0.0002,
+    "size": 8
+  },
+  "hardwareConcurrency": 4
+}

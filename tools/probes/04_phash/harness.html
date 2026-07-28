@@ -1,0 +1,269 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Photournament pHash probe harness</title>
+<body style="font:14px system-ui;padding:16px;background:#111;color:#eee">
+<h1>pHash probe harness</h1>
+<p id="status">idle</p>
+
+<!-- The SHIPPING module. Classic script src is the one URL-based load that
+     survives file:// (probe 01, row 36). -->
+<script src="../../../src/js/20_phash.js"></script>
+<script src="./lib/scenegen.js"></script>
+<script src="./lib/corpus.js"></script>
+<script src="./lib/analysis.js"></script>
+<script src="./lib/bench.js"></script>
+<script>
+(function () {
+  'use strict';
+  window.__log = [];
+  function setStatus(s) {
+    document.getElementById('status').textContent = s;
+    window.__log.push(s);
+  }
+  window.__setStatus = setStatus;
+
+  window.moduleShape = function () {
+    var ph = window.PT && window.PT.phash;
+    return {
+      hasPT: !!window.PT,
+      keys: ph ? Object.keys(ph) : null,
+      types: ph ? {
+        dhash: typeof ph.dhash, phash: typeof ph.phash, hamming: typeof ph.hamming,
+        sharpness: typeof ph.sharpness, cluster: typeof ph.cluster,
+        nominate: typeof ph.nominate,
+        DEFAULT_THRESHOLD: typeof ph.DEFAULT_THRESHOLD,
+        THRESHOLD_RANGE: Array.isArray(ph.THRESHOLD_RANGE) ? 'array' : typeof ph.THRESHOLD_RANGE
+      } : null,
+      DEFAULT_THRESHOLD: ph ? ph.DEFAULT_THRESHOLD : null,
+      THRESHOLD_RANGE: ph ? ph.THRESHOLD_RANGE : null,
+      location: location.protocol,
+      hardwareConcurrency: navigator.hardwareConcurrency
+    };
+  };
+
+  /**
+   * A deterministic non-monotonic test pattern. It must not be a plain
+   * gradient: a monotonic ramp gives dhash all-zero bits regardless of colour,
+   * so two different gradients would collide and the "different images differ"
+   * check would read as a module bug when it is a bad fixture.
+   */
+  function grad(w, h, seed) {
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+    var img = ctx.createImageData(w, h);
+    var d = img.data;
+    for (var y = 0, i = 0; y < h; y++) {
+      for (var x = 0; x < w; x++, i += 4) {
+        var v = 128 + 100 * Math.sin((x / w) * (3 + seed) * Math.PI) *
+                      Math.cos((y / h) * (2 + seed * 2) * Math.PI);
+        d[i] = v; d[i + 1] = 255 - v; d[i + 2] = (v * 1.7) % 256; d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return ctx.getImageData(0, 0, w, h);
+  }
+
+  /** Correctness and determinism checks that do not need the corpus. */
+  window.selfTest = function () {
+    var ph = window.PT.phash;
+    var out = { checks: [] };
+    function check(name, pass, detail) { out.checks.push({ name: name, pass: !!pass, detail: detail }); }
+
+    var a = grad(400, 300, 1);
+    var b = grad(400, 300, 1);
+    var c = grad(400, 300, 2);
+
+    var da = ph.dhash(a), db = ph.dhash(b), dc = ph.dhash(c);
+    var pa = ph.phash(a), pb = ph.phash(b), pc = ph.phash(c);
+
+    check('dhash is 16 lowercase hex', /^[0-9a-f]{16}$/.test(da), da);
+    check('phash is 16 lowercase hex', /^[0-9a-f]{16}$/.test(pa), pa);
+    check('dhash deterministic', da === db, da + ' vs ' + db);
+    check('phash deterministic', pa === pb, pa + ' vs ' + pb);
+    check('different images differ (dhash)', da !== dc, da + ' vs ' + dc);
+    check('different images differ (phash)', pa !== pc, pa + ' vs ' + pc);
+    check('hamming self = 0', ph.hamming(da, da) === 0, ph.hamming(da, da));
+    check('hamming max = 64', ph.hamming('ffffffffffffffff', '0000000000000000') === 64,
+      ph.hamming('ffffffffffffffff', '0000000000000000'));
+    check('hamming symmetric', ph.hamming(da, dc) === ph.hamming(dc, da), ph.hamming(da, dc));
+    check('hamming single bit = 1', ph.hamming('0000000000000000', '0000000000000001') === 1);
+    check('hamming counts across both words',
+      ph.hamming('8000000000000000', '0000000080000000') === 2);
+    check('phash DC bit is zero',
+      (parseInt(pa[0], 16) & 8) === 0 && (parseInt(pc[0], 16) & 8) === 0, pa[0] + '/' + pc[0]);
+
+    // triangle inequality must hold for a metric
+    var tri = true;
+    var hs = [da, dc, pa, pc, 'ffffffffffffffff', '0f0f0f0f0f0f0f0f'];
+    for (var i = 0; i < hs.length; i++) for (var j = 0; j < hs.length; j++) for (var k = 0; k < hs.length; k++) {
+      if (ph.hamming(hs[i], hs[k]) > ph.hamming(hs[i], hs[j]) + ph.hamming(hs[j], hs[k])) tri = false;
+    }
+    check('hamming obeys triangle inequality', tri);
+
+    // sharpness: a blurred copy must score lower
+    var cv = document.createElement('canvas'); cv.width = 400; cv.height = 300;
+    var cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.putImageData(a, 0, 0);
+    var bl = document.createElement('canvas'); bl.width = 400; bl.height = 300;
+    var bx = bl.getContext('2d', { willReadFrequently: true });
+    bx.filter = 'blur(3px)'; bx.drawImage(cv, 0, 0);
+    var sSharp = ph.sharpness(a), sBlur = ph.sharpness(bx.getImageData(0, 0, 400, 300));
+    check('sharpness(sharp) > sharpness(blurred)', sSharp > sBlur, sSharp.toFixed(3) + ' vs ' + sBlur.toFixed(3));
+    check('sharpness >= 0', sSharp >= 0 && sBlur >= 0);
+
+    // cluster determinism and ordering
+    var items = [
+      { id: 'z', hash: '0000000000000000' }, { id: 'a', hash: '0000000000000001' },
+      { id: 'm', hash: 'ffffffffffffffff' }, { id: 'b', hash: '0000000000000003' },
+      { id: 'q', hash: 'fffffffffffffffe' }
+    ];
+    var g1 = ph.cluster(items, { threshold: 4, mode: 'union' });
+    var shuffled = [items[2], items[0], items[4], items[3], items[1]];
+    var g2 = ph.cluster(shuffled, { threshold: 4, mode: 'union' });
+    check('cluster order-independent (union)', JSON.stringify(g1) === JSON.stringify(g2), JSON.stringify(g1));
+    var s1 = ph.cluster(items, { threshold: 4, mode: 'strict' });
+    var s2 = ph.cluster(shuffled, { threshold: 4, mode: 'strict' });
+    check('cluster order-independent (strict)', JSON.stringify(s1) === JSON.stringify(s2), JSON.stringify(s1));
+    check('groups sorted by smallest id',
+      g1.map(function (g) { return g[0]; }).join(',') === g1.map(function (g) { return g[0]; }).slice().sort().join(','),
+      JSON.stringify(g1.map(function (g) { return g[0]; })));
+    check('ids sorted inside groups',
+      g1.every(function (g) { return g.join(',') === g.slice().sort().join(','); }), JSON.stringify(g1));
+    var flat = [];
+    g1.forEach(function (g) { flat = flat.concat(g); });
+    check('every id appears exactly once', flat.length === items.length &&
+      new Set(flat).size === items.length, flat.join(','));
+    check('singletons included', ph.cluster([{ id: 'solo', hash: '0123456789abcdef' }], { threshold: 4 }).length === 1);
+    check('empty input -> []', ph.cluster([], {}).length === 0);
+
+    // strict really does bound the diameter, union does not
+    var chain = [
+      { id: 'c0', hash: '0000000000000000' },
+      { id: 'c1', hash: '000000000000000f' },
+      { id: 'c2', hash: '00000000000000ff' },
+      { id: 'c3', hash: '0000000000000fff' }
+    ];
+    var uc = ph.cluster(chain, { threshold: 4, mode: 'union' });
+    var sc = ph.cluster(chain, { threshold: 4, mode: 'strict' });
+    check('union chains a 4-link chain into one group', uc.length === 1, JSON.stringify(uc));
+    check('strict refuses to chain', sc.length > 1, JSON.stringify(sc));
+
+    // nominate
+    check('nominate picks max score',
+      ph.nominate([{ id: 'x', w: 100, h: 100, sharp: 1 }, { id: 'y', w: 100, h: 100, sharp: 9 }]) === 'y');
+    check('nominate singleton', ph.nominate([{ id: 'only', w: 1, h: 1, sharp: 0 }]) === 'only');
+    check('nominate tie breaks on smallest id',
+      ph.nominate([{ id: 'b', w: 10, h: 10, sharp: 5 }, { id: 'a', w: 10, h: 10, sharp: 5 }]) === 'a');
+    check('nominate tolerates null sharp',
+      ph.nominate([{ id: 'a', w: 10, h: 10, sharp: null }, { id: 'b', w: 20, h: 20, sharp: null }]) === 'b');
+
+    // error handling
+    function throws(fn) { try { fn(); return false; } catch (e) { return true; } }
+    check('dhash rejects non-ImageData', throws(function () { ph.dhash({ width: 4, height: 4 }); }));
+    check('hamming rejects wrong length', throws(function () { ph.hamming('abc', 'def'); }));
+    check('cluster rejects unknown mode', throws(function () {
+      ph.cluster([{ id: 'a', hash: '0000000000000000' }], { mode: 'nope' });
+    }));
+
+    out.allPass = out.checks.every(function (c2) { return c2.pass; });
+    return out;
+  };
+
+  window.runCorpus = function () {
+    return Corpus.build(function (i, n) { setStatus('corpus ' + i + '/' + n); })
+      .then(function (r) { setStatus('corpus done: ' + r.records.length); return r; });
+  };
+
+  window.runAnalysis = function (records) {
+    setStatus('analysis: pairs');
+    var pairs = Analysis.allPairs(records);
+    setStatus('analysis: distributions');
+    var dist = Analysis.distributionByLabel(pairs);
+    var sweeps = {};
+    Analysis.HASH_FIELDS.forEach(function (f) {
+      sweeps[f] = Analysis.thresholdSweep(pairs, f);
+      sweeps[f + '__noExpression'] = Analysis.thresholdSweep(pairs, f, {
+        excludeLabels: Object.keys(dist).filter(function (l) { return l.indexOf('POS_expression') === 0; })
+      });
+    });
+    setStatus('analysis: clustering');
+    var thresholds = [4, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24];
+    var clusters = {
+      dhash: Analysis.clusterReport(records, pairs, 'dhash', thresholds, ['union', 'strict']),
+      phash: Analysis.clusterReport(records, pairs, 'phash', thresholds, ['union', 'strict']),
+      dhashThumb: Analysis.clusterReport(records, pairs, 'dhashThumb', thresholds, ['union', 'strict'])
+    };
+    setStatus('analysis: chain');
+    var chain = {
+      dhash: Analysis.chainReport(records, 'dhash', [8, 10, 12, 14, 16]),
+      phash: Analysis.chainReport(records, 'phash', [8, 10, 12, 14, 16])
+    };
+    var chainRecs = records.filter(function (r) { return r.category === 'chain'; })
+      .sort(function (a, b) { return a.chainStep - b.chainStep; });
+    var triples = {
+      dhash_all: Analysis.transitivityTriples(records, 'dhash', 14),
+      dhash_chain: Analysis.transitivityTriples(chainRecs, 'phash', 14),
+      phash_all: Analysis.transitivityTriples(records, 'phash', 14)
+    };
+    setStatus('analysis: nomination');
+    var nomination = Analysis.nominationTrials(records, [
+      { name: 'sharp only (1.0/0.0)', ws: 1.0, wr: 0.0 },
+      { name: 'shipped (0.7/0.3)', ws: 0.7, wr: 0.3 },
+      { name: 'even (0.5/0.5)', ws: 0.5, wr: 0.5 },
+      { name: 'resolution only (0.0/1.0)', ws: 0.0, wr: 1.0 }
+    ]);
+    // thumbnail-vs-full agreement: does hashing the 320px thumb change anything?
+    var agree = { same: 0, diff: 0, maxDelta: 0, deltas: [] };
+    pairs.forEach(function (p) {
+      var d = Math.abs(p.dhash - p.dhashThumb);
+      agree.deltas.push(d);
+      if (d === 0) agree.same++; else agree.diff++;
+      if (d > agree.maxDelta) agree.maxDelta = d;
+    });
+    agree.summary = Analysis.summarise(agree.deltas);
+    delete agree.deltas;
+
+    // Bit-weight of every hash. pHash thresholds at the median of 63
+    // coefficients, so it should be a constant-weight code -> distances are
+    // always even. Worth confirming rather than assuming, because it halves
+    // the usable resolution of the sensitivity slider.
+    function weights(field) {
+      var w = {};
+      records.forEach(function (r) {
+        var n = 0, hx = r[field];
+        for (var i = 0; i < 16; i++) {
+          var v = parseInt(hx[i], 16);
+          n += (v & 1) + ((v >> 1) & 1) + ((v >> 2) & 1) + ((v >> 3) & 1);
+        }
+        w[n] = (w[n] || 0) + 1;
+      });
+      return w;
+    }
+    function parity(field) {
+      var odd = 0, even = 0;
+      pairs.forEach(function (p) { if (p[field] % 2) odd++; else even++; });
+      return { odd: odd, even: even };
+    }
+    var hashStats = {
+      dhashBitWeights: weights('dhash'), phashBitWeights: weights('phash'),
+      dhashDistanceParity: parity('dhash'), phashDistanceParity: parity('phash')
+    };
+
+    setStatus('analysis done');
+    return {
+      nPairs: pairs.length, hashStats: hashStats, dist: dist, sweeps: sweeps, clusters: clusters,
+      chain: chain, triples: triples, nomination: nomination, thumbAgreement: agree,
+      pairsSample: pairs.filter(function (p) { return p.label.indexOf('POS_expression') === 0; })
+    };
+  };
+
+  window.runBench = function (records) {
+    setStatus('bench');
+    var hashes = records.map(function (r) { return r.dhash; });
+    var b = Bench.run(hashes);
+    setStatus('bench done');
+    return b;
+  };
+})();
+</script>
+</body>

@@ -166,6 +166,15 @@
       }
     }
 
+    // --- scene texture ----------------------------------------------------
+    // Without this the render is almost all low-frequency gradient, which is
+    // nothing like a photograph: unrelated frames end up much closer in Hamming
+    // distance than real unrelated photos would, and every threshold conclusion
+    // drawn from the corpus would be optimistic in the wrong direction.
+    // Drawn INSIDE the camera transform so that panning and zooming reveal
+    // different texture, exactly as a real camera move would.
+    drawTexture(ctx, w, h, p.seed);
+
     // --- subject ---------------------------------------------------------
     if (p.subject) drawFigure(ctx, w, h, p.subject, pal);
 
@@ -191,6 +200,59 @@
     ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
 
     return canvas;
+  }
+
+  /**
+   * Multi-octave 1/f luminance texture, cached per scene seed. Generated at
+   * 1.6x the frame in scene space so that a camera pan or zoom uncovers texture
+   * the previous framing never showed.
+   */
+  var TEXTURE_CACHE = {};
+  function textureCanvas(seed, tw, th) {
+    var key = seed + ':' + tw + 'x' + th;
+    if (TEXTURE_CACHE[key]) return TEXTURE_CACHE[key];
+    var c = document.createElement('canvas');
+    c.width = tw; c.height = th;
+    var ctx = c.getContext('2d');
+    var img = ctx.createImageData(tw, th);
+    var d = img.data;
+    // Five octaves, halving amplitude, doubling frequency. The finest octave is
+    // a per-pixel hash so there is real energy above the 32x32 DCT grid.
+    var GRIDS = [7, 19, 53, 131];
+    var oct = [];
+    for (var o = 0; o < GRIDS.length; o++) oct.push(valueNoise2D(seed * 131 + o * 6151, GRIDS[o], GRIDS[o]));
+    var rnd = mulberry32(seed * 977 + 13);
+    var fine = new Float32Array(4096);
+    for (var q = 0; q < fine.length; q++) fine[q] = rnd();
+    for (var y = 0, i = 0; y < th; y++) {
+      var fy = y / th;
+      for (var x = 0; x < tw; x++, i += 4) {
+        var fx = x / tw;
+        var v = 0, amp = 1, norm = 0;
+        for (var k = 0; k < oct.length; k++) { v += amp * oct[k](fx, fy); norm += amp; amp *= 0.55; }
+        v = v / norm;
+        v = 0.85 * v + 0.15 * fine[((y * 71 + x * 37) & 4095)];
+        // Averaging octaves pulls everything toward 0.5, which under 'overlay'
+        // is a no-op. Stretch the contrast back out or the texture is invisible.
+        v = 0.5 + (v - 0.5) * 3.2;
+        var g = v < 0 ? 0 : (v > 1 ? 255 : v * 255);
+        d[i] = g; d[i + 1] = g; d[i + 2] = g; d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    TEXTURE_CACHE[key] = c;
+    return c;
+  }
+
+  function drawTexture(ctx, w, h, seed) {
+    var tw = Math.round(w * 0.9), th = Math.round(h * 0.9);
+    var tex = textureCanvas(seed, tw, th);
+    ctx.save();
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.globalAlpha = 0.8;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(tex, -0.3 * w, -0.3 * h, 1.6 * w, 1.6 * h);
+    ctx.restore();
   }
 
   /** A person: body, head, hair, eyes, brows, mouth. Expression is real geometry. */

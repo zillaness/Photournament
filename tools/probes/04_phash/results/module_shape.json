@@ -1,0 +1,33 @@
+{
+  "hasPT": true,
+  "keys": [
+    "dhash",
+    "phash",
+    "hamming",
+    "sharpness",
+    "cluster",
+    "nominate",
+    "DEFAULT_THRESHOLD",
+    "THRESHOLD_RANGE",
+    "DEFAULT_MODE",
+    "RECOMMENDED_HASH",
+    "_internal"
+  ],
+  "types": {
+    "dhash": "function",
+    "phash": "function",
+    "hamming": "function",
+    "sharpness": "function",
+    "cluster": "function",
+    "nominate": "function",
+    "DEFAULT_THRESHOLD": "number",
+    "THRESHOLD_RANGE": "array"
+  },
+  "DEFAULT_THRESHOLD": 14,
+  "THRESHOLD_RANGE": [
+    4,
+    20
+  ],
+  "location": "file:",
+  "hardwareConcurrency": 4
+}

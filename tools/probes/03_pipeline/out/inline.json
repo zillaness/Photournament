@@ -1,0 +1,62 @@
+{
+ "poolInfo": {
+  "size": 1,
+  "libheifUrl": null,
+  "inline": true
+ },
+ "libheifSrcBytes": 1462173,
+ "workerSrcLength": 33730,
+ "records": [
+  {
+   "id": "9584b4b784dddcf24c9d8bddcba124a426eceb15d49f2b7b150c3f8262276ebc",
+   "name": "nokia_C003.heic",
+   "path": "Trip/nokia_C003.heic",
+   "dir": "Trip",
+   "size": 224452,
+   "lastMod": 1785208329238,
+   "kind": "heic",
+   "w": 1280,
+   "h": 720,
+   "thumb": 12193,
+   "thumbType": "image/jpeg",
+   "preview": 162221,
+   "previewType": "image/jpeg",
+   "phash": "a9a9ebebebebcacb",
+   "sharp": 1547.39,
+   "err": null,
+   "format": "heic:mif1",
+   "orientation": 1,
+   "orientationApplied": 1,
+   "browserAppliesExif": null,
+   "orientationSource": "none",
+   "ms": 265.4,
+   "fromCache": false
+  },
+  {
+   "id": "9e4d505ad2ae6e3cbf4c2f1959bea5d02ce96dc096e3d9adfc2fcc1a96fb6470",
+   "name": "plain_800x600.jpg",
+   "path": "Trip/plain_800x600.jpg",
+   "dir": "Trip",
+   "size": 36569,
+   "lastMod": 1785217245161,
+   "kind": "jpeg",
+   "w": 800,
+   "h": 600,
+   "thumb": 8056,
+   "thumbType": "image/jpeg",
+   "preview": 31874,
+   "previewType": "image/jpeg",
+   "phash": "716869ce3beef7e7",
+   "sharp": 700.72,
+   "err": null,
+   "format": "jpeg",
+   "orientation": 1,
+   "orientationApplied": 1,
+   "browserAppliesExif": null,
+   "orientationSource": "none",
+   "ms": 14.5,
+   "fromCache": false
+  }
+ ],
+ "pageErrors": []
+}

@@ -1,0 +1,213 @@
+{
+ "decodes": 70,
+ "wallMs": 87962,
+ "msPerImage": 1257,
+ "perImage": {
+  "min": 1188.3,
+  "median": 1232.7,
+  "p95": 1437.8,
+  "max": 1711.1
+ },
+ "wasmHeapMB": [
+  {
+   "afterDecodes": 1,
+   "mb": 68.7
+  },
+  {
+   "afterDecodes": 10,
+   "mb": 68.7
+  },
+  {
+   "afterDecodes": 20,
+   "mb": 68.7
+  },
+  {
+   "afterDecodes": 30,
+   "mb": 68.7
+  },
+  {
+   "afterDecodes": 40,
+   "mb": 68.7
+  },
+  {
+   "afterDecodes": 50,
+   "mb": 68.7
+  },
+  {
+   "afterDecodes": 60,
+   "mb": 68.7
+  },
+  {
+   "afterDecodes": 70,
+   "mb": 68.7
+  }
+ ],
+ "heapGrowthPerDecodeMB": 0,
+ "projectedAt500MB": 69,
+ "processRssMB": {
+  "samples": 219,
+  "renderer": {
+   "start": 135,
+   "peak": 361,
+   "end": 266,
+   "firstHalfMean": 268,
+   "secondHalfMean": 268,
+   "series": [
+    135,
+    261,
+    261,
+    264,
+    318,
+    264,
+    265,
+    264,
+    265,
+    265,
+    266,
+    266,
+    266,
+    266,
+    266,
+    266,
+    266,
+    266,
+    266,
+    264,
+    264,
+    265,
+    265,
+    265,
+    265,
+    315,
+    266,
+    266
+   ]
+  },
+  "browser": {
+   "start": 164,
+   "peak": 187,
+   "end": 187,
+   "firstHalfMean": 169,
+   "secondHalfMean": 178,
+   "series": [
+    164,
+    165,
+    167,
+    168,
+    169,
+    170,
+    172,
+    173,
+    174,
+    175,
+    165,
+    166,
+    168,
+    169,
+    170,
+    171,
+    173,
+    174,
+    175,
+    176,
+    177,
+    179,
+    180,
+    181,
+    183,
+    184,
+    185,
+    187
+   ]
+  },
+  "gpu": {
+   "start": 60,
+   "peak": 60,
+   "end": 60,
+   "firstHalfMean": 60,
+   "secondHalfMean": 60,
+   "series": [
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60,
+    60
+   ]
+  },
+  "total": {
+   "start": 507,
+   "peak": 734,
+   "end": 655,
+   "firstHalfMean": 639,
+   "secondHalfMean": 647,
+   "series": [
+    507,
+    635,
+    636,
+    631,
+    688,
+    635,
+    638,
+    638,
+    640,
+    641,
+    632,
+    633,
+    635,
+    636,
+    637,
+    638,
+    640,
+    641,
+    642,
+    641,
+    642,
+    645,
+    646,
+    648,
+    649,
+    700,
+    652,
+    654
+   ]
+  }
+ },
+ "lastPhash": "2a1e6bb3d89c29d5",
+ "lastDims": [
+  3992,
+  2992
+ ],
+ "firstErr": null,
+ "stats": {
+  "done": 70,
+  "failed": 0,
+  "skipped": 0,
+  "inFlight": 0,
+  "queued": 0,
+  "msPerImage": 1256.6
+ },
+ "pageErrors": []
+}

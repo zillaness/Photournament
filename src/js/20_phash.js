@@ -21,21 +21,42 @@
   // ---------------------------------------------------------------------------
 
   /**
-   * Recommended Hamming distance for "these are the same shot".
-   * Measured on a 120-image synthetic corpus: at 12 the dHash separation
-   * between burst frames and unrelated photos is clean (0 false positives,
-   * 0 false negatives on non-expression burst pairs).
+   * Recommended Hamming distance for "these are the same shot", calibrated for
+   * phash() (see RECOMMENDED_HASH).
+   *
+   * Measured on a 122-frame corpus, 7,381 labelled pairs: pHash + strict at 14
+   * scored precision 1.000 and recall 1.000 — every burst, expression variant,
+   * re-encode and minor crop/rotation grouped, and not one unrelated pair did.
+   * The first false positive appears at 16; the first false negative at 13.
+   * Full sweep in tools/probes/04_phash/FINDINGS.md.
+   *
+   * dHash needs a different number. Its clean band is 8-10, and it has no
+   * threshold that separates the two populations completely.
    */
-  var DEFAULT_THRESHOLD = 12;
+  var DEFAULT_THRESHOLD = 14;
 
   /**
-   * Useful span for the PRD 7.7 sensitivity slider. Below 4 nothing but
-   * byte-level re-encodes group; above 20 unrelated photos start colliding.
+   * Useful span for the PRD 7.7 sensitivity slider. Below 4 only re-encodes of
+   * the same file group; above 20 pHash precision falls under 0.75 and the user
+   * spends more time splitting groups than the grouping saves.
+   *
+   * pHash is a constant-weight code (every hash has exactly 31 one-bits), so
+   * every pHash distance is EVEN and odd thresholds behave identically to the
+   * even one below. Step the slider by 2.
    */
   var THRESHOLD_RANGE = [4, 20];
 
   /** Default linkage for cluster(). See FINDINGS.md section 6. */
   var DEFAULT_MODE = 'strict';
+
+  /**
+   * Which hash to cluster on. pHash beat dHash on every measure that matters:
+   * complete separation of positives from negatives, 27 non-transitive triples
+   * against dHash's 356, and a precision curve that stays at 1.000 while recall
+   * climbs monotonically, so the sensitivity slider behaves predictably.
+   * dhash() stays exported: it is 1.2x cheaper and useful as a fast pre-filter.
+   */
+  var RECOMMENDED_HASH = 'phash';
 
   var DHASH_W = 9;   // 9x8 grey -> 8 rows x 8 horizontal comparisons = 64 bits
   var DHASH_H = 8;
@@ -125,6 +146,12 @@
    * and two frames of the same burst alias differently, which shows up directly
    * as burst-pair distance.
    *
+   * Implemented as a scatter: one sequential pass over the source accumulating
+   * into output buckets. The obvious gather form (walk the output, sum the
+   * source box) is 3.5x slower at 9x8 output on a 1600px source, because each
+   * output cell strides across ~1MB of source and the next cell walks the same
+   * rows again. Measured, not assumed — see FINDINGS.md section 7.
+   *
    * @param {Float32Array} src
    * @param {number} w source width
    * @param {number} h source height
@@ -134,21 +161,49 @@
    */
   function downsampleGrey(src, w, h, ow, oh) {
     var out = new Float32Array(ow * oh);
-    var sx = w / ow;
-    var sy = h / oh;
-    for (var oy = 0; oy < oh; oy++) {
-      var y0 = Math.floor(oy * sy);
-      var y1 = Math.min(h, Math.max(y0 + 1, Math.ceil((oy + 1) * sy)));
-      for (var ox = 0; ox < ow; ox++) {
-        var x0 = Math.floor(ox * sx);
-        var x1 = Math.min(w, Math.max(x0 + 1, Math.ceil((ox + 1) * sx)));
-        var sum = 0;
-        var count = (y1 - y0) * (x1 - x0);
-        for (var y = y0; y < y1; y++) {
-          var row = y * w;
-          for (var x = x0; x < x1; x++) sum += src[row + x];
+    var x, y;
+
+    // Upsampling has no box to average, so fall back to nearest-neighbour.
+    if (ow > w || oh > h) {
+      for (y = 0; y < oh; y++) {
+        var sy = Math.min(h - 1, Math.floor((y * h) / oh));
+        for (x = 0; x < ow; x++) {
+          out[y * ow + x] = src[sy * w + Math.min(w - 1, Math.floor((x * w) / ow))];
         }
-        out[oy * ow + ox] = sum / count;
+      }
+      return out;
+    }
+
+    // Column and row bucket maps, plus how many source pixels land in each.
+    // Both maps are monotonically non-decreasing, which is what lets the inner
+    // loop accumulate in a register and only touch memory at a bucket boundary.
+    var colBucket = new Int32Array(w);
+    var colCount = new Int32Array(ow);
+    for (x = 0; x < w; x++) {
+      var cb = Math.min(ow - 1, Math.floor((x * ow) / w));
+      colBucket[x] = cb;
+      colCount[cb]++;
+    }
+    var rowCount = new Int32Array(oh);
+    for (y = 0; y < h; y++) rowCount[Math.min(oh - 1, Math.floor((y * oh) / h))]++;
+
+    for (y = 0; y < h; y++) {
+      var orow = Math.min(oh - 1, Math.floor((y * oh) / h)) * ow;
+      var srow = y * w;
+      var sum = 0;
+      var bucket = 0;
+      for (x = 0; x < w; x++) {
+        var b = colBucket[x];
+        if (b !== bucket) { out[orow + bucket] += sum; sum = 0; bucket = b; }
+        sum += src[srow + x];
+      }
+      out[orow + bucket] += sum;
+    }
+
+    for (var oy2 = 0; oy2 < oh; oy2++) {
+      for (var ox2 = 0; ox2 < ow; ox2++) {
+        var n = colCount[ox2] * rowCount[oy2];
+        if (n) out[oy2 * ow + ox2] /= n;
       }
     }
     return out;
@@ -376,14 +431,14 @@
    * and it is exposed as `mode`:
    *
    *   "union"  single linkage / union-find. Any single edge merges two groups.
-   *            Maximum recall, but a burst that pans across a scene chains into
-   *            one group whose endpoints look nothing alike. Measured on the
-   *            probe's 6-frame pan: one group with a diameter of 30 bits at
-   *            threshold 12.
+   *            Maximum recall, but chaining is not a corner case: at the
+   *            default threshold of 14 the probe corpus produced a group whose
+   *            own diameter was 26 — members nearly twice the threshold apart,
+   *            in a group the user is told is a set of duplicates.
    *   "strict" complete linkage. A photo joins a group only if it is within
    *            `threshold` of EVERY current member, so a group's diameter can
-   *            never exceed the threshold. This is the default; see
-   *            FINDINGS.md section 6.
+   *            never exceed the threshold and the slider means exactly what it
+   *            says. This is the default; see FINDINGS.md section 6.
    *
    * Determinism: items are processed in sorted-id order and a joining photo
    * picks the group whose worst-case distance is smallest, so the result never
@@ -489,9 +544,13 @@
    *   score = 0.70 * (sharp / maxSharp) + 0.30 * (pixels / maxPixels)
    *
    * Sharpness carries most of the weight because blur is what a human actually
-   * notices. Resolution carries the rest so that a downscaled crisp re-export
-   * does not beat the full-size original it came from — the measured failure
-   * mode when resolution weight is zero (FINDINGS.md section 8).
+   * notices. Resolution carries the rest for margin: sharpness() is deliberately
+   * resolution-invariant, so a downscaled crisp re-export lands within 3-13% of
+   * the full-size original it came from, and 3% is inside the noise of JPEG
+   * quality and scene content. The resolution term turns that into a decisive
+   * 0.25 gap. On one earlier corpus, weighting sharpness alone picked the
+   * 480px copy over its 1200px source in 4 of 42 trials. FINDINGS.md section 8
+   * has the numbers and the crossover table.
    *
    * Ties break on the smallest id, so the nomination is stable across runs.
    *
@@ -538,6 +597,7 @@
     DEFAULT_THRESHOLD: DEFAULT_THRESHOLD,
     THRESHOLD_RANGE: THRESHOLD_RANGE,
     DEFAULT_MODE: DEFAULT_MODE,
+    RECOMMENDED_HASH: RECOMMENDED_HASH,
     // internals, exposed for the probe harness and for anything that already
     // holds a greyscale plane
     _internal: {

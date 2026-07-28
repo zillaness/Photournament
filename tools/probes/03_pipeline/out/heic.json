@@ -1,0 +1,204 @@
+{
+ "poolInfo": {
+  "size": 2,
+  "libheifUrl": "file:///home/user/Photournament/node_modules/libheif-js/libheif-wasm/libheif-bundle.js",
+  "inline": false
+ },
+ "wallMs": 2871,
+ "stats": {
+  "done": 5,
+  "failed": 0,
+  "skipped": 0,
+  "inFlight": 0,
+  "queued": 0,
+  "msPerImage": 592.5
+ },
+ "records": [
+  {
+   "id": "c3ea1d7df5372081fe691be06e0804b540acbfc5a40eb40f298080263d22ab67",
+   "name": "photo_12mp.heic",
+   "path": "Trip/photo_12mp.heic",
+   "dir": "Trip",
+   "size": 2994394,
+   "lastMod": 1785208329232,
+   "kind": "heic",
+   "w": 3992,
+   "h": 2992,
+   "thumb": 17401,
+   "thumbType": "image/jpeg",
+   "preview": 481464,
+   "previewType": "image/jpeg",
+   "phash": "2a1e6bb3d89c29d5",
+   "sharp": 818.91,
+   "err": null,
+   "format": "heic:heic",
+   "orientation": 1,
+   "orientationApplied": 1,
+   "browserAppliesExif": null,
+   "orientationSource": "none",
+   "ms": 1588.6,
+   "fromCache": false
+  },
+  {
+   "id": "7d1e1b8cb687dde40234ba74c31cd876150336779d8976ab118ab96c5220c400",
+   "name": "rot90_ccw.heic",
+   "path": "Trip/rot90_ccw.heic",
+   "dir": "Trip",
+   "size": 2994404,
+   "lastMod": 1785218331973,
+   "kind": "heic",
+   "w": 2992,
+   "h": 3992,
+   "thumb": 17404,
+   "thumbType": "image/jpeg",
+   "preview": 481822,
+   "previewType": "image/jpeg",
+   "phash": "e0a1ccf2e54aa804",
+   "sharp": 818.87,
+   "err": null,
+   "format": "heic:heic",
+   "orientation": 1,
+   "orientationApplied": 1,
+   "browserAppliesExif": null,
+   "orientationSource": "irot/imir, applied by libheif",
+   "ms": 1586.4,
+   "fromCache": false
+  },
+  {
+   "id": "1c21fca0eaedef64676ffdb21883116c03ca9bb43fc7b61ffbad229d04655aed",
+   "name": "rot180.heic",
+   "path": "Trip/rot180.heic",
+   "dir": "Trip",
+   "size": 2994404,
+   "lastMod": 1785218332033,
+   "kind": "heic",
+   "w": 3992,
+   "h": 2992,
+   "thumb": 17404,
+   "thumbType": "image/jpeg",
+   "preview": 481789,
+   "previewType": "image/jpeg",
+   "phash": "546bc6e4322987ab",
+   "sharp": 818.88,
+   "err": null,
+   "format": "heic:heic",
+   "orientation": 1,
+   "orientationApplied": 1,
+   "browserAppliesExif": null,
+   "orientationSource": "irot/imir, applied by libheif",
+   "ms": 1269.5,
+   "fromCache": false
+  },
+  {
+   "id": "4a6d644f7ecd3d687b0523bf7521b8173343e285574e5b54bd3f913e0c9fb2a9",
+   "name": "example_strukturag.heic",
+   "path": "Trip/example_strukturag.heic",
+   "dir": "Trip",
+   "size": 718114,
+   "lastMod": 1785208270923,
+   "kind": "heic",
+   "w": 1280,
+   "h": 854,
+   "thumb": 21624,
+   "thumbType": "image/jpeg",
+   "preview": 352459,
+   "previewType": "image/jpeg",
+   "phash": "80c0c1ec6b8eb9ab",
+   "sharp": 2903.94,
+   "err": null,
+   "format": "heic:mif1",
+   "orientation": 1,
+   "orientationApplied": 1,
+   "browserAppliesExif": null,
+   "orientationSource": "none",
+   "ms": 183.1,
+   "fromCache": false
+  },
+  {
+   "id": "9584b4b784dddcf24c9d8bddcba124a426eceb15d49f2b7b150c3f8262276ebc",
+   "name": "nokia_C003.heic",
+   "path": "Trip/nokia_C003.heic",
+   "dir": "Trip",
+   "size": 224452,
+   "lastMod": 1785208329238,
+   "kind": "heic",
+   "w": 1280,
+   "h": 720,
+   "thumb": 12193,
+   "thumbType": "image/jpeg",
+   "preview": 162221,
+   "previewType": "image/jpeg",
+   "phash": "a9a9ebebebebcacb",
+   "sharp": 1547.39,
+   "err": null,
+   "format": "heic:mif1",
+   "orientation": 1,
+   "orientationApplied": 1,
+   "browserAppliesExif": null,
+   "orientationSource": "none",
+   "ms": 95.5,
+   "fromCache": false
+  }
+ ],
+ "written": [
+  {
+   "file": "thumb_photo_12mp.jpg",
+   "bytes": 17401
+  },
+  {
+   "file": "preview_photo_12mp.jpg",
+   "bytes": 481464
+  },
+  {
+   "file": "thumb_rot90_ccw.jpg",
+   "bytes": 17404
+  },
+  {
+   "file": "preview_rot90_ccw.jpg",
+   "bytes": 481822
+  },
+  {
+   "file": "thumb_rot180.jpg",
+   "bytes": 17404
+  },
+  {
+   "file": "preview_rot180.jpg",
+   "bytes": 481789
+  },
+  {
+   "file": "thumb_example_strukturag.jpg",
+   "bytes": 21624
+  },
+  {
+   "file": "preview_example_strukturag.jpg",
+   "bytes": 352459
+  },
+  {
+   "file": "thumb_nokia_C003.jpg",
+   "bytes": 12193
+  },
+  {
+   "file": "preview_nokia_C003.jpg",
+   "bytes": 162221
+  }
+ ],
+ "pageErrors": [],
+ "logs": [
+  "ingest pool up: 2 workers, libheif=file:///home/user/Photournament/node_modules/libheif-js/libheif-wasm/libheif-bundle.js"
+ ],
+ "orientation": {
+  "note": "mean abs RGB difference (0-255) of the base thumbnail vs the irot fixture thumbnail under each quarter-turn hypothesis; the smallest is what happened",
+  "irot=1 (90 CCW) fixture": {
+   "identity": 72.08,
+   "rot180": 72.34,
+   "rot90ccw": 2.39,
+   "rot90cw": 94.8
+  },
+  "irot=2 (180) fixture": {
+   "identity": 94.91,
+   "rot180": 0.5,
+   "rot90ccw": 72.1,
+   "rot90cw": 72.4
+  }
+ }
+}

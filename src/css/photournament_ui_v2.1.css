@@ -323,13 +323,7 @@ a:hover { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .topbar-right { gap: 4px; }
 
-#topbar-title {
-  font-size: var(--fs-small);
-  font-weight: 650;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
+/* #topbar-title is now the wordmark; section 15 owns its whole treatment. */
 #topbar-context {
   font-size: var(--fs-small);
   color: var(--text);
@@ -704,45 +698,14 @@ kbd {
 #modal-body h2 { margin-bottom: 4px; }
 
 /* ==========================================================================
-   6. THE NINE-SQUARE MARK
+   6. (RETIRED) THE NINE-SQUARE MARK
    ==========================================================================
-   CSS-drawn, no image and no SVG. Nine cells, one marked: the whole product in
-   one glyph. Used on the entry screen and as the ingest activity indicator.
+   The CSS-drawn nine-cell mark and its walking ingest variant lived here.
+   Both jobs moved to the real identity artwork: the entry screen shows the
+   recursive mark from the sprite (section 14), and the ingest throbber is now
+   an overlay ON that mark (.pt-markcells), so the identity and the activity
+   indicator are one object instead of two lookalikes.
    ========================================================================== */
-
-.pt-mark {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  width: 62px;
-  aspect-ratio: 1;
-  flex: none;
-}
-.pt-mark i { background: var(--surface-3); border-radius: 1px; }
-.pt-mark i:nth-child(5) { background: var(--mark); }
-
-/* The ingest variant walks the mark, one cell at a time. Monochrome, no motion
-   larger than a few pixels, nothing that pulls the eye off the count. */
-.pt-mark-live i {
-  background: var(--surface-2);
-  animation: pt-cell 3.6s steps(1, end) infinite;
-}
-.pt-mark-live i:nth-child(1) { animation-delay: 0.0s; }
-.pt-mark-live i:nth-child(2) { animation-delay: 0.4s; }
-.pt-mark-live i:nth-child(3) { animation-delay: 0.8s; }
-.pt-mark-live i:nth-child(4) { animation-delay: 1.2s; }
-.pt-mark-live i:nth-child(5) { animation-delay: 1.6s; }
-.pt-mark-live i:nth-child(6) { animation-delay: 2.0s; }
-.pt-mark-live i:nth-child(7) { animation-delay: 2.4s; }
-.pt-mark-live i:nth-child(8) { animation-delay: 2.8s; }
-.pt-mark-live i:nth-child(9) { animation-delay: 3.2s; }
-@keyframes pt-cell {
-  0%, 11%  { background: var(--text-dim); }
-  12%, 100% { background: var(--surface-2); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pt-mark-live i { animation: none; background: var(--surface-3); }
-}
 
 /* ==========================================================================
    7. SCREEN: ENTRY
@@ -2007,20 +1970,168 @@ kbd {
 #app .pt-lockup { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
 #app .pt-lockup h1 { margin: 0; }
 
-/*
- * The wordmark, not a heading that happens to say the product name. Same
- * treatment as #topbar-title — uppercase, 650, 0.09em — because they are the
- * same object at two sizes. Full --text here rather than --text-dim: in the
- * topbar the wordmark is a label beside the work, on the entry screen it is
- * the thing itself.
- */
-#app .pt-wordmark {
+#app .screen-welcome .pt-brandmark { width: 46px; height: 46px; }
+
+/* ==========================================================================
+   15. THE WORDMARK
+   ==========================================================================
+   From docs/wordmark/wordmark.css v1.0 — that file is the source of truth;
+   this is it, re-prefixed with #app so the app's own #id rules cannot outrank
+   it, and painted from the live tokens so it inverts with the theme.
+
+   PHOTO and TOURNAMENT share exactly two letters. The markup's three spans are
+   the grid columns PHO / TO / URNAMENT; the accent rail spans columns 1–2
+   (PHOTO), the neutral rail spans 2–3 (TOURNAMENT), so the shared TO is the
+   only stretch with a rail above and below. The rails span grid COLUMNS, not
+   measured offsets, which is what keeps the geometry correct on whatever font
+   the system stack resolves to.
+   ========================================================================== */
+
+#app .wordmark {
+  /* Tracking. Used twice — see the note on span:last-of-type. */
+  --wm-ls: 0.09em;
+
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
   font-weight: 650;
-  letter-spacing: 0.09em;
+  letter-spacing: var(--wm-ls);
   text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+/*
+ * Trailing letter-spacing sits after the final T, so without this the lower
+ * rail overhangs the word by one tracking unit. The two values must stay
+ * equal, which is why both read from --wm-ls.
+ */
+#app .wordmark > span:last-of-type { margin-right: calc(-1 * var(--wm-ls)); }
+
+#app .wordmark .wm-rail-a,
+#app .wordmark .wm-rail-b {
+  height: 0.09em;
+  min-height: 2px;   /* below ~16px the rails would round away to nothing */
+}
+
+/* PHOTO: from the P through the shared TO. */
+#app .wordmark .wm-rail-a {
+  grid-row: 2;
+  grid-column: 1 / 3;
+  margin-top: 0.075em;
+  background: var(--accent);
+}
+
+/* TOURNAMENT: from the shared TO through the final T. */
+#app .wordmark .wm-rail-b {
+  grid-row: 3;
+  grid-column: 2 / 4;
+  margin-top: 0.06em;
+  background: var(--text-mute);
+}
+
+/*
+ * The display variant, for the entry lockup. 64px is from the spec's size
+ * table, and its 0.71 cap height lands at ~45px — which is why the 46px mark
+ * beside it reads as the same object. Full --text: on the entry screen the
+ * wordmark is the thing itself, not a label beside the work.
+ */
+#app .wordmark-display {
+  --wm-ls: 0.04em;
+  font-size: 64px;
   color: var(--text);
 }
-#app .screen-welcome .pt-brandmark { width: 46px; height: 46px; }
+
+/* The display cut is ~10em wide; at phone widths it must shrink, not clip. */
+@media (max-width: 720px) {
+  #app .wordmark-display { font-size: 40px; }
+}
+
+/* ==========================================================================
+   16. BUNDLED BURSTS IN THE FLOW
+   ==========================================================================
+   Stage A deals one cell per near-duplicate group and the bracket seats one
+   competitor per group, each wearing its representative. The badge is the
+   tell: it names the member count, echoes the dupes screen's stack language,
+   and opens the bundle to change which frame stands for it.
+   ========================================================================== */
+
+/*
+ * On the grid cell it sits opposite the number key: idx top-left, stack
+ * top-right. It is a BUTTON on top of a clickable cell, so it must read as
+ * its own target — chip ground, stack glyph drawn as two offset plates.
+ */
+#app .stack-badge {
+  position: absolute; top: 6px; right: 6px;
+  z-index: 3;
+  min-width: 22px; height: 22px; padding: 0 7px 0 20px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--chip);
+  color: var(--on-photo);
+  font: inherit;
+  font-size: var(--fs-micro); line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(3px);
+  cursor: pointer;
+}
+#app .stack-badge::before,
+#app .stack-badge::after {
+  content: "";
+  position: absolute; top: 7px; left: 6px;
+  width: 8px; height: 8px;
+  border-radius: 1.5px;
+  border: 1px solid currentColor;
+  opacity: 0.55;
+}
+#app .stack-badge::after { top: 5px; left: 8px; opacity: 1; background: var(--chip); }
+/* The chip ground is FIXED dark (it sits on a photograph), so the hover text
+   must stay the fixed on-photo white — var(--text) here goes near-black in the
+   light theme and the count vanishes exactly when pointed at. */
+#app .stack-badge:hover { background: oklch(0 0 0 / 0.78); color: var(--on-photo); }
+
+/* In the bracket caption it flows inline with the name, not absolutely. */
+#app .stack-badge-cap {
+  position: static;
+  flex: none;
+  backdrop-filter: none;
+  background: var(--surface-3);
+  color: var(--text-dim);
+}
+#app .stack-badge-cap:hover { background: var(--surface-2); }
+
+/* The bundle, opened: pick which frame stands for the group. */
+#app .stack-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+  max-height: 52vh;
+  overflow: auto;
+}
+#app .stack-opt {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--well);
+}
+#app .stack-opt .thumb { width: 100%; aspect-ratio: 3 / 2; object-fit: contain; display: block; }
+#app .stack-opt:hover { border-color: var(--line-2); }
+#app .stack-opt.current { border-color: var(--mark); cursor: default; }
+#app .stack-name {
+  display: block;
+  padding: 5px 8px;
+  font-size: var(--fs-micro);
+  color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#app .stack-opt .stack-tag {
+  position: absolute; top: 6px; left: 6px;
+  background: var(--mark); color: var(--on-mark);
+  font-weight: 700;
+}
 
 /*
  * In the topbar it sits beside the wordmark, sized to that text's cap height.
@@ -2133,7 +2244,9 @@ kbd {
 #app .topbar-left { gap: 9px; }
 
 @media (max-width: 720px) {
-  #app .pt-brandmark { width: 38px; height: 38px; }
+  /* Must out-rank the desktop sizes above, which carry extra selectors. */
+  #app .screen-welcome .pt-brandmark { width: 38px; height: 38px; }
   #app .pt-brandmark-bar { width: 19px; height: 19px; }
   #app .pt-markslot { width: 38px; height: 38px; }
+  #app .pt-markslot .pt-brandmark { width: 100%; height: 100%; }
 }

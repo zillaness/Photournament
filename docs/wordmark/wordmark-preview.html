@@ -1,0 +1,157 @@
+<!doctype html>
+<!--
+  file: wordmark-preview.html
+  version: 1.0
+  author: Samuel Cao
+  created: 2026-07-28
+  last_updated: 2026-07-28
+  description: Contact sheet for the Photournament wordmark — every variant at every
+    size, both themes, live CSS beside the SVG exports. Open by double-clicking.
+  ai_update: Update last_updated and version. Rename file to match. Append changelog at bottom.
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Photournament wordmark</title>
+<link rel="stylesheet" href="wordmark.css">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #161618; --surface: #202022; --line: #2f2f2f; --well: #000;
+    --text: #efefef; --text-dim: #b8b8b8; --text-mute: #777; --accent: #759cc2;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #cdcdcd; --surface: #dfdfdf; --line: #b4b4b4; --well: #878787;
+    --text: #1f1f1f; --text-dim: #4a4a4a; --text-mute: #767676; --accent: #466c90;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 34px 30px 70px; background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 16px; line-height: 1.45;
+  }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -.015em; margin: 0 0 6px; }
+  h2 {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--text-mute); margin: 34px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+  p { color: var(--text-dim); max-width: 70ch; text-wrap: pretty; margin: 0 0 4px; }
+  .head { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+  .btn {
+    font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 5px; padding: 8px 15px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--text-mute); }
+  .well { background: var(--well); border-radius: 5px; padding: 26px 24px; }
+  .chrome { background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 22px 24px; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .cap { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-mute); margin-bottom: 8px; }
+  .bar {
+    display: flex; align-items: center; gap: 14px; height: 60px; padding: 0 18px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 5px;
+  }
+  .bar .ctx { font-size: 14px; color: var(--text); padding-left: 14px; border-left: 1px solid var(--line); }
+  .sizes { display: flex; flex-direction: column; gap: 20px; align-items: flex-start; }
+  .sizes .row { display: flex; align-items: flex-end; gap: 18px; }
+  .sizes .px { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: var(--text-mute); width: 46px; }
+  img { display: block; max-width: 100%; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div>
+    <h1>Photournament wordmark</h1>
+    <p>Live CSS above, SVG exports below. If a pair does not match, the CSS is right and the SVG needs regenerating.</p>
+  </div>
+  <span style="flex:1"></span>
+  <button class="btn" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">Switch theme</button>
+</div>
+
+<h2>In the topbar — 14px, canonical</h2>
+<div class="bar">
+  <span class="wordmark">
+    <span>PHO</span><span>TO</span><span>URNAMENT</span>
+    <i class="wm-rail-a"></i><i class="wm-rail-b"></i>
+  </span>
+  <span class="ctx">Vestrahorn · pass 1 · Keep up to half</span>
+</div>
+
+<h2>Size ramp — live CSS</h2>
+<div class="well">
+  <div class="sizes">
+    <div class="row"><span class="px">14px</span>
+      <span class="wordmark" style="font-size:14px;color:var(--text)"><span>PHO</span><span>TO</span><span>URNAMENT</span><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span></div>
+    <div class="row"><span class="px">20px</span>
+      <span class="wordmark" style="font-size:20px;color:var(--text)"><span>PHO</span><span>TO</span><span>URNAMENT</span><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span></div>
+    <div class="row"><span class="px">32px</span>
+      <span class="wordmark" style="font-size:32px;color:var(--text)"><span>PHO</span><span>TO</span><span>URNAMENT</span><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span></div>
+    <div class="row"><span class="px">64px</span>
+      <span class="wordmark wordmark-display" style="font-size:64px"><span>PHO</span><span>TO</span><span>URNAMENT</span><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span></div>
+    <div class="row"><span class="px">104px</span>
+      <span class="wordmark wordmark-display" style="font-size:104px"><span>PHO</span><span>TO</span><span>URNAMENT</span><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span></div>
+  </div>
+</div>
+<p style="margin-top:8px;font-size:14px">The 64px and 104px rows use the display variant — <code>--wm-ls: 0.04em</code>. Everything at or under 32px uses canonical tracking.</p>
+
+<h2>Mono — one colour, no accent</h2>
+<div class="cols">
+  <div class="well">
+    <div class="cap">on the well</div>
+    <span class="wordmark wordmark-mono" style="font-size:30px;color:var(--text)"><span>PHO</span><span>TO</span><span>URNAMENT</span><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span>
+  </div>
+  <div class="chrome">
+    <div class="cap">on chrome</div>
+    <span class="wordmark wordmark-mono" style="font-size:30px;color:var(--text-dim)"><span>PHO</span><span>TO</span><span>URNAMENT</span><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span>
+  </div>
+</div>
+
+<h2>SVG exports</h2>
+<div class="cols">
+  <div class="chrome" style="background:#161618;border-color:#2f2f2f">
+    <div class="cap">photournament-wordmark-dark.svg</div>
+    <img src="photournament-wordmark-dark.svg" alt="Photournament" style="width:100%">
+  </div>
+  <div class="chrome" style="background:#dfdfdf;border-color:#b4b4b4">
+    <div class="cap" style="color:#767676">photournament-wordmark-light.svg</div>
+    <img src="photournament-wordmark-light.svg" alt="Photournament" style="width:100%">
+  </div>
+  <div class="chrome" style="background:#161618;border-color:#2f2f2f">
+    <div class="cap">display-dark.svg</div>
+    <img src="photournament-wordmark-display-dark.svg" alt="Photournament" style="width:100%">
+  </div>
+  <div class="chrome" style="background:#dfdfdf;border-color:#b4b4b4">
+    <div class="cap" style="color:#767676">display-light.svg</div>
+    <img src="photournament-wordmark-display-light.svg" alt="Photournament" style="width:100%">
+  </div>
+  <div class="chrome" style="color:#efefef">
+    <div class="cap">mono.svg — inherits currentColor</div>
+    <img src="photournament-wordmark-mono.svg" alt="Photournament" style="width:100%">
+  </div>
+</div>
+<p style="margin-top:8px;font-size:14px">The mono SVG uses <code>currentColor</code>, which only resolves when the file is inlined into a document. Loaded through an <code>&lt;img&gt;</code> tag it falls back to black — that is expected, not a broken export.</p>
+
+<h2>Don't</h2>
+<div class="cols">
+  <div class="well">
+    <div class="cap">rails at the same depth</div>
+    <span class="wordmark" style="font-size:26px;color:var(--text)"><span>PHO</span><span>TO</span><span>URNAMENT</span><i class="wm-rail-a"></i><i class="wm-rail-b" style="grid-row:2;margin-top:.075em"></i></span>
+    <p style="font-size:13px;margin-top:10px">They overlap under TO and the accent rail is painted over.</p>
+  </div>
+  <div class="well">
+    <div class="cap">on a photograph</div>
+    <div style="background:linear-gradient(122deg,#4a3b2a,#c9b9a0);border-radius:3px;padding:18px 16px">
+      <span class="wordmark" style="font-size:26px;color:#fff"><span>PHO</span><span>TO</span><span>URNAMENT</span><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span>
+    </div>
+    <p style="font-size:13px;margin-top:10px">The mark belongs on chrome. Nothing with an accent goes over image content.</p>
+  </div>
+</div>
+
+<!--
+  CHANGELOG
+  v1.0 (2026-07-28): Initial release.
+-->
+</body>
+</html>

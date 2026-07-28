@@ -1,6 +1,6 @@
 /**
  * @file 35_session.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -129,8 +129,65 @@
    * the settings are COPIED into the pass, so changing a setting mid-pass cannot
    * loosen the quota the user committed to.
    */
+  /**
+   * Collapse the pool into DEAL SLOTS: one per reviewed near-duplicate group,
+   * one per ungrouped photo. This is where "a burst costs one decision rather
+   * than several" becomes literally true — Stage A shows a burst as a single
+   * cell wearing its representative, and keeping or cutting it keeps or cuts
+   * every member together. The members are only prised apart later, in the
+   * Stage C runoff, which exists for exactly that.
+   *
+   * A group whose members have been separated by earlier decisions (rescue can
+   * pull one member back alone) only bundles the members still in the pool;
+   * with one member left it degrades to an ordinary singleton. No reviewed
+   * grouping at all — the user skipped the step before it computed, or an old
+   * session predates it — degrades to one slot per photo, which is exactly the
+   * pre-grouping behaviour.
+   *
+   * @returns {Array<{face:string, members:Array<string>}>} in pool order
+   */
+  function slotsFor(unit) {
+    var groupOf = Object.create(null);
+    (unit.groups || []).forEach(function (g, gi) {
+      var ids = Array.isArray(g) ? g : ((g && g.ids) || []);
+      ids.forEach(function (id) { groupOf[id] = gi; });
+    });
+    var inPool = Object.create(null);
+    unit.pool.forEach(function (id) { inPool[id] = 1; });
+
+    var done = Object.create(null);
+    var slots = [];
+    unit.pool.forEach(function (id) {
+      if (done[id]) return;
+      var gi = groupOf[id];
+      if (gi === undefined) {
+        done[id] = 1;
+        slots.push({ face: id, members: [id] });
+        return;
+      }
+      var g = unit.groups[gi];
+      var ids = (Array.isArray(g) ? g : g.ids).filter(function (m) { return inPool[m]; });
+      ids.forEach(function (m) { done[m] = 1; });
+      if (ids.length < 2) {
+        slots.push({ face: id, members: [id] });
+        return;
+      }
+      var rep = (!Array.isArray(g) && g.rep && inPool[g.rep]) ? g.rep : ids[0];
+      slots.push({ face: rep, members: ids });
+    });
+    return slots;
+  }
+
   function startPass(unit, settings) {
     var seed = (Date.now() ^ (unit.passes.length * 2654435761)) >>> 0;
+    // The pass deals slots, not photos: order holds one FACE per slot, and
+    // pass.slots remembers each face's members as they were at deal time, so
+    // the expansion at pass end is stable even if the grouping is edited
+    // mid-pass.
+    var slots = slotsFor(unit);
+    var faces = slots.map(function (sl) { return sl.face; });
+    var members = Object.create(null);
+    slots.forEach(function (sl) { members[sl.face] = sl.members; });
     return {
       n: unit.passes.length + 1,
       gridSize: settings.gridSize,
@@ -138,12 +195,18 @@
       quotaCustom: settings.quotaCustom,
       shuffled: settings.shuffle,
       seed: seed,
-      order: settings.shuffle ? seededShuffle(unit.pool, seed) : unit.pool.slice(),
+      order: settings.shuffle ? seededShuffle(faces, seed) : faces,
+      slots: members,
       index: 0,               // screens completed
-      kept: [],               // ids kept so far this pass
+      kept: [],               // FACE ids kept so far this pass
       startedAt: Date.now(),
       fieldAtStart: unit.pool.length
     };
+  }
+
+  /** A face back to its members. Old sessions' passes have no slot map. */
+  function expandSlot(pass, faceId) {
+    return (pass && pass.slots && pass.slots[faceId]) || [faceId];
   }
 
   function screenAt(pass, i) {
@@ -164,9 +227,21 @@
     var keptSet = Object.create(null);
     pass.kept.forEach(function (id) { keptSet[id] = 1; });
 
-    var cutNow = pass.order.filter(function (id) { return !keptSet[id]; });
+    // kept/order hold slot faces; the pool and the cut pile hold photos, so a
+    // kept burst carries every member forward and a cut burst loses them all —
+    // one decision, honestly accounted. Every summary number below is photos,
+    // not decisions, because the summary is about the collection.
+    var keptIds = [], cutNow = [];
+    pass.kept.forEach(function (face) {
+      expandSlot(pass, face).forEach(function (id) { keptIds.push(id); });
+    });
+    pass.order.forEach(function (face) {
+      if (keptSet[face]) return;
+      expandSlot(pass, face).forEach(function (id) { cutNow.push(id); });
+    });
+
     var before = pass.fieldAtStart;
-    var after = pass.kept.length;
+    var after = keptIds.length;
 
     var summary = {
       n: pass.n,
@@ -182,7 +257,7 @@
       ms: Date.now() - pass.startedAt
     };
 
-    unit.pool = pass.kept.slice();
+    unit.pool = keptIds;
     unit.cut = unit.cut.concat(cutNow);
     unit.passes.push(summary);
     unit.currentPass = null;
@@ -256,6 +331,8 @@
     resolveQuota: resolveQuota,
     quotaLabel: quotaLabel,
     seededShuffle: seededShuffle,
+    slotsFor: slotsFor,
+    expandSlot: expandSlot,
     startPass: startPass,
     screenAt: screenAt,
     screensTotal: screensTotal,
@@ -273,4 +350,9 @@
  *   unit state, quota resolution, deterministic seeded shuffle so a resumed pass
  *   deals identically, pass lifecycle with locked configuration, low cull rate
  *   check, and bracket handoff suggestion.
- */
+  * v1.2 (2026-07-28): Bundled bursts. slotsFor() collapses the pool into deal
+ *   slots — one per reviewed near-duplicate group, wearing its representative —
+ *   and startPass deals faces with a frozen slot map, so a burst is one
+ *   decision. finishPass expands kept and cut faces back to photos, keeping
+ *   every summary number in photos.
+*/

@@ -139,7 +139,8 @@
     if (s === '') return { mode: MODE.POOLED, value: null };
     if (s === '*' || s === '∞' || s.toLowerCase() === 'inf') return { mode: MODE.UNCAPPED, value: null };
 
-    var pct = /^(\d{1,3}(?:\.\d+)?)\s*%$/.exec(s);
+    var pct = /^(\d{0,3}(?:\.\d+)?)\s*%$/.exec(s);
+    if (pct && pct[1] === '') pct = null;
     if (pct) {
       var p = parseFloat(pct[1]);
       if (!isFinite(p) || p < 0 || p > 100) return null;

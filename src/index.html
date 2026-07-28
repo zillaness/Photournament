@@ -132,10 +132,19 @@
 <div id="app">
   <header id="topbar" hidden>
     <div class="topbar-left">
-      <svg class="pt-brandmark pt-brandmark-bar" viewBox="0 0 100 100" role="img" aria-label="Photournament">
+      <svg class="pt-brandmark pt-brandmark-bar" viewBox="0 0 100 100" aria-hidden="true">
         <use href="#ptm-mark-plate"></use>
       </svg>
-      <span id="topbar-title">Photournament</span>
+      <!--
+        The wordmark (docs/wordmark/wordmark_spec_v1.0.md): PHOTO and TOURNAMENT
+        share TO, and the two rails draw that — accent under PHOTO, neutral
+        under TOURNAMENT, both present only under the shared letters. The split
+        spans are the mark's grid columns, not styling hooks; aria carries the
+        real name.
+      -->
+      <span id="topbar-title" class="wordmark" role="img" aria-label="Photournament"
+        ><span aria-hidden="true">PHO</span><span aria-hidden="true">TO</span><span aria-hidden="true">URNAMENT</span
+        ><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span>
       <span id="topbar-context" class="muted"></span>
     </div>
     <div class="topbar-right">

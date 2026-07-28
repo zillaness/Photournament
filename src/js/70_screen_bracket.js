@@ -1,6 +1,6 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -602,14 +602,28 @@
     if (!u.bracket || !u.bracket.ops) {
       PT.store.dispatch('bracket:init', function (s) {
         var unit = s.session.units[unitId];
-        var target = unit.target == null ? unit.pool.length : Math.min(unit.target, unit.pool.length);
+        // One competitor per reviewed near-duplicate group, wearing its
+        // representative — two frames of the same burst going head to head is
+        // a comparison with no information in it. The members ride along in
+        // `slots` and come back in the Stage C runoff.
+        //
+        // The target therefore counts DECISIONS, capped at the number of
+        // distinct-photo slots: with 10 photos in 4 bundles, "keep 6" cannot
+        // seat 6 competitors because only 4 exist. The runoff's multi-keep is
+        // where the photo count can rise back toward the configured target.
+        var slots = PT.session.slotsFor(unit);
+        var faces = slots.map(function (sl) { return sl.face; });
+        var members = Object.create(null);
+        slots.forEach(function (sl) { members[sl.face] = sl.members; });
+        var target = unit.target == null ? faces.length : Math.min(unit.target, faces.length);
         var seed = (Date.now() ^ 0x9e3779b9) >>> 0;
         unit.bracket = {
           seed: seed,
-          pool: unit.pool.slice(),
+          pool: faces,
+          slots: members,
           target: target,
           uncapped: unit.target == null,
-          order: PT.session.seededShuffle(unit.pool, seed),
+          order: PT.session.seededShuffle(faces, seed),
           ops: [],
           stopped: false,
           complete: false,
@@ -676,6 +690,10 @@
 
     S.onKey = function (e) {
       if (!S) return;
+      // Keys pressed with a dialog open still bubble to document-level
+      // listeners. The stack modal is open right over this screen — an arrow
+      // key must not decide the match behind it.
+      if (document.querySelector('dialog[open]')) return;
       var t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       var m = S.engine && currentMatch(S.engine);
@@ -951,6 +969,74 @@
     else paintMatch(u, E, m);
   }
 
+  /**
+   * The bundle, opened mid-bracket. Same contract as the grid's: it changes
+   * which photo the decisions are about, never the decisions themselves.
+   */
+  function openBracketStack(faceId) {
+    var u = unitOf(S.unitId);
+    var members = (u && u.bracket && u.bracket.slots && u.bracket.slots[faceId]) || [faceId];
+
+    var body = PT.dom.$('#modal-body');
+    PT.dom.clear(body);
+    body.appendChild(el('h2', { text: 'A group of ' + members.length + ' near-duplicates' }));
+    body.appendChild(el('p', { class: 'muted', style: 'margin:8px 0 14px', text:
+      'One frame competes for the whole burst. Click a photo to put it forward instead — every ' +
+      'comparison this group has already won or lost carries over to it.' }));
+
+    var grid = el('div', { class: 'stack-pick' });
+    members.forEach(function (mid) {
+      var img = el('img', { alt: '', class: 'thumb' });
+      var blob = blobFor(mid);
+      if (blob) PT.dom.setImg(img, blob);
+      grid.appendChild(el('div', {
+        class: 'stack-opt' + (mid === faceId ? ' current' : ''),
+        title: nameOf(mid),
+        onclick: function () {
+          if (mid !== faceId) swapBracketFace(faceId, mid);
+          PT.dom.$('#modal').close();
+        }
+      }, [
+        img,
+        el('span', { class: 'stack-name', text: nameOf(mid) }),
+        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'competing' }) : null
+      ]));
+    });
+    body.appendChild(grid);
+    body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn-quiet', text: 'Close',
+        onclick: function () { PT.dom.$('#modal').close(); } })
+    ]));
+    PT.dom.$('#modal').showModal();
+  }
+
+  /**
+   * Rename a competitor across the whole bracket. Sound because the op log
+   * references matches POSITIONALLY (mid is tag:round:pair) and photos only by
+   * winner id — rewrite pool, order and every op's winner and the rebuild
+   * rederives rounds, placements and unit.winners with the new face in the old
+   * face's exact standing.
+   */
+  function swapBracketFace(oldFace, newFace) {
+    commit('bracket:swapFace', function (b, unit) {
+      ['pool', 'order'].forEach(function (k) {
+        var i = b[k].indexOf(oldFace);
+        if (i >= 0) b[k][i] = newFace;
+      });
+      b.ops.forEach(function (op) { if (op.w === oldFace) op.w = newFace; });
+      if (b.slots && b.slots[oldFace]) {
+        b.slots[newFace] = b.slots[oldFace];
+        delete b.slots[oldFace];
+      }
+      // Pin the choice so the runoff and the dupes review agree.
+      (unit.groups || []).forEach(function (g) {
+        if (!g || Array.isArray(g) || (g.ids || []).indexOf(newFace) < 0) return;
+        g.rep = newFace;
+      });
+    });
+  }
+
   function paintMatch(u, E, m) {
     S.stage.style.display = '';
     PT.dom.clear(S.head);
@@ -995,6 +1081,13 @@
       S.view = { z: 1, cx: 0.5, cy: 0.5 };
       loadPane(S.panes[0], m.a);
       loadPane(S.panes[1], m.b);
+    } else {
+      // Same pairing, but a face swap can rename a competitor under it. Reload
+      // only the drifted pane, and keep the shared view: the incoming frame is
+      // a near-duplicate of the outgoing one, so holding the zoom region is
+      // what lets the user compare the swap at the pixels they were already on.
+      if (S.panes[0].id !== m.a) loadPane(S.panes[0], m.a);
+      if (S.panes[1].id !== m.b) loadPane(S.panes[1], m.b);
     }
 
     S.zoomLabel = el('span', { class: 'bk-zoom', text: Math.round(S.view.z * 100) + '%' });
@@ -1025,6 +1118,23 @@
     P.nat.w = 0; P.nat.h = 0;
     var nm = P.cap.querySelector('.nm');
     if (nm) nm.textContent = nameOf(id);
+
+    // A competitor standing for a burst says so, and the badge opens the
+    // bundle: swap the face here and the comparison (and every decision
+    // already made about this competitor) carries over to the chosen frame.
+    var oldBadge = P.cap.querySelector('.stack-badge');
+    if (oldBadge) oldBadge.remove();
+    var u = unitOf(S.unitId);
+    var members = (u && u.bracket && u.bracket.slots && u.bracket.slots[id]) || null;
+    if (members && members.length > 1) {
+      var badge = el('button', {
+        class: 'stack-badge stack-badge-cap', type: 'button', dataset: { t: 'bk-stack' },
+        text: String(members.length),
+        title: 'A group of ' + members.length + ' near-duplicates — click to change which one competes',
+        onclick: function (e) { e.stopPropagation(); openBracketStack(id); }
+      });
+      P.cap.insertBefore(badge, P.cap.querySelector('.spacer'));
+    }
     var blob = blobFor(id, true);
     if (blob) { PT.dom.setImg(P.img, blob); return; }
     PT.dom.setImg(P.img, null);
@@ -1465,4 +1575,11 @@
  *   plain language about choosing the best of duplicates.
  * v1.3 (2026-07-28): Adopted photournament_ui_v2.0.css; removed the injected
  *   style block.
+ * v1.4 (2026-07-28): One competitor per burst. The bracket seeds slot faces
+ *   (two frames of one burst head to head carries no information), panes badge
+ *   grouped competitors, and the badge swaps the competing face mid-bracket —
+ *   sound because ops reference matches positionally and photos only by winner
+ *   id, so rewriting pool, order and op winners hands the standing to the
+ *   chosen frame. Same-match pane reloads follow a face swap without resetting
+ *   the shared zoom.
 */

@@ -1,6 +1,6 @@
 /**
  * @file 60_screen_grid.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -231,7 +231,7 @@
    * A photo cell. `pos` is 1-based and drives the number-key mapping; the tenth
    * cell is labelled 0 because that is the key that selects it.
    */
-  function photoCell(id, pos, onClick) {
+  function photoCell(id, pos, onClick, members) {
     var img = el('img', { class: 'thumb', alt: '' });
     var blob = thumbOf(id);
     var body;
@@ -251,7 +251,91 @@
       el('span', { class: 'idx', text: pos <= 9 ? String(pos) : (pos === 10 ? '0' : String(pos)) }),
       el('span', { class: 'pt-cell-name', text: photoName(id) })
     ]);
+
+    // A bundled burst wears its representative and says so: the badge names the
+    // count, and opening it is the only action that must NOT toggle keep.
+    if (members && members.length > 1) {
+      cell.appendChild(el('button', {
+        class: 'stack-badge', type: 'button', dataset: { t: 'stack' },
+        text: String(members.length),
+        title: 'A group of ' + members.length + ' near-duplicates — click to view them or change which one stands for the group',
+        onclick: function (e) { e.stopPropagation(); openStack(id); }
+      }));
+    }
     return { cell: cell, img: blob ? img : null };
+  }
+
+  /**
+   * The bundle, opened mid-pass. Shows every member and lets the user put a
+   * different one forward; keeping and cutting still happen on the cell, so
+   * this modal never decides anything — it only changes which photo the
+   * decision is ABOUT.
+   */
+  function openStack(faceId) {
+    var unit = getUnit(G.unitId);
+    var pass = unit.currentPass;
+    var members = (pass && pass.slots && pass.slots[faceId]) || [faceId];
+
+    var body = PT.dom.$('#modal-body');
+    PT.dom.clear(body);
+    body.appendChild(el('h2', { text: 'A group of ' + members.length + ' near-duplicates' }));
+    body.appendChild(el('p', { class: 'muted', style: 'margin:8px 0 14px', text:
+      'They are kept or cut together — one decision for the burst. Click a photo to make it ' +
+      'the one that stands for the group; the rest come back in the best-of-duplicates round.' }));
+
+    var grid = el('div', { class: 'stack-pick' });
+    members.forEach(function (mid) {
+      var img = el('img', { class: 'thumb', alt: '' });
+      var blob = thumbOf(mid);
+      if (blob) dom.setImg(img, blob);
+      var opt = el('div', {
+        class: 'stack-opt' + (mid === faceId ? ' current' : ''),
+        title: photoName(mid),
+        onclick: function () {
+          if (mid !== faceId) swapFace(faceId, mid);
+          PT.dom.$('#modal').close();
+        }
+      }, [
+        img,
+        el('span', { class: 'stack-name', text: photoName(mid) }),
+        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'showing' }) : null
+      ]);
+      grid.appendChild(opt);
+    });
+    body.appendChild(grid);
+    body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+      el('span', { class: 'small dim', text: 'Splitting or regrouping happens on the duplicates screen.' }),
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn-quiet', text: 'Close',
+        onclick: function () { PT.dom.$('#modal').close(); } })
+    ]));
+    PT.dom.$('#modal').showModal();
+  }
+
+  /**
+   * Put a different member forward as the group's face, mid-pass. The slot's
+   * identity in the pass is its face id, so the swap renames it everywhere the
+   * pass holds it — order, kept, sel, the slot map — and pins the choice as
+   * the group's representative so the runoff and the dupes review agree.
+   */
+  function swapFace(oldFace, newFace) {
+    editUnit(G.unitId, 'grid:swapFace', function (u, state) {
+      var p = u.currentPass;
+      if (p) {
+        ['order', 'kept', 'sel'].forEach(function (k) {
+          var a = p[k] || [];
+          var i = a.indexOf(oldFace);
+          if (i >= 0) a[i] = newFace;
+        });
+        if (p.slots && p.slots[oldFace]) {
+          p.slots[newFace] = p.slots[oldFace];
+          delete p.slots[oldFace];
+        }
+      }
+      setGroupRep(u, state, newFace);
+    });
+    G.undoStack = G.undoStack.map(function (id) { return id === oldFace ? newFace : id; });
+    paintScreen();
   }
 
   /* --------------------------------------------------------- config card */
@@ -558,7 +642,7 @@
     G.cells = [];
     G.undoStack = [];
     ids.forEach(function (id, i) {
-      var made = photoCell(id, i + 1, toggle);
+      var made = photoCell(id, i + 1, toggle, pass.slots && pass.slots[id]);
       if (made.img) G.imgs.push(made.img);
       G.cells.push(made.cell);
       host.appendChild(made.cell);
@@ -693,6 +777,24 @@
     render();
   }
 
+  /**
+   * Pin `newFace` as the representative of whichever reviewed group holds it —
+   * in unit.groups (what the runoff reads) and in the review's own constraint
+   * store (what the dupes screen reads), so no screen disagrees afterwards.
+   */
+  function setGroupRep(u, state, newFace) {
+    (u.groups || []).forEach(function (g) {
+      if (!g || Array.isArray(g)) return;
+      if ((g.ids || []).indexOf(newFace) < 0) return;
+      g.rep = newFace;
+      var gs = state.session.groups;
+      if (gs && gs.reps) {
+        (g.ids || []).forEach(function (id) { delete gs.reps[id]; });
+        gs.reps[newFace] = 1;
+      }
+    });
+  }
+
   /* ---------------------------------------------------------- finish early */
 
   /**
@@ -705,8 +807,13 @@
     var p = unit.currentPass;
     if (!p) return unit.pool.slice();
     // Kept first, then the unjudged remainder in dealt order, so what the user
-    // actively chose outranks what merely was not reached.
-    return p.kept.concat(p.order.slice(p.index * p.gridSize));
+    // actively chose outranks what merely was not reached. Faces expand to
+    // their bundled members: a kept burst is kept whole.
+    var out = [];
+    p.kept.concat(p.order.slice(p.index * p.gridSize)).forEach(function (face) {
+      S.expandSlot(p, face).forEach(function (id) { out.push(id); });
+    });
+    return out;
   }
 
   /**
@@ -726,7 +833,8 @@
     if (!standing.length) return;
 
     var p = unit.currentPass;
-    var judged = p ? p.kept.length : 0;
+    var judged = 0;
+    if (p) p.kept.forEach(function (f) { judged += S.expandSlot(p, f).length; });
     var unjudged = p ? standing.length - judged : 0;
 
     var body = PT.dom.$('#modal-body');
@@ -735,7 +843,7 @@
     body.appendChild(el('p', { class: 'muted', style: 'margin:10px 0', text:
       p
         ? standing.length + ' photos are still in — ' + judged + ' you kept this pass and ' +
-          unjudged + ' you haven’t been shown yet. Nothing unjudged is lost by stopping.'
+          unjudged + ' not yet judged, this screen included. Nothing unjudged is lost by stopping.'
         : 'All ' + standing.length + ' photos still in the pool become this folder’s finalists.' }));
     body.appendChild(el('p', { class: 'small dim', text:
       'They are taken as they are, skipping the head-to-head ranking' +
@@ -798,6 +906,11 @@
 
   function onKey(e) {
     if (!G || !G.mode) return;
+    // A document-level listener outlives showModal()'s focus trap: keys pressed
+    // WITH A DIALOG OPEN still bubble here. Without this, Enter behind the
+    // finish-early confirm advances the pass it is asking about, and digits
+    // behind the stack modal toggle cells the user cannot see.
+    if (document.querySelector('dialog[open]')) return;
     var tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     var unit = getUnit(G.unitId);
@@ -1156,4 +1269,9 @@
  *   part-finished pass into the cut pile honestly, sets winners, marks the unit
  *   done and advances. Offered from the pass topbar and as an explicit
  *   "Finish here" on the setup screen, behind a confirm modal.
+ * v1.4 (2026-07-28): Bundles on the grid. A cell standing for a burst wears a
+ *   stack badge naming the member count; opening it shows every member and
+ *   swaps which one fronts the slot — order, kept, sel, the slot map and the
+ *   group's pinned representative all follow. standingIds and the finish-early
+ *   modal expand slots, so stopping early still keeps bursts whole.
 */

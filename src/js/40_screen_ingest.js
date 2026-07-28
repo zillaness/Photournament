@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.7
+ * @version 1.8
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -32,6 +32,25 @@
   PT.sources = PT.sources || Object.create(null);
 
   var PREVIEW_PX = 1280;
+
+  /**
+   * The WORDMARK (docs/wordmark/wordmark_spec_v1.0.md): PHO / TO / URNAMENT as
+   * grid columns, with the accent rail under PHOTO and the neutral rail under
+   * TOURNAMENT so the shared TO carries both. The spans are geometry, not
+   * content — aria carries the real name.
+   */
+  function wordmark(display) {
+    var w = el('h1', {
+      class: 'wordmark' + (display ? ' wordmark-display' : ''),
+      role: 'img', 'aria-label': 'Photournament'
+    });
+    ['PHO', 'TO', 'URNAMENT'].forEach(function (t) {
+      w.appendChild(el('span', { text: t, 'aria-hidden': 'true' }));
+    });
+    w.appendChild(el('i', { class: 'wm-rail-a' }));
+    w.appendChild(el('i', { class: 'wm-rail-b' }));
+    return w;
+  }
 
   /**
    * The BRAND MARK is the real recursive identity, referenced from the sprite
@@ -89,7 +108,7 @@
         // Mark and wordmark are one lockup, not two stacked things.
         el('div', { class: 'pt-lockup' }, [
           brandMark(),
-          el('h1', { class: 'pt-wordmark', text: 'Photournament' })
+          wordmark(true)
         ]),
         el('p', { class: 'muted', text:
           'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
@@ -718,4 +737,7 @@
  *   stacks the nine walking cells over the brand mark on the sprite's own
  *   geometry and cross-fades between them, so the logo flattens into the
  *   nine-cell grid while ingest runs and resolves back when it finishes.
+ * v1.8 (2026-07-28): The wordmark (docs/wordmark spec v1.0) replaces the plain
+ *   entry heading: PHO/TO/URNAMENT as grid columns with the two rails, display
+ *   cut, aria carrying the real name.
 */

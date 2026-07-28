@@ -162,10 +162,26 @@ check('mid-pass state is as staged', before.kept === 1 && before.index === 1 && 
 await page.click('#topbar-stop');
 await page.waitForSelector('[data-t="finish-early-confirm"]');
 
+// Keys must be dead behind the dialog: '3' here used to toggle cell 3 on the
+// screen the modal is covering.
+const selBefore = await page.evaluate(() => {
+  const s = window.PT.store.get();
+  return (s.session.units[s.session.activeUnitId].currentPass.sel || []).length;
+});
+await page.keyboard.press('3');
+await page.waitForTimeout(120);
+const selAfter = await page.evaluate(() => {
+  const s = window.PT.store.get();
+  return (s.session.units[s.session.activeUnitId].currentPass.sel || []).length;
+});
+check('keys are inert behind the confirm dialog', selAfter === selBefore,
+  selBefore + ' -> ' + selAfter);
+
 const modalText = await page.evaluate(() => document.getElementById('modal-body').textContent);
 // 1 kept + 12 never judged (screen 2's 9 + screen 3's 3) = 13 standing.
 check('the modal counts 13 standing', /\b13\b/.test(modalText), modalText.slice(0, 140));
-check('the modal separates kept from unjudged', /1 you kept/.test(modalText) && /12 you haven/.test(modalText));
+check('the modal separates kept from unjudged',
+  /1 you kept/.test(modalText) && /12 not yet judged/.test(modalText));
 
 await page.click('[data-t="finish-early-confirm"]');
 await page.waitForSelector('.screen-export, #export-list, [data-screen="export"], h1', { timeout: 15000 });

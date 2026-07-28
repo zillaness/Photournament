@@ -1,0 +1,86 @@
+/**
+ * file: wordmark.css
+ * version: 1.0
+ * author: Samuel Cao
+ * created: 2026-07-28
+ * last_updated: 2026-07-28
+ * description: The Photournament wordmark as live HTML and CSS. Excerpted from
+ *   photournament_ui_v2.1.css so the mark can be dropped into anything without
+ *   pulling in the whole app stylesheet. Vanilla CSS, no external resources.
+ * ai_update: Update last_updated and version. Rename file to match. Append changelog at bottom.
+ *
+ * This, not the SVG, is the source of truth for the app. The app ships as one
+ * file opened from a file:// origin where no external resource loads, so the
+ * mark has to be drawn in CSS. The SVGs in this folder are for everything else:
+ * slides, the repo README, a sticker.
+ *
+ * Markup:
+ *
+ *   <span class="wordmark">
+ *     <span>PHO</span><span>TO</span><span>URNAMENT</span>
+ *     <i class="wm-rail-a"></i>
+ *     <i class="wm-rail-b"></i>
+ *   </span>
+ *
+ * Set font-size and nothing else. Every dimension below is in em.
+ */
+
+.wordmark {
+  /* Tracking. Used twice — see the note on .wordmark > span:last-of-type. */
+  --wm-ls: 0.09em;
+
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: var(--wm-ls);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-dim, #777);
+}
+
+/*
+ * Trailing letter-spacing sits after the final T, so without this the lower rail
+ * overhangs the word by one tracking unit. Trimming the last column pulls the
+ * rail back to the last glyph. The two values must stay equal, which is why both
+ * read from --wm-ls.
+ */
+.wordmark > span:last-of-type { margin-right: calc(-1 * var(--wm-ls)); }
+
+.wordmark .wm-rail-a,
+.wordmark .wm-rail-b {
+  height: 0.09em;
+  min-height: 2px;   /* below ~16px the rails would round away to nothing */
+}
+
+/* PHOTO: from the P through the shared TO. */
+.wordmark .wm-rail-a {
+  grid-row: 2;
+  grid-column: 1 / 3;
+  margin-top: 0.075em;
+  background: var(--accent, #759cc2);
+}
+
+/* TOURNAMENT: from the shared TO through the final T. */
+.wordmark .wm-rail-b {
+  grid-row: 3;
+  grid-column: 2 / 4;
+  margin-top: 0.06em;
+  background: var(--text-mute, #777);
+}
+
+/* Above roughly 40px the canonical tracking reads loose. */
+.wordmark-display {
+  --wm-ls: 0.04em;
+  font-size: 64px;
+  color: var(--text, #efefef);
+}
+
+/* One colour: drop the accent, let both rails inherit. */
+.wordmark-mono .wm-rail-a,
+.wordmark-mono .wm-rail-b { background: currentColor; }
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Canonical, display and mono variants.
+ */

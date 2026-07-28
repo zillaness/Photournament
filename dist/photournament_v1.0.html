@@ -379,13 +379,7 @@ a:hover { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .topbar-right { gap: 4px; }
 
-#topbar-title {
-  font-size: var(--fs-small);
-  font-weight: 650;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
+/* #topbar-title is now the wordmark; section 15 owns its whole treatment. */
 #topbar-context {
   font-size: var(--fs-small);
   color: var(--text);
@@ -760,45 +754,14 @@ kbd {
 #modal-body h2 { margin-bottom: 4px; }
 
 /* ==========================================================================
-   6. THE NINE-SQUARE MARK
+   6. (RETIRED) THE NINE-SQUARE MARK
    ==========================================================================
-   CSS-drawn, no image and no SVG. Nine cells, one marked: the whole product in
-   one glyph. Used on the entry screen and as the ingest activity indicator.
+   The CSS-drawn nine-cell mark and its walking ingest variant lived here.
+   Both jobs moved to the real identity artwork: the entry screen shows the
+   recursive mark from the sprite (section 14), and the ingest throbber is now
+   an overlay ON that mark (.pt-markcells), so the identity and the activity
+   indicator are one object instead of two lookalikes.
    ========================================================================== */
-
-.pt-mark {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  width: 62px;
-  aspect-ratio: 1;
-  flex: none;
-}
-.pt-mark i { background: var(--surface-3); border-radius: 1px; }
-.pt-mark i:nth-child(5) { background: var(--mark); }
-
-/* The ingest variant walks the mark, one cell at a time. Monochrome, no motion
-   larger than a few pixels, nothing that pulls the eye off the count. */
-.pt-mark-live i {
-  background: var(--surface-2);
-  animation: pt-cell 3.6s steps(1, end) infinite;
-}
-.pt-mark-live i:nth-child(1) { animation-delay: 0.0s; }
-.pt-mark-live i:nth-child(2) { animation-delay: 0.4s; }
-.pt-mark-live i:nth-child(3) { animation-delay: 0.8s; }
-.pt-mark-live i:nth-child(4) { animation-delay: 1.2s; }
-.pt-mark-live i:nth-child(5) { animation-delay: 1.6s; }
-.pt-mark-live i:nth-child(6) { animation-delay: 2.0s; }
-.pt-mark-live i:nth-child(7) { animation-delay: 2.4s; }
-.pt-mark-live i:nth-child(8) { animation-delay: 2.8s; }
-.pt-mark-live i:nth-child(9) { animation-delay: 3.2s; }
-@keyframes pt-cell {
-  0%, 11%  { background: var(--text-dim); }
-  12%, 100% { background: var(--surface-2); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pt-mark-live i { animation: none; background: var(--surface-3); }
-}
 
 /* ==========================================================================
    7. SCREEN: ENTRY
@@ -2063,20 +2026,168 @@ kbd {
 #app .pt-lockup { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
 #app .pt-lockup h1 { margin: 0; }
 
-/*
- * The wordmark, not a heading that happens to say the product name. Same
- * treatment as #topbar-title — uppercase, 650, 0.09em — because they are the
- * same object at two sizes. Full --text here rather than --text-dim: in the
- * topbar the wordmark is a label beside the work, on the entry screen it is
- * the thing itself.
- */
-#app .pt-wordmark {
+#app .screen-welcome .pt-brandmark { width: 46px; height: 46px; }
+
+/* ==========================================================================
+   15. THE WORDMARK
+   ==========================================================================
+   From docs/wordmark/wordmark.css v1.0 — that file is the source of truth;
+   this is it, re-prefixed with #app so the app's own #id rules cannot outrank
+   it, and painted from the live tokens so it inverts with the theme.
+
+   PHOTO and TOURNAMENT share exactly two letters. The markup's three spans are
+   the grid columns PHO / TO / URNAMENT; the accent rail spans columns 1–2
+   (PHOTO), the neutral rail spans 2–3 (TOURNAMENT), so the shared TO is the
+   only stretch with a rail above and below. The rails span grid COLUMNS, not
+   measured offsets, which is what keeps the geometry correct on whatever font
+   the system stack resolves to.
+   ========================================================================== */
+
+#app .wordmark {
+  /* Tracking. Used twice — see the note on span:last-of-type. */
+  --wm-ls: 0.09em;
+
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
   font-weight: 650;
-  letter-spacing: 0.09em;
+  letter-spacing: var(--wm-ls);
   text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+/*
+ * Trailing letter-spacing sits after the final T, so without this the lower
+ * rail overhangs the word by one tracking unit. The two values must stay
+ * equal, which is why both read from --wm-ls.
+ */
+#app .wordmark > span:last-of-type { margin-right: calc(-1 * var(--wm-ls)); }
+
+#app .wordmark .wm-rail-a,
+#app .wordmark .wm-rail-b {
+  height: 0.09em;
+  min-height: 2px;   /* below ~16px the rails would round away to nothing */
+}
+
+/* PHOTO: from the P through the shared TO. */
+#app .wordmark .wm-rail-a {
+  grid-row: 2;
+  grid-column: 1 / 3;
+  margin-top: 0.075em;
+  background: var(--accent);
+}
+
+/* TOURNAMENT: from the shared TO through the final T. */
+#app .wordmark .wm-rail-b {
+  grid-row: 3;
+  grid-column: 2 / 4;
+  margin-top: 0.06em;
+  background: var(--text-mute);
+}
+
+/*
+ * The display variant, for the entry lockup. 64px is from the spec's size
+ * table, and its 0.71 cap height lands at ~45px — which is why the 46px mark
+ * beside it reads as the same object. Full --text: on the entry screen the
+ * wordmark is the thing itself, not a label beside the work.
+ */
+#app .wordmark-display {
+  --wm-ls: 0.04em;
+  font-size: 64px;
   color: var(--text);
 }
-#app .screen-welcome .pt-brandmark { width: 46px; height: 46px; }
+
+/* The display cut is ~10em wide; at phone widths it must shrink, not clip. */
+@media (max-width: 720px) {
+  #app .wordmark-display { font-size: 40px; }
+}
+
+/* ==========================================================================
+   16. BUNDLED BURSTS IN THE FLOW
+   ==========================================================================
+   Stage A deals one cell per near-duplicate group and the bracket seats one
+   competitor per group, each wearing its representative. The badge is the
+   tell: it names the member count, echoes the dupes screen's stack language,
+   and opens the bundle to change which frame stands for it.
+   ========================================================================== */
+
+/*
+ * On the grid cell it sits opposite the number key: idx top-left, stack
+ * top-right. It is a BUTTON on top of a clickable cell, so it must read as
+ * its own target — chip ground, stack glyph drawn as two offset plates.
+ */
+#app .stack-badge {
+  position: absolute; top: 6px; right: 6px;
+  z-index: 3;
+  min-width: 22px; height: 22px; padding: 0 7px 0 20px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--chip);
+  color: var(--on-photo);
+  font: inherit;
+  font-size: var(--fs-micro); line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(3px);
+  cursor: pointer;
+}
+#app .stack-badge::before,
+#app .stack-badge::after {
+  content: "";
+  position: absolute; top: 7px; left: 6px;
+  width: 8px; height: 8px;
+  border-radius: 1.5px;
+  border: 1px solid currentColor;
+  opacity: 0.55;
+}
+#app .stack-badge::after { top: 5px; left: 8px; opacity: 1; background: var(--chip); }
+/* The chip ground is FIXED dark (it sits on a photograph), so the hover text
+   must stay the fixed on-photo white — var(--text) here goes near-black in the
+   light theme and the count vanishes exactly when pointed at. */
+#app .stack-badge:hover { background: oklch(0 0 0 / 0.78); color: var(--on-photo); }
+
+/* In the bracket caption it flows inline with the name, not absolutely. */
+#app .stack-badge-cap {
+  position: static;
+  flex: none;
+  backdrop-filter: none;
+  background: var(--surface-3);
+  color: var(--text-dim);
+}
+#app .stack-badge-cap:hover { background: var(--surface-2); }
+
+/* The bundle, opened: pick which frame stands for the group. */
+#app .stack-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+  max-height: 52vh;
+  overflow: auto;
+}
+#app .stack-opt {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--well);
+}
+#app .stack-opt .thumb { width: 100%; aspect-ratio: 3 / 2; object-fit: contain; display: block; }
+#app .stack-opt:hover { border-color: var(--line-2); }
+#app .stack-opt.current { border-color: var(--mark); cursor: default; }
+#app .stack-name {
+  display: block;
+  padding: 5px 8px;
+  font-size: var(--fs-micro);
+  color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#app .stack-opt .stack-tag {
+  position: absolute; top: 6px; left: 6px;
+  background: var(--mark); color: var(--on-mark);
+  font-weight: 700;
+}
 
 /*
  * In the topbar it sits beside the wordmark, sized to that text's cap height.
@@ -2189,9 +2300,11 @@ kbd {
 #app .topbar-left { gap: 9px; }
 
 @media (max-width: 720px) {
-  #app .pt-brandmark { width: 38px; height: 38px; }
+  /* Must out-rank the desktop sizes above, which carry extra selectors. */
+  #app .screen-welcome .pt-brandmark { width: 38px; height: 38px; }
   #app .pt-brandmark-bar { width: 19px; height: 19px; }
   #app .pt-markslot { width: 38px; height: 38px; }
+  #app .pt-markslot .pt-brandmark { width: 100%; height: 100%; }
 }
 
 </style>
@@ -2279,10 +2392,19 @@ kbd {
 <div id="app">
   <header id="topbar" hidden>
     <div class="topbar-left">
-      <svg class="pt-brandmark pt-brandmark-bar" viewBox="0 0 100 100" role="img" aria-label="Photournament">
+      <svg class="pt-brandmark pt-brandmark-bar" viewBox="0 0 100 100" aria-hidden="true">
         <use href="#ptm-mark-plate"></use>
       </svg>
-      <span id="topbar-title">Photournament</span>
+      <!--
+        The wordmark (docs/wordmark/wordmark_spec_v1.0.md): PHOTO and TOURNAMENT
+        share TO, and the two rails draw that — accent under PHOTO, neutral
+        under TOURNAMENT, both present only under the shared letters. The split
+        spans are the mark's grid columns, not styling hooks; aria carries the
+        real name.
+      -->
+      <span id="topbar-title" class="wordmark" role="img" aria-label="Photournament"
+        ><span aria-hidden="true">PHO</span><span aria-hidden="true">TO</span><span aria-hidden="true">URNAMENT</span
+        ><i class="wm-rail-a"></i><i class="wm-rail-b"></i></span>
       <span id="topbar-context" class="muted"></span>
     </div>
     <div class="topbar-right">
@@ -5469,7 +5591,8 @@ v1.0 - 2026-07-28 - Samuel Cao
     if (s === '') return { mode: MODE.POOLED, value: null };
     if (s === '*' || s === '∞' || s.toLowerCase() === 'inf') return { mode: MODE.UNCAPPED, value: null };
 
-    var pct = /^(\d{1,3}(?:\.\d+)?)\s*%$/.exec(s);
+    var pct = /^(\d{0,3}(?:\.\d+)?)\s*%$/.exec(s);
+    if (pct && pct[1] === '') pct = null;
     if (pct) {
       var p = parseFloat(pct[1]);
       if (!isFinite(p) || p < 0 || p > 100) return null;
@@ -5868,7 +5991,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 35_session.js ===== */
 /**
  * @file 35_session.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -5997,8 +6120,65 @@ v1.0 - 2026-07-28 - Samuel Cao
    * the settings are COPIED into the pass, so changing a setting mid-pass cannot
    * loosen the quota the user committed to.
    */
+  /**
+   * Collapse the pool into DEAL SLOTS: one per reviewed near-duplicate group,
+   * one per ungrouped photo. This is where "a burst costs one decision rather
+   * than several" becomes literally true — Stage A shows a burst as a single
+   * cell wearing its representative, and keeping or cutting it keeps or cuts
+   * every member together. The members are only prised apart later, in the
+   * Stage C runoff, which exists for exactly that.
+   *
+   * A group whose members have been separated by earlier decisions (rescue can
+   * pull one member back alone) only bundles the members still in the pool;
+   * with one member left it degrades to an ordinary singleton. No reviewed
+   * grouping at all — the user skipped the step before it computed, or an old
+   * session predates it — degrades to one slot per photo, which is exactly the
+   * pre-grouping behaviour.
+   *
+   * @returns {Array<{face:string, members:Array<string>}>} in pool order
+   */
+  function slotsFor(unit) {
+    var groupOf = Object.create(null);
+    (unit.groups || []).forEach(function (g, gi) {
+      var ids = Array.isArray(g) ? g : ((g && g.ids) || []);
+      ids.forEach(function (id) { groupOf[id] = gi; });
+    });
+    var inPool = Object.create(null);
+    unit.pool.forEach(function (id) { inPool[id] = 1; });
+
+    var done = Object.create(null);
+    var slots = [];
+    unit.pool.forEach(function (id) {
+      if (done[id]) return;
+      var gi = groupOf[id];
+      if (gi === undefined) {
+        done[id] = 1;
+        slots.push({ face: id, members: [id] });
+        return;
+      }
+      var g = unit.groups[gi];
+      var ids = (Array.isArray(g) ? g : g.ids).filter(function (m) { return inPool[m]; });
+      ids.forEach(function (m) { done[m] = 1; });
+      if (ids.length < 2) {
+        slots.push({ face: id, members: [id] });
+        return;
+      }
+      var rep = (!Array.isArray(g) && g.rep && inPool[g.rep]) ? g.rep : ids[0];
+      slots.push({ face: rep, members: ids });
+    });
+    return slots;
+  }
+
   function startPass(unit, settings) {
     var seed = (Date.now() ^ (unit.passes.length * 2654435761)) >>> 0;
+    // The pass deals slots, not photos: order holds one FACE per slot, and
+    // pass.slots remembers each face's members as they were at deal time, so
+    // the expansion at pass end is stable even if the grouping is edited
+    // mid-pass.
+    var slots = slotsFor(unit);
+    var faces = slots.map(function (sl) { return sl.face; });
+    var members = Object.create(null);
+    slots.forEach(function (sl) { members[sl.face] = sl.members; });
     return {
       n: unit.passes.length + 1,
       gridSize: settings.gridSize,
@@ -6006,12 +6186,18 @@ v1.0 - 2026-07-28 - Samuel Cao
       quotaCustom: settings.quotaCustom,
       shuffled: settings.shuffle,
       seed: seed,
-      order: settings.shuffle ? seededShuffle(unit.pool, seed) : unit.pool.slice(),
+      order: settings.shuffle ? seededShuffle(faces, seed) : faces,
+      slots: members,
       index: 0,               // screens completed
-      kept: [],               // ids kept so far this pass
+      kept: [],               // FACE ids kept so far this pass
       startedAt: Date.now(),
       fieldAtStart: unit.pool.length
     };
+  }
+
+  /** A face back to its members. Old sessions' passes have no slot map. */
+  function expandSlot(pass, faceId) {
+    return (pass && pass.slots && pass.slots[faceId]) || [faceId];
   }
 
   function screenAt(pass, i) {
@@ -6032,9 +6218,21 @@ v1.0 - 2026-07-28 - Samuel Cao
     var keptSet = Object.create(null);
     pass.kept.forEach(function (id) { keptSet[id] = 1; });
 
-    var cutNow = pass.order.filter(function (id) { return !keptSet[id]; });
+    // kept/order hold slot faces; the pool and the cut pile hold photos, so a
+    // kept burst carries every member forward and a cut burst loses them all —
+    // one decision, honestly accounted. Every summary number below is photos,
+    // not decisions, because the summary is about the collection.
+    var keptIds = [], cutNow = [];
+    pass.kept.forEach(function (face) {
+      expandSlot(pass, face).forEach(function (id) { keptIds.push(id); });
+    });
+    pass.order.forEach(function (face) {
+      if (keptSet[face]) return;
+      expandSlot(pass, face).forEach(function (id) { cutNow.push(id); });
+    });
+
     var before = pass.fieldAtStart;
-    var after = pass.kept.length;
+    var after = keptIds.length;
 
     var summary = {
       n: pass.n,
@@ -6050,7 +6248,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       ms: Date.now() - pass.startedAt
     };
 
-    unit.pool = pass.kept.slice();
+    unit.pool = keptIds;
     unit.cut = unit.cut.concat(cutNow);
     unit.passes.push(summary);
     unit.currentPass = null;
@@ -6124,6 +6322,8 @@ v1.0 - 2026-07-28 - Samuel Cao
     resolveQuota: resolveQuota,
     quotaLabel: quotaLabel,
     seededShuffle: seededShuffle,
+    slotsFor: slotsFor,
+    expandSlot: expandSlot,
     startPass: startPass,
     screenAt: screenAt,
     screensTotal: screensTotal,
@@ -6141,14 +6341,19 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   unit state, quota resolution, deterministic seeded shuffle so a resumed pass
  *   deals identically, pass lifecycle with locked configuration, low cull rate
  *   check, and bracket handoff suggestion.
- */
+  * v1.2 (2026-07-28): Bundled bursts. slotsFor() collapses the pool into deal
+ *   slots — one per reviewed near-duplicate group, wearing its representative —
+ *   and startPass deals faces with a frozen slot map, so a burst is one
+ *   decision. finishPass expands kept and cut faces back to photos, keeping
+ *   every summary number in photos.
+*/
 
 </script>
 <script>
 /* ===== 40_screen_ingest.js ===== */
 /**
  * @file 40_screen_ingest.js
- * @version 1.7
+ * @version 1.8
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -6180,6 +6385,25 @@ v1.0 - 2026-07-28 - Samuel Cao
   PT.sources = PT.sources || Object.create(null);
 
   var PREVIEW_PX = 1280;
+
+  /**
+   * The WORDMARK (docs/wordmark/wordmark_spec_v1.0.md): PHO / TO / URNAMENT as
+   * grid columns, with the accent rail under PHOTO and the neutral rail under
+   * TOURNAMENT so the shared TO carries both. The spans are geometry, not
+   * content — aria carries the real name.
+   */
+  function wordmark(display) {
+    var w = el('h1', {
+      class: 'wordmark' + (display ? ' wordmark-display' : ''),
+      role: 'img', 'aria-label': 'Photournament'
+    });
+    ['PHO', 'TO', 'URNAMENT'].forEach(function (t) {
+      w.appendChild(el('span', { text: t, 'aria-hidden': 'true' }));
+    });
+    w.appendChild(el('i', { class: 'wm-rail-a' }));
+    w.appendChild(el('i', { class: 'wm-rail-b' }));
+    return w;
+  }
 
   /**
    * The BRAND MARK is the real recursive identity, referenced from the sprite
@@ -6237,7 +6461,7 @@ v1.0 - 2026-07-28 - Samuel Cao
         // Mark and wordmark are one lockup, not two stacked things.
         el('div', { class: 'pt-lockup' }, [
           brandMark(),
-          el('h1', { class: 'pt-wordmark', text: 'Photournament' })
+          wordmark(true)
         ]),
         el('p', { class: 'muted', text:
           'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
@@ -6866,6 +7090,9 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   stacks the nine walking cells over the brand mark on the sprite's own
  *   geometry and cross-fades between them, so the logo flattens into the
  *   nine-cell grid while ingest runs and resolves back when it finishes.
+ * v1.8 (2026-07-28): The wordmark (docs/wordmark spec v1.0) replaces the plain
+ *   entry heading: PHO/TO/URNAMENT as grid columns with the two rails, display
+ *   cut, aria carrying the real name.
 */
 
 </script>
@@ -8138,8 +8365,11 @@ v1.0 - 2026-07-28 - Samuel Cao
                 : { mode: 'pooled', value: null });
               return;
             }
+            // One decimal of precision, so the flip re-expresses the SAME
+            // count: 2 of 300 becomes 0.7%, which resolves back to 2 — a
+            // whole-number 1% would resolve to 3 and the row would jump.
             var share = (node.eff.mode === 'fixed' && node.subtreeCount > 0)
-              ? Math.max(1, Math.min(100, Math.round((node.eff.value / node.subtreeCount) * 100)))
+              ? Math.max(0.1, Math.min(100, Math.round((node.eff.value / node.subtreeCount) * 1000) / 10))
               : 10;
             setAlloc(path, { mode: 'percent', value: share });
           }
@@ -8294,6 +8524,7 @@ v1.0 - 2026-07-28 - Samuel Cao
           title: 'How many photos the best-of-the-best round should end up with'
         });
         stageDTarget.addEventListener('input', function () {
+          if (!/^\d+$/.test(stageDTarget.value.trim())) return;
           var v = parseInt(stageDTarget.value, 10);
           if (!(v >= 1)) { stageDTarget.classList.add('invalid'); return; }
           stageDTarget.classList.remove('invalid');
@@ -8386,7 +8617,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 60_screen_grid.js ===== */
 /**
  * @file 60_screen_grid.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -8617,7 +8848,7 @@ v1.0 - 2026-07-28 - Samuel Cao
    * A photo cell. `pos` is 1-based and drives the number-key mapping; the tenth
    * cell is labelled 0 because that is the key that selects it.
    */
-  function photoCell(id, pos, onClick) {
+  function photoCell(id, pos, onClick, members) {
     var img = el('img', { class: 'thumb', alt: '' });
     var blob = thumbOf(id);
     var body;
@@ -8637,7 +8868,91 @@ v1.0 - 2026-07-28 - Samuel Cao
       el('span', { class: 'idx', text: pos <= 9 ? String(pos) : (pos === 10 ? '0' : String(pos)) }),
       el('span', { class: 'pt-cell-name', text: photoName(id) })
     ]);
+
+    // A bundled burst wears its representative and says so: the badge names the
+    // count, and opening it is the only action that must NOT toggle keep.
+    if (members && members.length > 1) {
+      cell.appendChild(el('button', {
+        class: 'stack-badge', type: 'button', dataset: { t: 'stack' },
+        text: String(members.length),
+        title: 'A group of ' + members.length + ' near-duplicates — click to view them or change which one stands for the group',
+        onclick: function (e) { e.stopPropagation(); openStack(id); }
+      }));
+    }
     return { cell: cell, img: blob ? img : null };
+  }
+
+  /**
+   * The bundle, opened mid-pass. Shows every member and lets the user put a
+   * different one forward; keeping and cutting still happen on the cell, so
+   * this modal never decides anything — it only changes which photo the
+   * decision is ABOUT.
+   */
+  function openStack(faceId) {
+    var unit = getUnit(G.unitId);
+    var pass = unit.currentPass;
+    var members = (pass && pass.slots && pass.slots[faceId]) || [faceId];
+
+    var body = PT.dom.$('#modal-body');
+    PT.dom.clear(body);
+    body.appendChild(el('h2', { text: 'A group of ' + members.length + ' near-duplicates' }));
+    body.appendChild(el('p', { class: 'muted', style: 'margin:8px 0 14px', text:
+      'They are kept or cut together — one decision for the burst. Click a photo to make it ' +
+      'the one that stands for the group; the rest come back in the best-of-duplicates round.' }));
+
+    var grid = el('div', { class: 'stack-pick' });
+    members.forEach(function (mid) {
+      var img = el('img', { class: 'thumb', alt: '' });
+      var blob = thumbOf(mid);
+      if (blob) dom.setImg(img, blob);
+      var opt = el('div', {
+        class: 'stack-opt' + (mid === faceId ? ' current' : ''),
+        title: photoName(mid),
+        onclick: function () {
+          if (mid !== faceId) swapFace(faceId, mid);
+          PT.dom.$('#modal').close();
+        }
+      }, [
+        img,
+        el('span', { class: 'stack-name', text: photoName(mid) }),
+        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'showing' }) : null
+      ]);
+      grid.appendChild(opt);
+    });
+    body.appendChild(grid);
+    body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+      el('span', { class: 'small dim', text: 'Splitting or regrouping happens on the duplicates screen.' }),
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn-quiet', text: 'Close',
+        onclick: function () { PT.dom.$('#modal').close(); } })
+    ]));
+    PT.dom.$('#modal').showModal();
+  }
+
+  /**
+   * Put a different member forward as the group's face, mid-pass. The slot's
+   * identity in the pass is its face id, so the swap renames it everywhere the
+   * pass holds it — order, kept, sel, the slot map — and pins the choice as
+   * the group's representative so the runoff and the dupes review agree.
+   */
+  function swapFace(oldFace, newFace) {
+    editUnit(G.unitId, 'grid:swapFace', function (u, state) {
+      var p = u.currentPass;
+      if (p) {
+        ['order', 'kept', 'sel'].forEach(function (k) {
+          var a = p[k] || [];
+          var i = a.indexOf(oldFace);
+          if (i >= 0) a[i] = newFace;
+        });
+        if (p.slots && p.slots[oldFace]) {
+          p.slots[newFace] = p.slots[oldFace];
+          delete p.slots[oldFace];
+        }
+      }
+      setGroupRep(u, state, newFace);
+    });
+    G.undoStack = G.undoStack.map(function (id) { return id === oldFace ? newFace : id; });
+    paintScreen();
   }
 
   /* --------------------------------------------------------- config card */
@@ -8944,7 +9259,7 @@ v1.0 - 2026-07-28 - Samuel Cao
     G.cells = [];
     G.undoStack = [];
     ids.forEach(function (id, i) {
-      var made = photoCell(id, i + 1, toggle);
+      var made = photoCell(id, i + 1, toggle, pass.slots && pass.slots[id]);
       if (made.img) G.imgs.push(made.img);
       G.cells.push(made.cell);
       host.appendChild(made.cell);
@@ -9079,6 +9394,24 @@ v1.0 - 2026-07-28 - Samuel Cao
     render();
   }
 
+  /**
+   * Pin `newFace` as the representative of whichever reviewed group holds it —
+   * in unit.groups (what the runoff reads) and in the review's own constraint
+   * store (what the dupes screen reads), so no screen disagrees afterwards.
+   */
+  function setGroupRep(u, state, newFace) {
+    (u.groups || []).forEach(function (g) {
+      if (!g || Array.isArray(g)) return;
+      if ((g.ids || []).indexOf(newFace) < 0) return;
+      g.rep = newFace;
+      var gs = state.session.groups;
+      if (gs && gs.reps) {
+        (g.ids || []).forEach(function (id) { delete gs.reps[id]; });
+        gs.reps[newFace] = 1;
+      }
+    });
+  }
+
   /* ---------------------------------------------------------- finish early */
 
   /**
@@ -9091,8 +9424,13 @@ v1.0 - 2026-07-28 - Samuel Cao
     var p = unit.currentPass;
     if (!p) return unit.pool.slice();
     // Kept first, then the unjudged remainder in dealt order, so what the user
-    // actively chose outranks what merely was not reached.
-    return p.kept.concat(p.order.slice(p.index * p.gridSize));
+    // actively chose outranks what merely was not reached. Faces expand to
+    // their bundled members: a kept burst is kept whole.
+    var out = [];
+    p.kept.concat(p.order.slice(p.index * p.gridSize)).forEach(function (face) {
+      S.expandSlot(p, face).forEach(function (id) { out.push(id); });
+    });
+    return out;
   }
 
   /**
@@ -9112,7 +9450,8 @@ v1.0 - 2026-07-28 - Samuel Cao
     if (!standing.length) return;
 
     var p = unit.currentPass;
-    var judged = p ? p.kept.length : 0;
+    var judged = 0;
+    if (p) p.kept.forEach(function (f) { judged += S.expandSlot(p, f).length; });
     var unjudged = p ? standing.length - judged : 0;
 
     var body = PT.dom.$('#modal-body');
@@ -9121,7 +9460,7 @@ v1.0 - 2026-07-28 - Samuel Cao
     body.appendChild(el('p', { class: 'muted', style: 'margin:10px 0', text:
       p
         ? standing.length + ' photos are still in — ' + judged + ' you kept this pass and ' +
-          unjudged + ' you haven’t been shown yet. Nothing unjudged is lost by stopping.'
+          unjudged + ' not yet judged, this screen included. Nothing unjudged is lost by stopping.'
         : 'All ' + standing.length + ' photos still in the pool become this folder’s finalists.' }));
     body.appendChild(el('p', { class: 'small dim', text:
       'They are taken as they are, skipping the head-to-head ranking' +
@@ -9184,6 +9523,11 @@ v1.0 - 2026-07-28 - Samuel Cao
 
   function onKey(e) {
     if (!G || !G.mode) return;
+    // A document-level listener outlives showModal()'s focus trap: keys pressed
+    // WITH A DIALOG OPEN still bubble here. Without this, Enter behind the
+    // finish-early confirm advances the pass it is asking about, and digits
+    // behind the stack modal toggle cells the user cannot see.
+    if (document.querySelector('dialog[open]')) return;
     var tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     var unit = getUnit(G.unitId);
@@ -9542,6 +9886,11 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   part-finished pass into the cut pile honestly, sets winners, marks the unit
  *   done and advances. Offered from the pass topbar and as an explicit
  *   "Finish here" on the setup screen, behind a confirm modal.
+ * v1.4 (2026-07-28): Bundles on the grid. A cell standing for a burst wears a
+ *   stack badge naming the member count; opening it shows every member and
+ *   swaps which one fronts the slot — order, kept, sel, the slot map and the
+ *   group's pinned representative all follow. standingIds and the finish-early
+ *   modal expand slots, so stopping early still keeps bursts whole.
 */
 
 </script>
@@ -9549,7 +9898,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 70_screen_bracket.js ===== */
 /**
  * @file 70_screen_bracket.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -10151,14 +10500,28 @@ v1.0 - 2026-07-28 - Samuel Cao
     if (!u.bracket || !u.bracket.ops) {
       PT.store.dispatch('bracket:init', function (s) {
         var unit = s.session.units[unitId];
-        var target = unit.target == null ? unit.pool.length : Math.min(unit.target, unit.pool.length);
+        // One competitor per reviewed near-duplicate group, wearing its
+        // representative — two frames of the same burst going head to head is
+        // a comparison with no information in it. The members ride along in
+        // `slots` and come back in the Stage C runoff.
+        //
+        // The target therefore counts DECISIONS, capped at the number of
+        // distinct-photo slots: with 10 photos in 4 bundles, "keep 6" cannot
+        // seat 6 competitors because only 4 exist. The runoff's multi-keep is
+        // where the photo count can rise back toward the configured target.
+        var slots = PT.session.slotsFor(unit);
+        var faces = slots.map(function (sl) { return sl.face; });
+        var members = Object.create(null);
+        slots.forEach(function (sl) { members[sl.face] = sl.members; });
+        var target = unit.target == null ? faces.length : Math.min(unit.target, faces.length);
         var seed = (Date.now() ^ 0x9e3779b9) >>> 0;
         unit.bracket = {
           seed: seed,
-          pool: unit.pool.slice(),
+          pool: faces,
+          slots: members,
           target: target,
           uncapped: unit.target == null,
-          order: PT.session.seededShuffle(unit.pool, seed),
+          order: PT.session.seededShuffle(faces, seed),
           ops: [],
           stopped: false,
           complete: false,
@@ -10225,6 +10588,10 @@ v1.0 - 2026-07-28 - Samuel Cao
 
     S.onKey = function (e) {
       if (!S) return;
+      // Keys pressed with a dialog open still bubble to document-level
+      // listeners. The stack modal is open right over this screen — an arrow
+      // key must not decide the match behind it.
+      if (document.querySelector('dialog[open]')) return;
       var t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       var m = S.engine && currentMatch(S.engine);
@@ -10500,6 +10867,74 @@ v1.0 - 2026-07-28 - Samuel Cao
     else paintMatch(u, E, m);
   }
 
+  /**
+   * The bundle, opened mid-bracket. Same contract as the grid's: it changes
+   * which photo the decisions are about, never the decisions themselves.
+   */
+  function openBracketStack(faceId) {
+    var u = unitOf(S.unitId);
+    var members = (u && u.bracket && u.bracket.slots && u.bracket.slots[faceId]) || [faceId];
+
+    var body = PT.dom.$('#modal-body');
+    PT.dom.clear(body);
+    body.appendChild(el('h2', { text: 'A group of ' + members.length + ' near-duplicates' }));
+    body.appendChild(el('p', { class: 'muted', style: 'margin:8px 0 14px', text:
+      'One frame competes for the whole burst. Click a photo to put it forward instead — every ' +
+      'comparison this group has already won or lost carries over to it.' }));
+
+    var grid = el('div', { class: 'stack-pick' });
+    members.forEach(function (mid) {
+      var img = el('img', { alt: '', class: 'thumb' });
+      var blob = blobFor(mid);
+      if (blob) PT.dom.setImg(img, blob);
+      grid.appendChild(el('div', {
+        class: 'stack-opt' + (mid === faceId ? ' current' : ''),
+        title: nameOf(mid),
+        onclick: function () {
+          if (mid !== faceId) swapBracketFace(faceId, mid);
+          PT.dom.$('#modal').close();
+        }
+      }, [
+        img,
+        el('span', { class: 'stack-name', text: nameOf(mid) }),
+        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'competing' }) : null
+      ]));
+    });
+    body.appendChild(grid);
+    body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn-quiet', text: 'Close',
+        onclick: function () { PT.dom.$('#modal').close(); } })
+    ]));
+    PT.dom.$('#modal').showModal();
+  }
+
+  /**
+   * Rename a competitor across the whole bracket. Sound because the op log
+   * references matches POSITIONALLY (mid is tag:round:pair) and photos only by
+   * winner id — rewrite pool, order and every op's winner and the rebuild
+   * rederives rounds, placements and unit.winners with the new face in the old
+   * face's exact standing.
+   */
+  function swapBracketFace(oldFace, newFace) {
+    commit('bracket:swapFace', function (b, unit) {
+      ['pool', 'order'].forEach(function (k) {
+        var i = b[k].indexOf(oldFace);
+        if (i >= 0) b[k][i] = newFace;
+      });
+      b.ops.forEach(function (op) { if (op.w === oldFace) op.w = newFace; });
+      if (b.slots && b.slots[oldFace]) {
+        b.slots[newFace] = b.slots[oldFace];
+        delete b.slots[oldFace];
+      }
+      // Pin the choice so the runoff and the dupes review agree.
+      (unit.groups || []).forEach(function (g) {
+        if (!g || Array.isArray(g) || (g.ids || []).indexOf(newFace) < 0) return;
+        g.rep = newFace;
+      });
+    });
+  }
+
   function paintMatch(u, E, m) {
     S.stage.style.display = '';
     PT.dom.clear(S.head);
@@ -10544,6 +10979,13 @@ v1.0 - 2026-07-28 - Samuel Cao
       S.view = { z: 1, cx: 0.5, cy: 0.5 };
       loadPane(S.panes[0], m.a);
       loadPane(S.panes[1], m.b);
+    } else {
+      // Same pairing, but a face swap can rename a competitor under it. Reload
+      // only the drifted pane, and keep the shared view: the incoming frame is
+      // a near-duplicate of the outgoing one, so holding the zoom region is
+      // what lets the user compare the swap at the pixels they were already on.
+      if (S.panes[0].id !== m.a) loadPane(S.panes[0], m.a);
+      if (S.panes[1].id !== m.b) loadPane(S.panes[1], m.b);
     }
 
     S.zoomLabel = el('span', { class: 'bk-zoom', text: Math.round(S.view.z * 100) + '%' });
@@ -10574,6 +11016,23 @@ v1.0 - 2026-07-28 - Samuel Cao
     P.nat.w = 0; P.nat.h = 0;
     var nm = P.cap.querySelector('.nm');
     if (nm) nm.textContent = nameOf(id);
+
+    // A competitor standing for a burst says so, and the badge opens the
+    // bundle: swap the face here and the comparison (and every decision
+    // already made about this competitor) carries over to the chosen frame.
+    var oldBadge = P.cap.querySelector('.stack-badge');
+    if (oldBadge) oldBadge.remove();
+    var u = unitOf(S.unitId);
+    var members = (u && u.bracket && u.bracket.slots && u.bracket.slots[id]) || null;
+    if (members && members.length > 1) {
+      var badge = el('button', {
+        class: 'stack-badge stack-badge-cap', type: 'button', dataset: { t: 'bk-stack' },
+        text: String(members.length),
+        title: 'A group of ' + members.length + ' near-duplicates — click to change which one competes',
+        onclick: function (e) { e.stopPropagation(); openBracketStack(id); }
+      });
+      P.cap.insertBefore(badge, P.cap.querySelector('.spacer'));
+    }
     var blob = blobFor(id, true);
     if (blob) { PT.dom.setImg(P.img, blob); return; }
     PT.dom.setImg(P.img, null);
@@ -11014,6 +11473,13 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   plain language about choosing the best of duplicates.
  * v1.3 (2026-07-28): Adopted photournament_ui_v2.0.css; removed the injected
  *   style block.
+ * v1.4 (2026-07-28): One competitor per burst. The bracket seeds slot faces
+ *   (two frames of one burst head to head carries no information), panes badge
+ *   grouped competitors, and the badge swaps the competing face mid-bracket —
+ *   sound because ops reference matches positionally and photos only by winner
+ *   id, so rewriting pool, order and op winners hands the standing to the
+ *   chosen frame. Same-match pane reloads follow a face swap without resetting
+ *   the shared zoom.
 */
 
 </script>

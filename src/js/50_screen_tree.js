@@ -154,8 +154,11 @@
                 : { mode: 'pooled', value: null });
               return;
             }
+            // One decimal of precision, so the flip re-expresses the SAME
+            // count: 2 of 300 becomes 0.7%, which resolves back to 2 — a
+            // whole-number 1% would resolve to 3 and the row would jump.
             var share = (node.eff.mode === 'fixed' && node.subtreeCount > 0)
-              ? Math.max(1, Math.min(100, Math.round((node.eff.value / node.subtreeCount) * 100)))
+              ? Math.max(0.1, Math.min(100, Math.round((node.eff.value / node.subtreeCount) * 1000) / 10))
               : 10;
             setAlloc(path, { mode: 'percent', value: share });
           }
@@ -310,6 +313,7 @@
           title: 'How many photos the best-of-the-best round should end up with'
         });
         stageDTarget.addEventListener('input', function () {
+          if (!/^\d+$/.test(stageDTarget.value.trim())) return;
           var v = parseInt(stageDTarget.value, 10);
           if (!(v >= 1)) { stageDTarget.classList.add('invalid'); return; }
           stageDTarget.classList.remove('invalid');

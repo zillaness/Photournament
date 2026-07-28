@@ -1,6 +1,6 @@
 /**
  * file: e2e_resume.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -47,15 +47,28 @@ function chunk(t, d) {
   return Buffer.concat([l, td, c]);
 }
 function png(w, h, seed) {
+  // Structurally distinct per seed, PROVABLY: each image is a 4x4 board of
+  // high-contrast blocks whose on/off pattern is a multiplicative hash of the
+  // seed — any two seeds in this corpus differ in at least 4 of 16 blocks (a
+  // quarter of the image at full contrast), which the perceptual hash cannot
+  // read as a burst. Smooth gradients recoloured per seed DID read as bursts:
+  // the duplicate review (correctly) bundled the whole corpus into a handful
+  // of decisions, and this test lost the second screen it needs to resume onto.
   const raw = Buffer.alloc((w * 3 + 1) * h);
+  const clamp = (v) => (v < 0 ? 0 : v > 255 ? 255 : v | 0);
+  const bits = ((seed * 2654435761) >>> 16) & 0xffff;
   let p = 0, s = (seed * 2654435761) >>> 0;
   for (let y = 0; y < h; y++) {
     raw[p++] = 0;
+    const by = Math.min(3, (y * 4 / h) | 0);
     for (let x = 0; x < w; x++) {
       s = (s * 1664525 + 1013904223) >>> 0;
-      raw[p++] = (x * 7 + seed * 13 + (s >>> 24)) & 0xff;
-      raw[p++] = (y * 5 + seed * 29) & 0xff;
-      raw[p++] = ((x ^ y) + seed * 3) & 0xff;
+      const bx = Math.min(3, (x * 4 / w) | 0);
+      const on = (bits >> (by * 4 + bx)) & 1;
+      const v = (on ? 196 : 52) + ((s >>> 24) - 128) * 0.08;
+      raw[p++] = clamp(v + ((seed * 13) % 40));
+      raw[p++] = clamp(v * 0.9 + ((seed * 29) % 50));
+      raw[p++] = clamp(v * 0.8 + ((x ^ y) & 15));
     }
   }
   const i = Buffer.alloc(13);
@@ -374,4 +387,9 @@ process.exit(failed === 0 ? 0 : 1);
 /* CHANGELOG
  * v1.0 (2026-07-28): Initial release. Mid-pass and mid-bracket reload against a
  *   persistent profile, and a full Stage D run through to export.
- */
+  * v1.1 (2026-07-28): Corpus rebuilt as high-contrast block boards with provable
+ *   pairwise separation. The old recoloured gradients were near-duplicates to
+ *   the perceptual hash, and once Stage A began bundling reviewed groups into
+ *   single decisions, the whole unit fit one screen and mid-pass resume had
+ *   nothing to resume into.
+*/

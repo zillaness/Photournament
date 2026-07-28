@@ -9,7 +9,7 @@
     "build": "node tools/build.mjs && node tools/build.mjs --no-heic --out photournament_slim_v1.0.html",
     "serve": "http-server src -p 8080 -c-1",
     "serve:dist": "http-server dist -p 8081 -c-1",
-    "test": "node --test \"tests/**/*_test.mjs\" && node tests/dist_fresh.mjs && node tests/smoke_load.mjs && node tests/smoke_dist.mjs && node tests/e2e_flow.mjs && node tests/e2e_full.mjs && node tests/e2e_resume.mjs && node tests/e2e_theme.mjs && node tests/e2e_mark.mjs && node tests/e2e_stop.mjs && node tests/dupes_e2e.mjs"
+    "test": "node --test \"tests/**/*_test.mjs\" && node tests/dist_fresh.mjs && node tests/smoke_load.mjs && node tests/smoke_dist.mjs && node tests/e2e_flow.mjs && node tests/e2e_full.mjs && node tests/e2e_resume.mjs && node tests/e2e_theme.mjs && node tests/e2e_mark.mjs && node tests/e2e_stop.mjs && node tests/dupes_e2e.mjs && node tests/e2e_bundle.mjs"
   },
   "dependencies": {
     "libheif-js": "^1.19.8"

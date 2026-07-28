@@ -315,9 +315,20 @@
 
   var EXT_KIND = {
     jpg: 'jpeg', jpeg: 'jpeg', jpe: 'jpeg',
-    png: 'png', webp: 'webp',
+    png: 'png', webp: 'webp', gif: 'gif',
     heic: 'heic', heif: 'heic', hif: 'heic',
-    cr2: 'raw', nef: 'raw', arw: 'raw', dng: 'raw', raf: 'raw', orf: 'raw', rw2: 'raw'
+
+    // Out of scope but EXPECTED, and that distinction matters. A real phone-photo
+    // folder is mostly video by weight — one measured set had 175 clips at 6GB
+    // against 746 stills at 1.6GB. Lumping those in with corrupt files would
+    // produce 175 alarming "unsupported" rows describing something entirely
+    // normal, so video and raw are named categories that get counted and
+    // reported, not errors. PRD 9 puts both out of scope for v1.
+    mp4: 'video', mov: 'video', m4v: 'video', avi: 'video', mkv: 'video',
+    webm: 'video', mpg: 'video', mpeg: 'video', '3gp': 'video', wmv: 'video',
+
+    cr2: 'raw', cr3: 'raw', nef: 'raw', arw: 'raw', dng: 'raw',
+    raf: 'raw', orf: 'raw', rw2: 'raw', pef: 'raw', srw: 'raw'
   };
 
   /** PRD 7.9: flag unsupported files at load rather than dropping them silently. */
@@ -327,8 +338,22 @@
     return EXT_KIND[m[1].toLowerCase()] || 'unsupported';
   };
 
+  /**
+   * GIF is included because it decodes natively in Chromium and real folders
+   * contain a few. Only the first frame is used; nothing here animates.
+   */
   PT.isImageKind = function (kind) {
-    return kind === 'jpeg' || kind === 'png' || kind === 'webp' || kind === 'heic';
+    return kind === 'jpeg' || kind === 'png' || kind === 'webp' || kind === 'gif' || kind === 'heic';
+  };
+
+  /** Recognised, deliberately not culled. Reported as a count, never as an error. */
+  PT.isSkippedKind = function (kind) {
+    return kind === 'video' || kind === 'raw';
+  };
+
+  PT.KIND_LABEL = {
+    jpeg: 'JPEG', png: 'PNG', webp: 'WebP', gif: 'GIF', heic: 'HEIC',
+    video: 'video', raw: 'RAW', unsupported: 'unrecognised'
   };
 
   /* ------------------------------------------------------------ dom helpers */

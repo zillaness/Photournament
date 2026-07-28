@@ -128,13 +128,38 @@ const banner =
   `-->`;
 
 // Replace the dev-mode blocks wholesale, tokens included.
-html = html.replace(/<!--BUILD:CSS-->[\s\S]*?<!--\/BUILD:CSS-->/, cssBlock);
-html = html.replace(/<!--BUILD:JS-->[\s\S]*?<!--\/BUILD:JS-->/, jsBlock);
-html = html.replace('<!--BUILD:LIBHEIF-->', libheif);
+//
+// The replacements MUST be functions, never strings. In String.replace, a
+// replacement string treats $$, $&, $`, $' and $1 as substitution patterns, so
+// passing source code directly silently rewrites it. This bit for real: `$$:` in
+// a DOM helper object literal became `$:`, which redefined PT.dom.$ as
+// querySelectorAll and broke every screen — while src/ still read correctly.
+// A replacer function disables that interpretation entirely.
+html = html.replace(/<!--BUILD:CSS-->[\s\S]*?<!--\/BUILD:CSS-->/, () => cssBlock);
+html = html.replace(/<!--BUILD:JS-->[\s\S]*?<!--\/BUILD:JS-->/, () => jsBlock);
+html = html.replace('<!--BUILD:LIBHEIF-->', () => libheif);
 html = banner + '\n' + html;
 
 for (const token of ['BUILD:CSS', 'BUILD:JS', 'BUILD:LIBHEIF']) {
   if (html.includes(`<!--${token}-->`)) throw new Error(`build token ${token} was not replaced`);
+}
+
+// Every byte of every source file must survive into the artifact. This is the
+// guard against silent rewriting during assembly — the failure mode that
+// produced a working src/ and a subtly broken dist/, which is the worst kind of
+// bug this build can have.
+for (const f of js) {
+  if (!html.includes(safeForInlineScript(f.body))) {
+    throw new Error(
+      `${f.name} was altered during assembly — the artifact does not contain it verbatim. ` +
+      `Check for string-replacement pattern expansion ($$, $&, $\`, $', $1) in build.mjs.`
+    );
+  }
+}
+for (const f of css) {
+  if (!html.includes(f.body)) {
+    throw new Error(`${f.name} was altered during assembly — the artifact does not contain it verbatim.`);
+  }
 }
 
 mkdirSync(DIST, { recursive: true });

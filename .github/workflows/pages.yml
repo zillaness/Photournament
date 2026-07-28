@@ -1,0 +1,83 @@
+# file: pages.yml
+# version: 1.0
+# author: Samuel Cao
+# created: 2026-07-28
+# last_updated: 2026-07-28
+# description: Builds the single-file artifact from src/ and publishes it to GitHub Pages.
+# ai_update: Update last_updated and version. Append changelog at bottom.
+#
+# Builds rather than publishing the committed dist/, so the site can never be a
+# rebuild behind source — the same drift tests/dist_fresh.mjs guards locally.
+#
+# Nothing about the app changes when it is served: it still runs entirely in the
+# browser and still reads photos only from the folder the user picks. Serving it
+# over https actually IMPROVES it, because a real origin gets its own IndexedDB
+# bucket rather than sharing the single file__0 bucket every local HTML page in
+# the profile writes into.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master, claude/photournament-prd-v1-8-fojs7d]
+    paths:
+      - 'src/**'
+      - 'tools/build.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it midway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # libheif-js is the only dependency, and it is inlined into the artifact.
+      - run: npm ci
+
+      - run: node tools/build.mjs
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          # Pages serves index.html at the root; the artifact IS the site.
+          cp dist/photournament_v1.0.html _site/index.html
+          # Keep the versioned name available for direct download too.
+          cp dist/photournament_v1.0.html _site/
+          # Without this, Jekyll would ignore any file or folder starting with _.
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+# CHANGELOG
+# v1.0 (2026-07-28): Initial release. Builds from src and publishes the artifact
+#   as the site root.

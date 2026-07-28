@@ -1,6 +1,6 @@
 /**
  * @file 00_core.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -27,7 +27,7 @@
 
   var PT = (window.PT = window.PT || {});
 
-  PT.VERSION = '0.1';
+  PT.VERSION = '0.2';
 
   /* ---------------------------------------------------------------- logging */
 
@@ -518,4 +518,10 @@
  *   named actions and debounced persistence, IndexedDB wrapper with a namespaced
  *   database, chunked file fingerprinting, format classification, DOM and format
  *   helpers, and the screen router.
- */
+  * v1.1 (2026-07-28): Added video, RAW and GIF to format classification so a real
+ *   phone-photo folder triages correctly, with isSkippedKind separating expected
+ *   out-of-scope files from genuinely unrecognised ones. Fixed a use-after-revoke
+ *   race in dom.releaseImg: revoking an object URL while an <img> was still
+ *   decoding aborted the load, surfacing on a file:// origin as "Not allowed to
+ *   load local resource". src is now detached before revoking.
+*/

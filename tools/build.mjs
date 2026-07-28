@@ -1,6 +1,6 @@
 /**
  * file: build.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -31,7 +31,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SRC = path.join(ROOT, 'src');
 const DIST = path.join(ROOT, 'dist');
 
-const APP_VERSION = '0.1';
+const APP_VERSION = '0.2';
 const OUT_NAME = `photournament_v${APP_VERSION}.html`;
 
 const argv = process.argv.slice(2);
@@ -176,4 +176,8 @@ console.log(`       ${libheifNote}`);
  * v1.0 (2026-07-28): Initial release. Ordered concatenation, CSS and JS
  *   inlining, inert libheif payload, ESM-syntax guard, closing-tag escaping,
  *   and a --no-heic slim build.
- */
+  * v1.1 (2026-07-28): Replacements are now functions rather than strings, because
+ *   String.replace expands $$, $&, $`, $' and $1 in a replacement string and was
+ *   silently rewriting source during assembly. Added a guard asserting every
+ *   source file survives into the artifact verbatim.
+*/

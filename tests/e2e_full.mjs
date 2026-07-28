@@ -23,7 +23,7 @@ import path from 'node:path';
 import os from 'node:os';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const ARTIFACT = path.join(ROOT, 'dist', 'photournament_v0.1.html');
+const ARTIFACT = path.join(ROOT, 'dist', 'photournament_v0.2.html');
 if (!existsSync(ARTIFACT)) { console.error('run: node tools/build.mjs'); process.exit(1); }
 
 /* --------------------------------------------------------- png generator -- */

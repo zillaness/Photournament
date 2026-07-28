@@ -1,6 +1,6 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -1441,4 +1441,8 @@
  *   decided places plus depth-inferred order. Stage C runoff expands any
  *   finalist's burst into a reversible Keep-1 pass, and says so plainly when a
  *   unit has no near-duplicate groups.
- */
+  * v1.1 (2026-07-28): Held the repechage candidate pool in fixed slots so mini
+ *   brackets that did not contain the placed photo replay unchanged, and stopped
+ *   re-asking any pairing the user had already judged. 712 comparisons for a
+ *   500-photo top 20 against 1389 before, and 53 for a 32-photo top 8.
+*/

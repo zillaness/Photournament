@@ -1,5 +1,5 @@
 <!--
-  Photournament v0.1 — built 2026-07-28
+  Photournament v0.2 — built 2026-07-28
   GENERATED FILE. Do not edit; edit src/ and re-run: node tools/build.mjs
   11 script(s), 2 stylesheet(s). omitted (--no-heic): HEIC files will be flagged as unsupported.
   Open by double-clicking. Chromium only: resume and disk-write need the
@@ -386,7 +386,7 @@ kbd {
 /* ===== 00_core.js ===== */
 /**
  * @file 00_core.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -413,7 +413,7 @@ kbd {
 
   var PT = (window.PT = window.PT || {});
 
-  PT.VERSION = '0.1';
+  PT.VERSION = '0.2';
 
   /* ---------------------------------------------------------------- logging */
 
@@ -904,7 +904,13 @@ kbd {
  *   named actions and debounced persistence, IndexedDB wrapper with a namespaced
  *   database, chunked file fingerprinting, format classification, DOM and format
  *   helpers, and the screen router.
- */
+  * v1.1 (2026-07-28): Added video, RAW and GIF to format classification so a real
+ *   phone-photo folder triages correctly, with isSkippedKind separating expected
+ *   out-of-scope files from genuinely unrecognised ones. Fixed a use-after-revoke
+ *   race in dom.releaseImg: revoking an object URL while an <img> was still
+ *   decoding aborted the load, surfacing on a file:// origin as "Not allowed to
+ *   load local resource". src is now detached before revoking.
+*/
 
 </script>
 <script>
@@ -5309,7 +5315,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 70_screen_bracket.js ===== */
 /**
  * @file 70_screen_bracket.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -6750,7 +6756,11 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   decided places plus depth-inferred order. Stage C runoff expands any
  *   finalist's burst into a reversible Keep-1 pass, and says so plainly when a
  *   unit has no near-duplicate groups.
- */
+  * v1.1 (2026-07-28): Held the repechage candidate pool in fixed slots so mini
+ *   brackets that did not contain the placed photo replay unchanged, and stopped
+ *   re-asking any pairing the user had already judged. 712 comparisons for a
+ *   500-photo top 20 against 1389 before, and 53 for a 32-photo top 8.
+*/
 
 </script>
 <script>

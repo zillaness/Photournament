@@ -1,0 +1,70 @@
+<!--
+  file: index.html
+  version: 1.0
+  author: Samuel Cao
+  created: 2026-07-28
+  last_updated: 2026-07-28
+  description: Application shell for Photournament. Build tokens are replaced by tools/build.mjs to produce the single-file dist artifact.
+  ai_update: Update last_updated and version. Append changelog comment at bottom.
+
+  Two ways to run this file:
+    dev   - served over http (npm run serve), loading css/js as separate files
+    dist  - node tools/build.mjs, producing one self-contained HTML file
+
+  The dist build is the one that matters. Measured constraint: from a file://
+  origin Chromium blocks fetch, XHR, module scripts with src, and relative-URL
+  workers, so a multi-file app cannot run from a double-clicked HTML file.
+  See tools/probes/01_capability_matrix/FINDINGS.md.
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photournament</title>
+
+<!--BUILD:CSS-->
+<link rel="stylesheet" href="css/00_base.css">
+<!--/BUILD:CSS-->
+
+<div id="app">
+  <header id="topbar" hidden>
+    <div class="topbar-left">
+      <span id="topbar-title">Photournament</span>
+      <span id="topbar-context" class="muted"></span>
+    </div>
+    <div class="topbar-right">
+      <span id="topbar-counters" class="counters"></span>
+      <button id="topbar-stop" class="btn btn-quiet" hidden>Stop early</button>
+    </div>
+  </header>
+
+  <!-- The router mounts exactly one screen here at a time. -->
+  <main id="screen"></main>
+
+  <div id="toasts" aria-live="polite"></div>
+
+  <dialog id="modal">
+    <div id="modal-body"></div>
+  </dialog>
+</div>
+
+<noscript>
+  <p class="error-box">Photournament needs JavaScript. Nothing is uploaded anywhere; it all runs in this tab.</p>
+</noscript>
+
+<!--
+  libheif is parked here as inert text rather than a script. It is only turned
+  into a worker when the first HEIC is actually encountered, so a folder of
+  JPEGs never pays its parse cost. The build replaces this element's contents.
+-->
+<script type="text/plain" id="libheif-src"><!--BUILD:LIBHEIF--></script>
+
+<!--BUILD:JS-->
+<script src="js/00_core.js"></script>
+<script src="js/10_ingest_worker.js"></script>
+<script src="js/20_phash.js"></script>
+<script src="js/30_tree.js"></script>
+<!--/BUILD:JS-->
+
+<!-- CHANGELOG
+  v1.0 (2026-07-28): Initial release. Shell, screen host, toast and modal
+    containers, and build tokens for CSS, JS and the libheif payload.
+-->

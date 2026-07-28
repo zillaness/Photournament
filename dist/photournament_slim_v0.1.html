@@ -1,0 +1,3107 @@
+<!--
+  Photournament v0.1 — built 2026-07-28
+  GENERATED FILE. Do not edit; edit src/ and re-run: node tools/build.mjs
+  4 script(s), 1 stylesheet(s). omitted (--no-heic): HEIC files will be flagged as unsupported.
+  Open by double-clicking. Chromium only: resume and disk-write need the
+  File System Access API, which Chromium alone implements.
+-->
+<!--
+  file: index.html
+  version: 1.0
+  author: Samuel Cao
+  created: 2026-07-28
+  last_updated: 2026-07-28
+  description: Application shell for Photournament. Build tokens are replaced by tools/build.mjs to produce the single-file dist artifact.
+  ai_update: Update last_updated and version. Append changelog comment at bottom.
+
+  Two ways to run this file:
+    dev   - served over http (npm run serve), loading css/js as separate files
+    dist  - node tools/build.mjs, producing one self-contained HTML file
+
+  The dist build is the one that matters. Measured constraint: from a file://
+  origin Chromium blocks fetch, XHR, module scripts with src, and relative-URL
+  workers, so a multi-file app cannot run from a double-clicked HTML file.
+  See tools/probes/01_capability_matrix/FINDINGS.md.
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photournament</title>
+
+<style>
+/* ===== 00_base.css ===== */
+/**
+ * file: 00_base.css
+ * version: 1.0
+ * author: Samuel Cao
+ * created: 2026-07-28
+ * last_updated: 2026-07-28
+ * description: Design tokens, reset, layout primitives and shared components for Photournament.
+ * ai_update: Update last_updated and version. Append changelog comment at bottom.
+ *
+ * This is a tool for judging photographs, so the chrome recedes. Neutral greys
+ * only, with no colour cast anywhere near a photo: a warm or cool surround
+ * shifts how the image on top of it reads, and the whole point of the app is
+ * comparing images fairly. The single accent is reserved for the one thing the
+ * user must not miss on a screen.
+ */
+
+:root {
+  --bg:        #0d0d0e;
+  --surface:   #171719;
+  --surface-2: #202023;
+  --line:      #2e2e32;
+  --line-2:    #3d3d43;
+
+  --text:      #e8e8ea;
+  --text-dim:  #9a9aa2;
+  --text-mute: #6b6b73;
+
+  /* Desaturated so it never competes with a photograph for attention. */
+  --accent:    #5b8dd6;
+  --accent-dim:#2f4a६e;
+  --good:      #5fa87a;
+  --warn:      #c9a227;
+  --bad:       #c05a51;
+
+  --r:    6px;
+  --r-lg: 10px;
+  --gap:  12px;
+
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --topbar-h: 52px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Text selection during rapid grid clicking is pure noise. */
+body { user-select: none; }
+input, textarea, .selectable { user-select: text; }
+
+#app { display: flex; flex-direction: column; min-height: 100%; }
+
+/* ------------------------------------------------------------------ topbar */
+
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  height: var(--topbar-h);
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+#topbar[hidden] { display: none; }
+.topbar-left, .topbar-right { display: flex; align-items: center; gap: var(--gap); min-width: 0; }
+#topbar-title { font-weight: 600; letter-spacing: 0.2px; }
+#topbar-context { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.counters { display: flex; gap: 14px; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-dim); }
+.counters b { color: var(--text); font-weight: 600; }
+
+/* ------------------------------------------------------------------ screen */
+
+#screen { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.screen { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 20px; gap: 16px; }
+.screen-narrow { max-width: 820px; margin: 0 auto; width: 100%; }
+
+h1 { font-size: 21px; margin: 0; font-weight: 600; }
+h2 { font-size: 16px; margin: 0; font-weight: 600; }
+p  { margin: 0 0 10px; }
+.muted { color: var(--text-dim); }
+.dim   { color: var(--text-mute); }
+.small { font-size: 13px; }
+.mono  { font-family: var(--mono); }
+.nums  { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ button */
+
+.btn {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  padding: 7px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: #292930; border-color: #4a4a52; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #0b0b0c; font-weight: 600; }
+.btn-primary:hover:not(:disabled) { background: #6d9be0; border-color: #6d9be0; }
+.btn-quiet { background: transparent; border-color: transparent; color: var(--text-dim); }
+.btn-quiet:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+.btn-danger { border-color: var(--bad); color: var(--bad); background: transparent; }
+.btn-sm { padding: 4px 9px; font-size: 13px; }
+
+.row { display: flex; align-items: center; gap: var(--gap); flex-wrap: wrap; }
+.row-end { margin-left: auto; }
+.spacer { flex: 1; }
+
+/* ------------------------------------------------------------------ inputs */
+
+input[type="text"], input[type="number"], select, textarea {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  padding: 6px 9px;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+input.invalid { border-color: var(--bad); }
+
+label.check { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+
+/* ------------------------------------------------------------------- cards */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px;
+}
+.card-tight { padding: 12px; }
+
+/* ------------------------------------------------------------- notice boxes */
+
+.notice { border-radius: var(--r); padding: 10px 12px; font-size: 14px; border: 1px solid var(--line-2); background: var(--surface-2); }
+.notice-error { border-color: #5c2f2b; background: #2a1917; color: #f0c4c0; }
+.notice-warn  { border-color: #5c4f22; background: #262112; color: #f0e0b0; }
+.notice-note  { border-color: var(--line-2); background: var(--surface-2); color: var(--text-dim); }
+.error-box    { border: 1px solid #5c2f2b; background: #2a1917; color: #f0c4c0; padding: 12px; border-radius: var(--r); }
+
+/* --------------------------------------------------------------- progress */
+
+.bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); transition: width 120ms linear; }
+
+/* ---------------------------------------------------------------- photos */
+
+/*
+ * Photos sit on the darkest surface available with no border tint, so nothing
+ * around the frame biases the judgement being made about it.
+ */
+.thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.photo-cell {
+  position: relative;
+  background: #000;
+  border-radius: var(--r);
+  overflow: hidden;
+  border: 2px solid transparent;
+  cursor: pointer;
+  aspect-ratio: 3 / 2;
+}
+.photo-cell.kept { border-color: var(--accent); }
+.photo-cell.kept::after {
+  content: "";
+  position: absolute; inset: 0;
+  box-shadow: inset 0 0 0 2px var(--accent);
+  pointer-events: none;
+}
+.photo-cell .idx {
+  position: absolute; top: 6px; left: 6px;
+  min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.65);
+  color: var(--text-dim);
+  font-size: 12px; line-height: 20px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.photo-cell.kept .idx { background: var(--accent); color: #0b0b0c; font-weight: 600; }
+
+.grid { display: grid; gap: 10px; }
+.grid-6  { grid-template-columns: repeat(3, 1fr); }
+.grid-9  { grid-template-columns: repeat(3, 1fr); }
+.grid-12 { grid-template-columns: repeat(4, 1fr); }
+.grid-16 { grid-template-columns: repeat(4, 1fr); }
+
+/* ---------------------------------------------------------------- toasts */
+
+#toasts {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 8px; z-index: 60; pointer-events: none;
+}
+.toast {
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  padding: 9px 14px;
+  font-size: 14px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+}
+
+/* ----------------------------------------------------------------- modal */
+
+#modal {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0;
+  max-width: 560px;
+  width: calc(100vw - 40px);
+}
+#modal::backdrop { background: rgba(0,0,0,0.6); }
+#modal-body { padding: 18px; }
+
+/* ------------------------------------------------------------------ misc */
+
+.strike { text-decoration: line-through; opacity: 0.5; }
+kbd {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--surface-2); border: 1px solid var(--line-2);
+  border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px;
+}
+
+@media (max-width: 720px) {
+  .grid-12, .grid-16 { grid-template-columns: repeat(2, 1fr); }
+  .grid-6, .grid-9 { grid-template-columns: repeat(2, 1fr); }
+  .screen { padding: 14px; }
+}
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Neutral dark tokens chosen so nothing
+ *   around a photo biases judgement, reset, buttons, inputs, cards, notices,
+ *   photo cells and grid sizes, toasts and modal.
+ */
+
+</style>
+
+<div id="app">
+  <header id="topbar" hidden>
+    <div class="topbar-left">
+      <span id="topbar-title">Photournament</span>
+      <span id="topbar-context" class="muted"></span>
+    </div>
+    <div class="topbar-right">
+      <span id="topbar-counters" class="counters"></span>
+      <button id="topbar-stop" class="btn btn-quiet" hidden>Stop early</button>
+    </div>
+  </header>
+
+  <!-- The router mounts exactly one screen here at a time. -->
+  <main id="screen"></main>
+
+  <div id="toasts" aria-live="polite"></div>
+
+  <dialog id="modal">
+    <div id="modal-body"></div>
+  </dialog>
+</div>
+
+<noscript>
+  <p class="error-box">Photournament needs JavaScript. Nothing is uploaded anywhere; it all runs in this tab.</p>
+</noscript>
+
+<!--
+  libheif is parked here as inert text rather than a script. It is only turned
+  into a worker when the first HEIC is actually encountered, so a folder of
+  JPEGs never pays its parse cost. The build replaces this element's contents.
+-->
+<script type="text/plain" id="libheif-src"></script>
+
+<script>
+/* ===== 00_core.js ===== */
+/**
+ * @file 00_core.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description Core runtime for Photournament: global namespace, event bus, observable store, IndexedDB wrapper, file fingerprinting, DOM helpers, and the screen router.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * Loaded first. Every other module assumes PT, PT.bus, PT.store, PT.db and PT.dom exist.
+ *
+ * Runtime constraints this file is written against, all measured (see
+ * tools/probes/01_capability_matrix/FINDINGS.md):
+ *   - The page may be opened from file://, where window.origin is the opaque string "null".
+ *   - fetch(), XHR, module scripts with src, and relative-URL Workers are ALL CORS-blocked there.
+ *     Nothing in this file may load anything by URL.
+ *   - IndexedDB works fully on file:// and survives a browser restart, so it carries all persistence.
+ *   - Every file:// page in a Chrome profile shares ONE origin bucket named file__0. There is no
+ *     per-file isolation and the quota is shared with every other local HTML tool the user has open,
+ *     so the database name is explicitly namespaced.
+ *   - storage.persist() returns false even on localhost in a fresh profile. The cache is therefore
+ *     EVICTABLE: everything cached here must be re-derivable from the originals on disk.
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+
+  PT.VERSION = '0.1';
+
+  /* ---------------------------------------------------------------- logging */
+
+  var LOG_ON = true;
+  PT.log = function (scope) {
+    if (!LOG_ON) return;
+    var rest = Array.prototype.slice.call(arguments, 1);
+    console.log.apply(console, ['[' + scope + ']'].concat(rest));
+  };
+  PT.warn = function (scope) {
+    var rest = Array.prototype.slice.call(arguments, 1);
+    console.warn.apply(console, ['[' + scope + ']'].concat(rest));
+  };
+  PT.setLogging = function (on) { LOG_ON = !!on; };
+
+  /* -------------------------------------------------------------- event bus */
+
+  /**
+   * Fire-and-forget pub/sub. Used for cross-module notifications that are not
+   * state changes (progress ticks, screen transitions, toasts). Anything that
+   * IS state belongs in the store instead, so it persists and replays.
+   */
+  var listeners = Object.create(null);
+
+  PT.bus = {
+    /** @returns {function():void} unsubscribe */
+    on: function (name, fn) {
+      (listeners[name] || (listeners[name] = [])).push(fn);
+      return function () { PT.bus.off(name, fn); };
+    },
+    once: function (name, fn) {
+      var un = PT.bus.on(name, function (d) { un(); fn(d); });
+      return un;
+    },
+    off: function (name, fn) {
+      var a = listeners[name];
+      if (!a) return;
+      var i = a.indexOf(fn);
+      if (i >= 0) a.splice(i, 1);
+    },
+    emit: function (name, detail) {
+      var a = listeners[name];
+      if (!a) return;
+      // Copy: a handler may unsubscribe during dispatch.
+      a.slice().forEach(function (fn) {
+        try { fn(detail); } catch (e) { PT.warn('bus', 'handler for "' + name + '" threw', e); }
+      });
+    }
+  };
+
+  /* ------------------------------------------------------------------ store */
+
+  /**
+   * Single source of truth. Mutations go through dispatch(name, mutatorFn) so that
+   * every change has a name, subscribers fire once, and persistence is automatic
+   * rather than something each screen has to remember.
+   *
+   * The decision JSON of PRD 7.8 falls out of the action log rather than being
+   * assembled separately at export time.
+   */
+  var state = null;
+  var subs = [];
+  var actionLog = [];
+  var saveTimer = null;
+  var SAVE_DEBOUNCE_MS = 400;
+
+  PT.store = {
+    get: function () { return state; },
+
+    init: function (initial) {
+      state = initial;
+      actionLog = [];
+      subs.slice().forEach(function (fn) { fn(state, '@init'); });
+    },
+
+    /**
+     * @param {string} name  action name, recorded in the log
+     * @param {function(object):void} fn  mutates state in place
+     * @param {{silent?:boolean, transient?:boolean}} [opts]
+     *        silent    - do not notify subscribers (batching)
+     *        transient - do not record in the action log or trigger a save
+     *                    (use for high-frequency UI-only changes like hover)
+     */
+    dispatch: function (name, fn, opts) {
+      opts = opts || {};
+      if (!state) throw new Error('PT.store.dispatch before init');
+      fn(state);
+      if (!opts.transient) {
+        actionLog.push({ t: Date.now(), a: name });
+        scheduleSave();
+      }
+      if (!opts.silent) {
+        subs.slice().forEach(function (s) {
+          try { s(state, name); } catch (e) { PT.warn('store', 'subscriber threw on "' + name + '"', e); }
+        });
+      }
+    },
+
+    subscribe: function (fn) {
+      subs.push(fn);
+      return function () {
+        var i = subs.indexOf(fn);
+        if (i >= 0) subs.splice(i, 1);
+      };
+    },
+
+    actionLog: function () { return actionLog.slice(); },
+
+    /** Force an immediate write, bypassing the debounce. Called before unload. */
+    flush: function () {
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      return persist();
+    }
+  };
+
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { saveTimer = null; persist(); }, SAVE_DEBOUNCE_MS);
+  }
+
+  function persist() {
+    if (!state || !state.session) return Promise.resolve();
+    // Photo Blobs live in their own store keyed by id; the session record holds
+    // only structured data, so a save stays small and fast even at 500 photos.
+    var snapshot = PT.serializeSession ? PT.serializeSession(state) : state.session;
+    return PT.db.put('sessions', snapshot).catch(function (e) {
+      PT.warn('store', 'persist failed', e);
+    });
+  }
+
+  /* --------------------------------------------------------------- indexeddb */
+
+  /**
+   * Namespaced because every file:// page shares the single file__0 origin bucket
+   * with every other local tool the user has ever opened.
+   */
+  var DB_NAME = 'photournament/v1';
+  var DB_VERSION = 1;
+
+  var STORES = {
+    sessions:    { keyPath: 'id' },
+    photos:      { keyPath: 'id' },   // photo records minus Blobs
+    derivatives: { keyPath: 'id' },   // {id, thumb: Blob, preview: Blob, sidecar: Blob|null}
+    handles:     { keyPath: 'key' }   // {key, handle} — FileSystemDirectoryHandle, structured-cloneable
+  };
+
+  var dbPromise = null;
+
+  function openDb() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function (resolve, reject) {
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function (e) {
+        var db = e.target.result;
+        Object.keys(STORES).forEach(function (name) {
+          if (!db.objectStoreNames.contains(name)) {
+            db.createObjectStore(name, STORES[name]);
+          }
+        });
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+      req.onblocked = function () { PT.warn('db', 'open blocked by another tab'); };
+    });
+    return dbPromise;
+  }
+
+  function tx(storeName, mode, fn) {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var t = db.transaction(storeName, mode);
+        var store = t.objectStore(storeName);
+        var out;
+        try { out = fn(store); } catch (e) { reject(e); return; }
+        t.oncomplete = function () { resolve(out && out.result !== undefined ? out.result : out); };
+        t.onerror = function () { reject(t.error); };
+        t.onabort = function () { reject(t.error || new Error('transaction aborted')); };
+      });
+    });
+  }
+
+  PT.db = {
+    name: DB_NAME,
+
+    get: function (store, key) {
+      return tx(store, 'readonly', function (s) { return s.get(key); });
+    },
+    put: function (store, value) {
+      return tx(store, 'readwrite', function (s) { return s.put(value); });
+    },
+    /** Writes many records in ONE transaction — materially faster at 500 photos. */
+    putAll: function (store, values) {
+      return tx(store, 'readwrite', function (s) {
+        values.forEach(function (v) { s.put(v); });
+        return values.length;
+      });
+    },
+    del: function (store, key) {
+      return tx(store, 'readwrite', function (s) { return s.delete(key); });
+    },
+    clear: function (store) {
+      return tx(store, 'readwrite', function (s) { return s.clear(); });
+    },
+    all: function (store) {
+      return tx(store, 'readonly', function (s) { return s.getAll(); });
+    },
+    keys: function (store) {
+      return tx(store, 'readonly', function (s) { return s.getAllKeys(); });
+    },
+
+    /**
+     * Cache size for PRD section 8's "show cache size, offer clear-cache" mitigation.
+     * usageDetails.indexedDB is the honest number; quota tracks free disk.
+     */
+    usage: function () {
+      if (!navigator.storage || !navigator.storage.estimate) {
+        return Promise.resolve({ usage: 0, quota: 0, idb: 0, supported: false });
+      }
+      return navigator.storage.estimate().then(function (e) {
+        return {
+          usage: e.usage || 0,
+          quota: e.quota || 0,
+          idb: (e.usageDetails && e.usageDetails.indexedDB) || 0,
+          supported: true
+        };
+      });
+    },
+
+    /**
+     * Best-effort. Measured to return false even on localhost in a fresh profile,
+     * so callers must treat a false result as normal, not as an error.
+     */
+    requestPersistence: function () {
+      if (!navigator.storage || !navigator.storage.persist) return Promise.resolve(false);
+      return navigator.storage.persist().catch(function () { return false; });
+    }
+  };
+
+  /* ------------------------------------------------------------ fingerprint */
+
+  /**
+   * PRD 7.9: fingerprint each photo as hash + filename + byte size + last modified,
+   * so cached derivatives and decisions re-associate on return.
+   *
+   * Only the first and last 64KB are hashed rather than the whole file. Reading
+   * 500 x 3MB through crypto.subtle at ingest would cost more than the decode it
+   * is meant to let us skip, and combined with exact size + mtime + name the
+   * collision risk is not meaningful for a local photo folder.
+   */
+  var FP_CHUNK = 65536;
+
+  PT.fingerprint = function (file, path) {
+    var head = file.slice(0, Math.min(FP_CHUNK, file.size));
+    var tail = file.size > FP_CHUNK ? file.slice(Math.max(0, file.size - FP_CHUNK)) : null;
+    var parts = tail ? [head, tail] : [head];
+
+    return Promise.all(parts.map(function (b) { return b.arrayBuffer(); }))
+      .then(function (bufs) {
+        var total = bufs.reduce(function (n, b) { return n + b.byteLength; }, 0);
+        var merged = new Uint8Array(total);
+        var off = 0;
+        bufs.forEach(function (b) { merged.set(new Uint8Array(b), off); off += b.byteLength; });
+        return crypto.subtle.digest('SHA-256', merged);
+      })
+      .then(function (digest) {
+        var hex = Array.prototype.map
+          .call(new Uint8Array(digest, 0, 12), function (b) { return ('0' + b.toString(16)).slice(-2); })
+          .join('');
+        // Path is included so the same file copied into two folders stays two
+        // photos — PRD section 4 allocates by folder, so identity is per-location.
+        return hex + '-' + hash32(path + '|' + file.size + '|' + file.lastModified);
+      });
+  };
+
+  function hash32(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+
+  /* ----------------------------------------------------------------- format */
+
+  var EXT_KIND = {
+    jpg: 'jpeg', jpeg: 'jpeg', jpe: 'jpeg',
+    png: 'png', webp: 'webp',
+    heic: 'heic', heif: 'heic', hif: 'heic',
+    cr2: 'raw', nef: 'raw', arw: 'raw', dng: 'raw', raf: 'raw', orf: 'raw', rw2: 'raw'
+  };
+
+  /** PRD 7.9: flag unsupported files at load rather than dropping them silently. */
+  PT.kindOf = function (filename) {
+    var m = /\.([A-Za-z0-9]+)$/.exec(filename || '');
+    if (!m) return 'unsupported';
+    return EXT_KIND[m[1].toLowerCase()] || 'unsupported';
+  };
+
+  PT.isImageKind = function (kind) {
+    return kind === 'jpeg' || kind === 'png' || kind === 'webp' || kind === 'heic';
+  };
+
+  /* ------------------------------------------------------------ dom helpers */
+
+  PT.dom = {
+    el: function (tag, attrs, children) {
+      var n = document.createElement(tag);
+      if (attrs) {
+        Object.keys(attrs).forEach(function (k) {
+          var v = attrs[k];
+          if (v == null || v === false) return;
+          if (k === 'class') n.className = v;
+          else if (k === 'text') n.textContent = v;
+          else if (k === 'html') n.innerHTML = v;
+          else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2).toLowerCase(), v);
+          else if (k === 'dataset') Object.keys(v).forEach(function (d) { n.dataset[d] = v[d]; });
+          else n.setAttribute(k, v === true ? '' : v);
+        });
+      }
+      (children || []).forEach(function (c) {
+        if (c == null) return;
+        n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+      });
+      return n;
+    },
+    $: function (sel, root) { return (root || document).querySelector(sel); },
+    $: function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); },
+    clear: function (node) { while (node.firstChild) node.removeChild(node.firstChild); return node; },
+
+    /**
+     * Object URLs are revoked on replacement. At 500 photos, leaking one per
+     * thumbnail keeps every Blob alive and defeats the bounded-memory strategy
+     * PRD section 8 depends on.
+     */
+    setImg: function (img, blob) {
+      if (img._ptUrl) URL.revokeObjectURL(img._ptUrl);
+      if (!blob) { img.removeAttribute('src'); img._ptUrl = null; return; }
+      img._ptUrl = URL.createObjectURL(blob);
+      img.src = img._ptUrl;
+    },
+    releaseImg: function (img) {
+      if (img && img._ptUrl) { URL.revokeObjectURL(img._ptUrl); img._ptUrl = null; }
+    }
+  };
+
+  PT.fmt = {
+    bytes: function (n) {
+      if (!n) return '0 B';
+      var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
+      while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+      return (i === 0 ? n : n.toFixed(n < 10 ? 1 : 0)) + ' ' + u[i];
+    },
+    pct: function (x) { return Math.round(x * 100) + '%'; },
+    duration: function (ms) {
+      var s = Math.round(ms / 1000);
+      if (s < 60) return s + 's';
+      var m = Math.floor(s / 60);
+      return m + 'm ' + (s % 60) + 's';
+    },
+    /** Zero-padded ordinal for PRD 7.8 export prefixes. */
+    ordinal: function (n, total) {
+      var width = Math.max(2, String(total || 0).length);
+      return ('0000' + n).slice(-width);
+    }
+  };
+
+  /* ----------------------------------------------------------------- router */
+
+  /**
+   * Screens are registered by name and own one container element. Only one is
+   * mounted at a time; the previous screen's unmount() must release object URLs
+   * and detach listeners, which is what keeps memory flat across stage changes.
+   */
+  var screens = Object.create(null);
+  var current = null;
+
+  PT.router = {
+    register: function (name, def) { screens[name] = def; },
+
+    go: function (name, params) {
+      var next = screens[name];
+      if (!next) throw new Error('unknown screen: ' + name);
+      if (current && current.def.unmount) {
+        try { current.def.unmount(current.root); } catch (e) { PT.warn('router', 'unmount threw', e); }
+      }
+      var host = PT.dom.$('#screen');
+      PT.dom.clear(host);
+      var root = PT.dom.el('div', { class: 'screen screen-' + name });
+      host.appendChild(root);
+      current = { name: name, def: next, root: root, params: params || {} };
+      document.body.dataset.screen = name;
+      PT.bus.emit('screen:change', { name: name, params: params || {} });
+      try {
+        next.mount(root, params || {});
+      } catch (e) {
+        PT.warn('router', 'mount threw for ' + name, e);
+        root.appendChild(PT.dom.el('div', { class: 'error-box', text: 'This screen failed to load: ' + e.message }));
+      }
+      return current;
+    },
+
+    current: function () { return current ? current.name : null; },
+    params: function () { return current ? current.params : {}; },
+    /** Re-run mount with the same params, e.g. after a settings change. */
+    refresh: function () { if (current) PT.router.go(current.name, current.params); }
+  };
+
+  /* ------------------------------------------------------------------ boot */
+
+  PT.ready = function (fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  };
+
+  // A mid-pass Stage A position is worth more than the few ms this costs.
+  window.addEventListener('beforeunload', function () { PT.store.flush(); });
+
+  PT.env = {
+    isFileOrigin: location.protocol === 'file:',
+    hasFSA: typeof window.showDirectoryPicker === 'function',
+    cores: navigator.hardwareConcurrency || 4,
+    /**
+     * Disk write and resume need a directory handle, which needs the File System
+     * Access API. Loose dragged files degrade to a session-only run — PRD section 8
+     * requires that be stated plainly rather than failing quietly.
+     */
+    canPersistToDisk: function () { return PT.env.hasFSA; }
+  };
+
+  PT.log('core', 'ready', {
+    version: PT.VERSION,
+    origin: location.protocol,
+    fsa: PT.env.hasFSA,
+    cores: PT.env.cores
+  });
+})();
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Namespace, event bus, observable store with
+ *   named actions and debounced persistence, IndexedDB wrapper with a namespaced
+ *   database, chunked file fingerprinting, format classification, DOM and format
+ *   helpers, and the screen router.
+ */
+
+</script>
+<script>
+/* ===== 10_ingest_worker.js ===== */
+/**
+ * @file 10_ingest_worker.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description PRD 7.9 ingest: a blob-URL worker pool that decodes JPEG/PNG/WebP/HEIC off the main thread and emits thumbnails, previews, perceptual hashes, sharpness scores and stable fingerprints.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ */
+
+/* eslint-env browser */
+/* global PT */
+(function (global) {
+  'use strict';
+
+  var PT = (global.PT = global.PT || {});
+  var ingest = (PT.ingest = PT.ingest || {});
+
+  function log() {
+    if (typeof PT.log === 'function') {
+      try {
+        PT.log.apply(PT, ['ingest'].concat(Array.prototype.slice.call(arguments)));
+      } catch (e) {
+        /* logging must never break ingest */
+      }
+    }
+  }
+  function emit(name, detail) {
+    if (PT.bus && typeof PT.bus.emit === 'function') {
+      try {
+        PT.bus.emit(name, detail);
+      } catch (e) {
+        /* a listener throwing must not abort the pool */
+      }
+    }
+  }
+
+  // =========================================================================
+  // SHARED CODE
+  //
+  // This function is installed on the main thread AND stringified into the
+  // worker source, so format sniffing, orientation parsing and fingerprinting
+  // are byte-identical in both places. A fingerprint that differed between the
+  // two would silently break resume (PRD 7.10), so they must not be two
+  // implementations that merely look the same.
+  //
+  // It must not close over anything outside itself.
+  // =========================================================================
+  function PT_INGEST_SHARED(g) {
+    'use strict';
+    var H = {};
+    g.__PTI = H;
+
+    H.MAX_PIXELS = 200e6; // refuse absurd dimensions rather than OOM the tab
+
+    // ---- format sniffing -------------------------------------------------
+    // Magic bytes, never the extension. PRD 7.9 requires unsupported files be
+    // flagged rather than dropped, and a .txt renamed to .jpg must be caught.
+    var HEIF_BRANDS = {
+      heic: 1, heix: 1, heim: 1, heis: 1, hevc: 1, hevx: 1, hevm: 1, hevs: 1,
+      mif1: 1, msf1: 1, miaf: 1, mia1: 1
+    };
+    H.sniff = function (u8) {
+      var n = u8.length;
+      if (n >= 3 && u8[0] === 0xff && u8[1] === 0xd8 && u8[2] === 0xff) return { kind: 'jpeg', format: 'jpeg' };
+      if (n >= 8 && u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47 &&
+          u8[4] === 0x0d && u8[5] === 0x0a && u8[6] === 0x1a && u8[7] === 0x0a) return { kind: 'png', format: 'png' };
+      if (n >= 12 && u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46 &&
+          u8[8] === 0x57 && u8[9] === 0x45 && u8[10] === 0x42 && u8[11] === 0x50) return { kind: 'webp', format: 'webp' };
+      if (n >= 12 && u8[4] === 0x66 && u8[5] === 0x74 && u8[6] === 0x79 && u8[7] === 0x70) {
+        var brand = String.fromCharCode(u8[8], u8[9], u8[10], u8[11]);
+        if (HEIF_BRANDS[brand]) return { kind: 'heic', format: 'heic:' + brand };
+        if (brand === 'avif' || brand === 'avis') return { kind: 'unsupported', format: 'avif' };
+        return { kind: 'unsupported', format: 'iso-bmff:' + brand };
+      }
+      if (n >= 6 && u8[0] === 0x47 && u8[1] === 0x49 && u8[2] === 0x46) return { kind: 'unsupported', format: 'gif' };
+      if (n >= 2 && u8[0] === 0x42 && u8[1] === 0x4d) return { kind: 'unsupported', format: 'bmp' };
+      if (n >= 4 && ((u8[0] === 0x49 && u8[1] === 0x49 && u8[2] === 0x2a) || (u8[0] === 0x4d && u8[1] === 0x4d && u8[3] === 0x2a)))
+        return { kind: 'unsupported', format: 'tiff' };
+      if (n === 0) return { kind: 'unsupported', format: 'empty' };
+      return { kind: 'unsupported', format: 'unrecognised' };
+    };
+
+    // ---- EXIF ------------------------------------------------------------
+    // Reads only tag 0x0112 (Orientation) out of IFD0. Deliberately tiny: a
+    // general EXIF parser is not needed and is a much bigger attack surface on
+    // malformed files.
+    H.exifOrientationFromTiff = function (u8, tiffStart) {
+      try {
+        if (tiffStart + 8 > u8.length) return 0;
+        var le;
+        if (u8[tiffStart] === 0x49 && u8[tiffStart + 1] === 0x49) le = true;
+        else if (u8[tiffStart] === 0x4d && u8[tiffStart + 1] === 0x4d) le = false;
+        else return 0;
+        var dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+        if (dv.getUint16(tiffStart + 2, le) !== 42) return 0;
+        var ifd = tiffStart + dv.getUint32(tiffStart + 4, le);
+        if (ifd + 2 > u8.length) return 0;
+        var count = dv.getUint16(ifd, le);
+        if (count > 1024) return 0;
+        for (var i = 0; i < count; i++) {
+          var e = ifd + 2 + i * 12;
+          if (e + 12 > u8.length) return 0;
+          if (dv.getUint16(e, le) === 0x0112) {
+            var v = dv.getUint16(e + 8, le);
+            return v >= 1 && v <= 8 ? v : 0;
+          }
+        }
+      } catch (err) {
+        /* malformed EXIF is not an ingest failure */
+      }
+      return 0;
+    };
+
+    H.jpegOrientation = function (u8) {
+      // Walk JPEG markers looking for APP1/Exif. Bounded to the header region;
+      // EXIF never legitimately appears after the first few segments.
+      var p = 2;
+      var limit = Math.min(u8.length, 4 * 1024 * 1024);
+      while (p + 4 <= limit) {
+        if (u8[p] !== 0xff) { p++; continue; }
+        var marker = u8[p + 1];
+        if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { p += 2; continue; }
+        if (marker === 0xda || marker === 0xd9) break; // start of scan / end
+        var len = (u8[p + 2] << 8) | u8[p + 3];
+        if (len < 2) break;
+        if (marker === 0xe1 && p + 4 + 6 <= u8.length &&
+            u8[p + 4] === 0x45 && u8[p + 5] === 0x78 && u8[p + 6] === 0x69 && u8[p + 7] === 0x66 &&
+            u8[p + 8] === 0x00) {
+          var o = H.exifOrientationFromTiff(u8, p + 10);
+          if (o) return o;
+        }
+        p += 2 + len;
+      }
+      return 0;
+    };
+
+    // ---- ISO-BMFF / HEIF -------------------------------------------------
+    H.bmffChildren = function (u8, start, end) {
+      var out = [];
+      var dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+      var off = start;
+      var guard = 0;
+      while (off + 8 <= end && guard++ < 4096) {
+        var size = dv.getUint32(off);
+        var type = String.fromCharCode(u8[off + 4], u8[off + 5], u8[off + 6], u8[off + 7]);
+        var hdr = 8;
+        if (size === 1) {
+          if (off + 16 > end) break;
+          size = Number(dv.getBigUint64(off + 8));
+          hdr = 16;
+        } else if (size === 0) size = end - off;
+        if (size < hdr || off + size > end) break;
+        out.push({ off: off, size: size, type: type, body: off + hdr });
+        off += size;
+      }
+      return out;
+    };
+
+    // Returns {orientation, hasTransform, transform:{irot,imir}} for a HEIF file.
+    // hasTransform is the important one: libheif applies irot/imir itself, so a
+    // file that carries them must NOT also have EXIF orientation applied on top.
+    H.heifMeta = function (u8) {
+      var res = { orientation: 0, hasTransform: false, irot: 0, imir: -1 };
+      try {
+        var dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+        var top = H.bmffChildren(u8, 0, u8.length);
+        var meta = null;
+        for (var i = 0; i < top.length; i++) if (top[i].type === 'meta') meta = top[i];
+        if (!meta) return res;
+        var kids = H.bmffChildren(u8, meta.body + 4, meta.off + meta.size); // meta is a FullBox
+        var iinf = null, iloc = null, iprp = null;
+        for (var j = 0; j < kids.length; j++) {
+          if (kids[j].type === 'iinf') iinf = kids[j];
+          else if (kids[j].type === 'iloc') iloc = kids[j];
+          else if (kids[j].type === 'iprp') iprp = kids[j];
+        }
+
+        // -- irot / imir, anywhere in ipco
+        if (iprp) {
+          var ip = H.bmffChildren(u8, iprp.body, iprp.off + iprp.size);
+          for (var k = 0; k < ip.length; k++) {
+            if (ip[k].type !== 'ipco') continue;
+            var props = H.bmffChildren(u8, ip[k].body, ip[k].off + ip[k].size);
+            for (var m = 0; m < props.length; m++) {
+              if (props[m].type === 'irot') {
+                res.irot = u8[props[m].body] & 3;
+                if (res.irot) res.hasTransform = true;
+              } else if (props[m].type === 'imir') {
+                res.imir = u8[props[m].body] & 1;
+                res.hasTransform = true;
+              }
+            }
+          }
+        }
+
+        // -- locate the 'Exif' item via iinf, then its bytes via iloc
+        if (!iinf || !iloc) return res;
+        var exifId = -1;
+        var iinfVer = u8[iinf.body];
+        var ep = iinf.body + 4;
+        var nEntries;
+        if (iinfVer === 0) { nEntries = dv.getUint16(ep); ep += 2; } else { nEntries = dv.getUint32(ep); ep += 4; }
+        var infes = H.bmffChildren(u8, ep, iinf.off + iinf.size);
+        for (var q = 0; q < infes.length && q < nEntries + 4; q++) {
+          var box = infes[q];
+          if (box.type !== 'infe') continue;
+          var ver = u8[box.body];
+          if (ver < 2) continue;
+          var b = box.body + 4;
+          var itemId = ver === 2 ? dv.getUint16(b) : dv.getUint32(b);
+          b += ver === 2 ? 2 : 4;
+          b += 2; // protection index
+          var itemType = String.fromCharCode(u8[b], u8[b + 1], u8[b + 2], u8[b + 3]);
+          if (itemType === 'Exif') { exifId = itemId; break; }
+        }
+        if (exifId < 0) return res;
+
+        var lp = iloc.body;
+        var lver = u8[lp];
+        lp += 4;
+        var offsetSize = u8[lp] >> 4;
+        var lengthSize = u8[lp] & 15;
+        var baseOffsetSize = u8[lp + 1] >> 4;
+        var indexSize = lver === 1 || lver === 2 ? u8[lp + 1] & 15 : 0;
+        lp += 2;
+        var itemCount;
+        if (lver < 2) { itemCount = dv.getUint16(lp); lp += 2; } else { itemCount = dv.getUint32(lp); lp += 4; }
+        var rd = function (o, n) {
+          if (n === 0) return 0;
+          if (n === 4) return dv.getUint32(o);
+          if (n === 8) return Number(dv.getBigUint64(o));
+          var v = 0;
+          for (var z = 0; z < n; z++) v = v * 256 + u8[o + z];
+          return v;
+        };
+        for (var it = 0; it < itemCount; it++) {
+          var id = lver < 2 ? dv.getUint16(lp) : dv.getUint32(lp);
+          lp += lver < 2 ? 2 : 4;
+          var construction = 0;
+          if (lver === 1 || lver === 2) { construction = dv.getUint16(lp) & 15; lp += 2; }
+          lp += 2; // data_reference_index
+          var base = rd(lp, baseOffsetSize);
+          lp += baseOffsetSize;
+          var extents = dv.getUint16(lp);
+          lp += 2;
+          for (var x = 0; x < extents; x++) {
+            if (indexSize) lp += indexSize;
+            var eo = rd(lp, offsetSize);
+            lp += offsetSize;
+            var el = rd(lp, lengthSize);
+            lp += lengthSize;
+            if (id === exifId && construction === 0 && x === 0) {
+              var payload = base + eo;
+              if (payload + 4 < u8.length) {
+                // Exif item payload: 4-byte header offset, then the TIFF header.
+                var skip = dv.getUint32(payload);
+                var tiff = payload + 4 + skip;
+                var o2 = H.exifOrientationFromTiff(u8, tiff);
+                if (!o2) o2 = H.exifOrientationFromTiff(u8, payload + 4);
+                if (o2) res.orientation = o2;
+              }
+              void el;
+            }
+          }
+        }
+      } catch (err) {
+        /* orientation is best-effort; never fail an ingest over it */
+      }
+      return res;
+    };
+
+    // ---- fingerprint (PRD 7.9: hash + filename + byte size + last modified) --
+    H.hex = function (buf) {
+      var v = new Uint8Array(buf);
+      var s = '';
+      for (var i = 0; i < v.length; i++) s += (v[i] < 16 ? '0' : '') + v[i].toString(16);
+      return s;
+    };
+    H.sha256Hex = function (bytes) {
+      var ab;
+      if (bytes instanceof ArrayBuffer) ab = bytes;
+      else if (bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength) ab = bytes.buffer;
+      else ab = bytes.slice().buffer;
+      return g.crypto.subtle.digest('SHA-256', ab).then(H.hex);
+    };
+    H.fingerprint = function (bytes, name, size, lastMod) {
+      return H.sha256Hex(bytes).then(function (contentHash) {
+        var meta = contentHash + '|' + String(name == null ? '' : name) + '|' + String(size) + '|' + String(lastMod || 0);
+        return H.sha256Hex(new TextEncoder().encode(meta));
+      });
+    };
+
+    // ---- perceptual hash (self-contained dhash) --------------------------
+    // Inlined so the worker has no load-order dependency on 20_phash.js.
+    // If a compatible PT.phash turns up at runtime it wins; see workerPhash.
+    H.dhashFromGray = function (gray, gw, gh) {
+      var W = 9, Hh = 8;
+      var small = new Float32Array(W * Hh);
+      for (var y = 0; y < Hh; y++) {
+        for (var x = 0; x < W; x++) {
+          // bilinear sample of the source grid
+          var fx = ((x + 0.5) * gw) / W - 0.5;
+          var fy = ((y + 0.5) * gh) / Hh - 0.5;
+          var x0 = Math.floor(fx), y0 = Math.floor(fy);
+          var tx = fx - x0, ty = fy - y0;
+          var x1 = x0 + 1, y1 = y0 + 1;
+          if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
+          if (x1 > gw - 1) x1 = gw - 1; if (y1 > gh - 1) y1 = gh - 1;
+          if (x0 > gw - 1) x0 = gw - 1; if (y0 > gh - 1) y0 = gh - 1;
+          var a = gray[y0 * gw + x0], b = gray[y0 * gw + x1];
+          var c = gray[y1 * gw + x0], d = gray[y1 * gw + x1];
+          small[y * W + x] = a + (b - a) * tx + (c - a + (d - c - b + a) * tx) * ty;
+        }
+      }
+      var bits = new Uint8Array(64);
+      var i = 0;
+      for (var yy = 0; yy < Hh; yy++) {
+        for (var xx = 0; xx < W - 1; xx++) {
+          bits[i++] = small[yy * W + xx] < small[yy * W + xx + 1] ? 1 : 0;
+        }
+      }
+      var out = '';
+      for (var n = 0; n < 64; n += 4) {
+        out += ((bits[n] << 3) | (bits[n + 1] << 2) | (bits[n + 2] << 1) | bits[n + 3]).toString(16);
+      }
+      return out;
+    };
+
+    // ---- sharpness: variance of the Laplacian on a normalised grayscale ---
+    H.sharpness = function (gray, w, h) {
+      if (w < 3 || h < 3) return 0;
+      var sum = 0, sum2 = 0, n = 0;
+      for (var y = 1; y < h - 1; y++) {
+        for (var x = 1; x < w - 1; x++) {
+          var i = y * w + x;
+          var l = gray[i - 1] + gray[i + 1] + gray[i - w] + gray[i + w] - 4 * gray[i];
+          sum += l;
+          sum2 += l * l;
+          n++;
+        }
+      }
+      if (!n) return 0;
+      var mean = sum / n;
+      return Math.round((sum2 / n - mean * mean) * 100) / 100;
+    };
+
+    H.grayFromRGBA = function (data, w, h) {
+      var gray = new Float32Array(w * h);
+      for (var i = 0, p = 0; i < gray.length; i++, p += 4) {
+        gray[i] = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+      }
+      return gray;
+    };
+
+    // ---- orientation maths -----------------------------------------------
+    H.swapsAxes = function (o) { return o >= 5 && o <= 8; };
+
+    // A 16x4 JPEG carrying EXIF Orientation=6, used as a runtime self-test for
+    // whether createImageBitmap applies EXIF for us. It has to be measured, not
+    // assumed: Chromium deprecated imageOrientation:'none' and now silently
+    // treats it as 'from-image', which double-rotates anything that also
+    // applies the transform by hand. 803 bytes.
+    H.EXIF_PROBE_JPEG_B64 =
+      '/9j/4QAiRXhpZgAATU0AKgAAAAgAAQESAAMAAAABAAYAAAAAAAD/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQ' +
+      'EAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYA' +
+      'AQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWF' +
+      'laAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJD' +
+      'AAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AA' +
+      'ADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQA' +
+      'AAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQ' +
+      'BuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQYHjIhHhwcHj0sLiQySUBMS0dARkVQWnNiUFVtVkVGZIhlbXd7gYKB' +
+      'TmCNl4x9lnN+gXz/2wBDARUXFx4aHjshITt8U0ZTfHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fH' +
+      'x8fHx8fHz/wAARCAAEABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAYEAEAAwEAAAAAAAAAAAAAAAAAB0WD' +
+      'wv/EABQBAQAAAAAAAAAAAAAAAAAAAAD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwBIVfpyjAB//9k=';
+    H.EXIF_PROBE_UNROTATED = [16, 4];
+
+    H.b64ToBlob = function (b64, type) {
+      var bin = atob(b64);
+      var u = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      return new Blob([u], { type: type });
+    };
+
+    // Applies the EXIF transform in DESTINATION space. w/h are the *scaled,
+    // unrotated* draw dimensions; the canvas must already be sized
+    // swapsAxes(o) ? (h,w) : (w,h).
+    H.applyOrientation = function (ctx, o, w, h) {
+      switch (o) {
+        case 2: ctx.transform(-1, 0, 0, 1, w, 0); break;
+        case 3: ctx.transform(-1, 0, 0, -1, w, h); break;
+        case 4: ctx.transform(1, 0, 0, -1, 0, h); break;
+        case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;
+        case 6: ctx.transform(0, 1, -1, 0, h, 0); break;
+        case 7: ctx.transform(0, -1, -1, 0, h, w); break;
+        case 8: ctx.transform(0, -1, 1, 0, 0, w); break;
+        default: break;
+      }
+    };
+
+    H.blankRecord = function (meta) {
+      meta = meta || {};
+      var path = meta.path || meta.name || '';
+      var slash = path.lastIndexOf('/');
+      return {
+        id: meta.id || '',
+        name: meta.name || (slash >= 0 ? path.slice(slash + 1) : path),
+        path: path,
+        dir: meta.dir != null ? meta.dir : slash > 0 ? path.slice(0, slash) : '',
+        size: meta.size || 0,
+        lastMod: meta.lastMod || 0,
+        kind: meta.kind || 'unsupported',
+        w: 0,
+        h: 0,
+        thumb: null,
+        preview: null,
+        phash: null,
+        sharp: null,
+        err: null
+      };
+    };
+
+    return H;
+  }
+
+  // =========================================================================
+  // WORKER BODY
+  //
+  // Stringified via Function.prototype.toString and spawned from a blob URL,
+  // because probe 01 proved new Worker('./x.js') is a SecurityError on file://
+  // (opaque 'null' origin) while blob-URL workers are fine.
+  //
+  // It must not close over anything outside itself.
+  // =========================================================================
+  function PT_INGEST_WORKER(self) {
+    'use strict';
+    var H = self.__PTI;
+
+    var cfg = {
+      thumbPx: 320,
+      previewPx: 1600,
+      thumbQuality: 0.8,
+      previewQuality: 0.85,
+      libheifUrl: null,
+      libheifSrc: null,
+      askBeforeDecode: false,
+      decodeTimeoutMs: 180000
+    };
+
+    // ONE HeifDecoder for the whole worker lifetime. Probe 02 measured that a
+    // per-image decoder strands a heif_context in the Emscripten heap forever:
+    // 6.35 MB per image, ~3.2 GB at 500 photos. The context is only released by
+    // the NEXT decode() on the same instance, so the instance must be shared.
+    var heifDecoder = null;
+    var heifModule = null;
+    var heifLoading = null;
+    var heifError = null;
+
+    // The libheif display() callback runs inside a setTimeout, so a throw in
+    // there lands as an uncaught worker error rather than a rejection. Park the
+    // active rejector here so the global error handler can fail the right job.
+    var activeReject = null;
+
+    function loadHeif() {
+      if (heifLoading) return heifLoading;
+      heifLoading = (function () {
+        return Promise.resolve().then(function () {
+          if (typeof self.libheif === 'undefined') {
+            if (cfg.libheifSrc) {
+              // Indirect eval so the bundle's top-level `var libheif` lands on
+              // the worker global. new Function() would scope it away.
+              (0, eval)(cfg.libheifSrc);
+            } else if (cfg.libheifUrl) {
+              // Must be absolute: inside a blob worker location.href is
+              // blob:null/<uuid>, so a relative importScripts throws.
+              self.importScripts(cfg.libheifUrl);
+            } else {
+              throw new Error('libheif not configured (no libheifUrl and no injected source)');
+            }
+          }
+          var factory = self.libheif;
+          if (typeof factory !== 'function') {
+            throw new Error('libheif global is not the Emscripten MODULARIZE factory (got ' + typeof factory + ')');
+          }
+          // MODULARIZE: call the factory and await it. `new libheif.HeifDecoder()`
+          // as shown in the libheif-js README throws "not a constructor".
+          return factory();
+        }).then(function (mod) {
+          if (!mod || typeof mod.HeifDecoder !== 'function') throw new Error('libheif module exposes no HeifDecoder');
+          heifModule = mod;
+          heifDecoder = new mod.HeifDecoder();
+          return mod;
+        }).catch(function (e) {
+          heifError = e && e.message ? e.message : String(e);
+          throw e;
+        });
+      })();
+      return heifLoading;
+    }
+
+    // One-shot: does createImageBitmap apply EXIF orientation for us? Measured,
+    // not assumed, and only paid for when a file actually carries orientation.
+    var exifProbe = null;
+    var browserAppliesExif = null;
+    function probeBrowserExif() {
+      if (exifProbe) return exifProbe;
+      exifProbe = createImageBitmap(H.b64ToBlob(H.EXIF_PROBE_JPEG_B64, 'image/jpeg'), { imageOrientation: 'from-image' })
+        .then(function (bm) {
+          var w = bm.width, h = bm.height;
+          bm.close();
+          // The probe is 16x4 with Orientation=6 (90 deg CW). If it comes back
+          // 4x16 the browser rotated it and we must not rotate it again.
+          browserAppliesExif = w === H.EXIF_PROBE_UNROTATED[1] && h === H.EXIF_PROBE_UNROTATED[0];
+          return browserAppliesExif;
+        })
+        .catch(function () {
+          browserAppliesExif = true; // safer to under-rotate than to double-rotate
+          return true;
+        });
+      return exifProbe;
+    }
+
+    function fail(code, message) {
+      var e = new Error(message);
+      e.ptCode = code;
+      return e;
+    }
+
+    function decodeHeic(u8) {
+      return loadHeif().then(function () {
+        // decode() never throws; an empty array means "not decodable".
+        var images = heifDecoder.decode(u8);
+        return Promise.resolve()
+          .then(function () {
+            if (!images || !images.length) throw fail('unsupported', 'HEIC decode produced no images (unsupported or corrupt container)');
+            var img = images[0];
+            var w = img.get_width();
+            var h = img.get_height();
+            if (!(w > 0 && h > 0)) throw fail('corrupt', 'HEIC reported invalid dimensions ' + w + 'x' + h);
+            if (w * h > H.MAX_PIXELS) throw fail('too-large', 'HEIC is ' + w + 'x' + h + ', over the ' + H.MAX_PIXELS + ' pixel ceiling');
+            var imageData;
+            try {
+              imageData = new ImageData(w, h);
+            } catch (e) {
+              throw fail('too-large', 'cannot allocate ' + w + 'x' + h + ' RGBA buffer: ' + (e && e.message));
+            }
+            return new Promise(function (resolve, reject) {
+              var settled = false;
+              var timer = setTimeout(function () {
+                if (settled) return;
+                settled = true;
+                activeReject = null;
+                reject(fail('timeout', 'HEIC decode did not complete within ' + cfg.decodeTimeoutMs + 'ms'));
+              }, cfg.decodeTimeoutMs);
+              activeReject = function (e) {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                activeReject = null;
+                reject(e);
+              };
+              try {
+                img.display(imageData, function (out) {
+                  if (settled) return;
+                  settled = true;
+                  clearTimeout(timer);
+                  activeReject = null;
+                  // THE error signal. A truncated HEIC parses its metadata and
+                  // hands back a handle reporting full dimensions; the failure
+                  // only surfaces as a null here.
+                  if (!out) reject(fail('corrupt', 'HEIC pixel decode failed (display returned null) - file is truncated or corrupt'));
+                  else resolve(out);
+                });
+              } catch (e) {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                activeReject = null;
+                reject(e);
+              }
+            });
+          })
+          .then(
+            function (v) { freeAll(images); return v; },
+            function (e) { freeAll(images); throw e; }
+          );
+      });
+    }
+
+    // EVERY handle in the array, not just [0]. A multi-image HEIC (thumbnail
+    // pair, Live Photo, burst) returns several and each holds wasm memory.
+    function freeAll(images) {
+      if (!images) return;
+      for (var i = 0; i < images.length; i++) {
+        try { images[i].free(); } catch (e) { /* already freed */ }
+      }
+    }
+
+    function ctx2d(canvas, readback) {
+      return canvas.getContext('2d', { alpha: false, willReadFrequently: !!readback });
+    }
+
+    // Prefer a runtime-provided PT.phash when the host has injected 20_phash.js
+    // via createPool({extraSrc}), but only when it actually returns the record
+    // contract's 16-char lowercase hex. That module is owned by another agent
+    // and may be absent, may be a bare function, or may be the namespace object
+    // it currently is; none of those may become a load-order dependency here.
+    function workerPhash(hashImageData, gray, w, h) {
+      var P = self.PT && self.PT.phash;
+      try {
+        var v = null;
+        if (typeof P === 'function') v = P(gray, w, h);
+        else if (P && typeof P === 'object') {
+          var fn = (P.RECOMMENDED_HASH && typeof P[P.RECOMMENDED_HASH] === 'function' && P[P.RECOMMENDED_HASH]) ||
+            (typeof P.phash === 'function' && P.phash) ||
+            (typeof P.dhash === 'function' && P.dhash);
+          if (fn) v = fn(hashImageData);
+        }
+        if (typeof v === 'string' && /^[0-9a-f]{16}$/.test(v)) return v;
+      } catch (e) { /* fall through to the inlined dhash */ }
+      return H.dhashFromGray(gray, w, h);
+    }
+
+    function workerSharpness(sharpImageData, gray, w, h) {
+      var P = self.PT && self.PT.phash;
+      try {
+        if (P && typeof P.sharpness === 'function') {
+          var v = P.sharpness(sharpImageData);
+          if (typeof v === 'number' && isFinite(v)) return v;
+        }
+      } catch (e) { /* fall through to the inlined variance-of-Laplacian */ }
+      return H.sharpness(gray, w, h);
+    }
+
+    // Full-resolution source in -> thumbnail, preview, phash, sharpness out.
+    // Only one of these runs per worker at a time and the bitmap is closed the
+    // moment the preview exists, so at most `poolSize` full decodes coexist
+    // (PRD 8: "500 full-resolution decodes cannot coexist").
+    function derive(bitmap, orientation) {
+      var sw = bitmap.width, sh = bitmap.height;
+      var swap = H.swapsAxes(orientation);
+      var ow = swap ? sh : sw, oh = swap ? sw : sh;
+
+      var pScale = Math.min(1, cfg.previewPx / Math.max(ow, oh));
+      var dw = Math.max(1, Math.round(sw * pScale));
+      var dh = Math.max(1, Math.round(sh * pScale));
+      var preview = new OffscreenCanvas(swap ? dh : dw, swap ? dw : dh);
+      var pctx = ctx2d(preview, false);
+      pctx.imageSmoothingEnabled = true;
+      pctx.imageSmoothingQuality = 'high';
+      pctx.fillStyle = '#ffffff';
+      pctx.fillRect(0, 0, preview.width, preview.height);
+      pctx.save();
+      H.applyOrientation(pctx, orientation, dw, dh);
+      pctx.drawImage(bitmap, 0, 0, dw, dh);
+      pctx.restore();
+      bitmap.close();
+
+      var tScale = Math.min(1, cfg.thumbPx / Math.max(preview.width, preview.height));
+      var thumb = new OffscreenCanvas(
+        Math.max(1, Math.round(preview.width * tScale)),
+        Math.max(1, Math.round(preview.height * tScale))
+      );
+      var tctx = ctx2d(thumb, true);
+      tctx.imageSmoothingEnabled = true;
+      tctx.imageSmoothingQuality = 'high';
+      tctx.drawImage(preview, 0, 0, thumb.width, thumb.height);
+
+      // Same pass as the derivatives, per PRD 7.9.
+      var tData = tctx.getImageData(0, 0, thumb.width, thumb.height);
+      var tGray = H.grayFromRGBA(tData.data, thumb.width, thumb.height);
+      var sharp = workerSharpness(tData, tGray, thumb.width, thumb.height);
+
+      var hs = 32;
+      var hc = new OffscreenCanvas(hs, hs);
+      var hctx = ctx2d(hc, true);
+      hctx.imageSmoothingEnabled = true;
+      hctx.imageSmoothingQuality = 'high';
+      hctx.drawImage(preview, 0, 0, hs, hs);
+      var hData = hctx.getImageData(0, 0, hs, hs);
+      var hGray = H.grayFromRGBA(hData.data, hs, hs);
+      // The 320 px thumbnail goes to an external hasher (it does its own
+      // downsampling); the 32x32 greyscale feeds the inlined dhash.
+      var phash = workerPhash(tData, hGray, hs, hs);
+
+      return Promise.all([
+        preview.convertToBlob({ type: 'image/jpeg', quality: cfg.previewQuality }),
+        thumb.convertToBlob({ type: 'image/jpeg', quality: cfg.thumbQuality })
+      ]).then(function (blobs) {
+        // Drop the backing stores immediately rather than waiting for GC.
+        preview.width = preview.height = 0;
+        thumb.width = thumb.height = 0;
+        hc.width = hc.height = 0;
+        return {
+          w: ow,
+          h: oh,
+          preview: blobs[0],
+          thumb: blobs[1],
+          phash: phash,
+          sharp: sharp,
+          previewW: swap ? dh : dw,
+          previewH: swap ? dw : dh
+        };
+      });
+    }
+
+    function ingestBytes(u8, blob) {
+      var sniffed = H.sniff(u8);
+      var out = { kind: sniffed.kind, format: sniffed.format, orientationSource: 'none', orientation: 1 };
+
+      if (sniffed.kind === 'unsupported') {
+        out.err = 'unsupported file format (' + sniffed.format + ')';
+        return Promise.resolve(out);
+      }
+
+      var orientation = 1; // what the file declares
+      var heif = null;
+      if (sniffed.kind === 'heic') {
+        heif = H.heifMeta(u8);
+        // libheif applies irot/imir during decode (measured: an irot=1 fixture
+        // comes back with its axes swapped and its pixels genuinely rotated).
+        // So a file carrying them must have any EXIF Orientation ignored, or it
+        // gets rotated twice.
+        if (heif.hasTransform) {
+          out.orientationSource = 'irot/imir, applied by libheif';
+        } else if (heif.orientation > 1) {
+          orientation = heif.orientation;
+          out.orientationSource = 'heif-exif';
+        }
+        out.heif = heif;
+      } else if (sniffed.kind === 'jpeg') {
+        var jo = H.jpegOrientation(u8);
+        if (jo > 1) { orientation = jo; out.orientationSource = 'jpeg-exif'; }
+      }
+      out.orientation = orientation;
+
+      var gate = orientation > 1 && sniffed.kind !== 'heic' ? probeBrowserExif() : Promise.resolve(null);
+
+      return gate
+        .then(function () {
+          // The transform WE still have to apply. For non-HEIC that is nothing
+          // when the browser already did it; for HEIC it is always ours to do,
+          // because libheif never looks at EXIF.
+          var toApply = orientation;
+          if (sniffed.kind !== 'heic' && orientation > 1 && browserAppliesExif) toApply = 1;
+          out.orientationApplied = toApply;
+          out.browserAppliesExif = browserAppliesExif;
+
+          if (sniffed.kind === 'heic') {
+            return decodeHeic(u8).then(function (imageData) {
+              var p = createImageBitmap(imageData);
+              // Drop our reference immediately. createImageBitmap keeps its own
+              // until it settles, and holding both means 96 MB per worker for a
+              // 12 MP image instead of 48 MB.
+              imageData = null;
+              return p.then(function (bm) { return [bm, toApply]; });
+            });
+          }
+          return createImageBitmap(blob, { imageOrientation: 'from-image' })
+            .then(function (bm) { return [bm, toApply]; })
+            .catch(function (e) {
+              throw fail('corrupt', 'decode failed: ' + (e && e.message ? e.message : String(e)));
+            });
+        })
+        .then(function (pair) {
+          var bitmap = pair[0];
+          if (bitmap.width * bitmap.height > H.MAX_PIXELS) {
+            bitmap.close();
+            throw fail('too-large', 'image is ' + bitmap.width + 'x' + bitmap.height);
+          }
+          return derive(bitmap, pair[1]);
+        })
+        .then(function (d) {
+          out.w = d.w; out.h = d.h;
+          out.thumb = d.thumb; out.preview = d.preview;
+          out.phash = d.phash; out.sharp = d.sharp;
+          out.previewW = d.previewW; out.previewH = d.previewH;
+          return out;
+        })
+        .catch(function (e) {
+          out.err = (e && e.ptCode ? '[' + e.ptCode + '] ' : '') + (e && e.message ? e.message : String(e));
+          return out;
+        });
+    }
+
+    var pendingResume = Object.create(null);
+
+    function handleJob(msg) {
+      var jid = msg.jid;
+      var blob = msg.file;
+      var meta = msg.meta || {};
+      var t0 = (self.performance && self.performance.now) ? self.performance.now() : Date.now();
+      var u8 = null;
+
+      return Promise.resolve()
+        .then(function () { return blob.arrayBuffer(); })
+        .then(function (buf) {
+          u8 = new Uint8Array(buf);
+          return H.fingerprint(u8, meta.name || blob.name || '', blob.size, meta.lastMod || blob.lastModified || 0);
+        })
+        .then(function (id) {
+          if (!cfg.askBeforeDecode) return { id: id, skip: false };
+          self.postMessage({ t: 'fp', jid: jid, id: id });
+          return new Promise(function (resolve) {
+            pendingResume[jid] = function (skip) { resolve({ id: id, skip: !!skip }); };
+          });
+        })
+        .then(function (gate) {
+          if (gate.skip) {
+            u8 = null;
+            return { skipped: true, id: gate.id };
+          }
+          return ingestBytes(u8, blob).then(function (r) {
+            u8 = null;
+            r.id = gate.id;
+            return r;
+          });
+        })
+        .then(function (r) {
+          var t1 = (self.performance && self.performance.now) ? self.performance.now() : Date.now();
+          r.ms = Math.round((t1 - t0) * 10) / 10;
+          self.postMessage({ t: 'ok', jid: jid, res: r });
+        })
+        .catch(function (e) {
+          self.postMessage({ t: 'ok', jid: jid, res: { err: '[fatal] ' + (e && e.message ? e.message : String(e)), kind: 'unsupported' } });
+        });
+    }
+
+    self.addEventListener('error', function (ev) {
+      // libheif's display() callback fires from a setTimeout, so a throw inside
+      // it arrives here rather than as a rejected promise. Convert it into a
+      // failure for the job that is actually running.
+      if (activeReject) {
+        var r = activeReject;
+        activeReject = null;
+        try { ev.preventDefault(); } catch (e) { /* not cancelable */ }
+        r(fail('corrupt', 'decode threw: ' + (ev.message || 'unknown worker error')));
+      }
+    });
+
+    self.addEventListener('message', function (ev) {
+      var msg = ev.data;
+      if (!msg || !msg.t) return;
+      if (msg.t === 'cfg') {
+        for (var k in msg.cfg) if (Object.prototype.hasOwnProperty.call(msg.cfg, k)) cfg[k] = msg.cfg[k];
+        self.postMessage({ t: 'ready' });
+      } else if (msg.t === 'job') {
+        handleJob(msg);
+      } else if (msg.t === 'resume') {
+        var fn = pendingResume[msg.jid];
+        delete pendingResume[msg.jid];
+        if (fn) fn(msg.skip);
+      } else if (msg.t === 'warm') {
+        loadHeif().then(
+          function () { self.postMessage({ t: 'warm', ok: true }); },
+          function (e) { self.postMessage({ t: 'warm', ok: false, message: String(e && e.message || e) }); }
+        );
+      } else if (msg.t === 'diag') {
+        self.postMessage({
+          t: 'diag',
+          heifLoaded: !!heifDecoder,
+          heifError: heifError,
+          // The wasm arena is the number that actually moves when the decoder
+          // leaks; the JS heap barely reflects it.
+          wasmHeapBytes: heifModule && heifModule.HEAPU8 ? heifModule.HEAPU8.length : null
+        });
+      }
+    });
+
+    self.postMessage({ t: 'boot' });
+  }
+
+  // =========================================================================
+  // ASSEMBLY
+  // =========================================================================
+  PT_INGEST_SHARED(global); // main thread copy
+
+  ingest.WORKER_SRC =
+    '/* Photournament ingest worker (generated from 10_ingest_worker.js) */\n' +
+    '(' + PT_INGEST_SHARED.toString() + ')(self);\n' +
+    '(' + PT_INGEST_WORKER.toString() + ')(self);\n';
+
+  // Host pages that inline the libheif bundle (the fully self-contained
+  // single-file build) call this instead of pointing at a URL.
+  ingest.libheifSrc = ingest.libheifSrc || null;
+  ingest.setLibheifSource = function (text) {
+    ingest.libheifSrc = text || null;
+    return ingest.libheifSrc ? ingest.libheifSrc.length : 0;
+  };
+  ingest.DEFAULT_LIBHEIF_URL = 'assets/libheif-bundle.js';
+
+  /**
+   * PRD 7.9 fingerprint: content hash + filename + byte size + last modified,
+   * folded into one 64-char hex id. Main-thread convenience; the pool computes
+   * the identical value inside the worker so ingest never reads a file twice.
+   * @param {File|Blob|FileSystemFileHandle} file
+   * @returns {Promise<string>}
+   */
+  ingest.fingerprint = function (file) {
+    return Promise.resolve()
+      .then(function () {
+        return file && typeof file.getFile === 'function' ? file.getFile() : file;
+      })
+      .then(function (f) {
+        return f.arrayBuffer().then(function (buf) {
+          return global.__PTI.fingerprint(new Uint8Array(buf), f.name || '', f.size, f.lastModified || 0);
+        });
+      });
+  };
+
+  ingest.blankRecord = function (meta) { return global.__PTI.blankRecord(meta); };
+
+  /**
+   * @param {object} [opts]
+   * @param {number} [opts.size] worker count; defaults to min(hardwareConcurrency, 4).
+   *   Probe 02 measured scaling stopping dead at the core count: 8 workers were
+   *   no faster than 4 and doubled memory.
+   * @param {string|null} [opts.libheifUrl] URL of libheif-bundle.js, resolved to
+   *   absolute here on the main thread. null means "expect injected source".
+   * @param {string} [opts.libheifSrc] the bundle's source text, for the inlined build.
+   * @param {string} [opts.extraSrc] extra classic-script source prepended into the
+   *   worker (e.g. 20_phash.js, so PT.phash is reachable in-worker).
+   * @param {function} [opts.lookup] (id, meta) => record|null|Promise. Non-null
+   *   short-circuits decoding entirely, which is how resume skips known photos.
+   */
+  ingest.createPool = function (opts) {
+    opts = opts || {};
+    var hw = (global.navigator && global.navigator.hardwareConcurrency) || 4;
+    var size = Math.max(1, opts.size || Math.min(hw, 4));
+
+    var libheifSrc = opts.libheifSrc || ingest.libheifSrc || null;
+    var libheifUrl = null;
+    if (!libheifSrc) {
+      var rel = opts.libheifUrl === undefined ? ingest.DEFAULT_LIBHEIF_URL : opts.libheifUrl;
+      if (rel) {
+        // Resolve here: inside a blob worker location.href is blob:null/<uuid>,
+        // so the worker cannot resolve a relative path itself.
+        try { libheifUrl = new URL(rel, global.location.href).href; } catch (e) { libheifUrl = rel; }
+      }
+    }
+
+    var src = (opts.extraSrc ? opts.extraSrc + '\n' : '') + ingest.WORKER_SRC;
+    var blobUrl = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+
+    var cfg = {
+      thumbPx: opts.thumbPx || 320,
+      previewPx: opts.previewPx || 1600,
+      thumbQuality: opts.thumbQuality || 0.8,
+      previewQuality: opts.previewQuality || 0.85,
+      libheifUrl: libheifUrl,
+      libheifSrc: libheifSrc,
+      askBeforeDecode: typeof opts.lookup === 'function',
+      decodeTimeoutMs: opts.decodeTimeoutMs || 180000
+    };
+
+    var workers = [];
+    var idle = [];
+    var queue = [];
+    var jobs = Object.create(null);
+    var seq = 0;
+    var dead = false;
+    var stat = { done: 0, failed: 0, skipped: 0, t0: 0, busyMs: 0 };
+
+    function spawn() {
+      var w = new Worker(blobUrl);
+      w.__busy = null;
+      w.onmessage = function (ev) { onMessage(w, ev.data); };
+      w.onerror = function (ev) {
+        log('worker error', ev.message);
+        if (w.__busy) {
+          var job = jobs[w.__busy];
+          delete jobs[w.__busy];
+          w.__busy = null;
+          if (job) {
+            job.rec.err = '[worker] ' + (ev.message || 'worker crashed');
+            finish(job, w);
+          }
+        }
+      };
+      w.postMessage({ t: 'cfg', cfg: cfg });
+      workers.push(w);
+      idle.push(w);
+      return w;
+    }
+
+    function finish(job, w) {
+      if (job.rec.err) stat.failed++; else stat.done++;
+      idle.push(w);
+      job.resolve(job.rec);
+      emit('ingest:photo', job.rec);
+      emit('ingest:progress', pool.stats());
+      pump();
+    }
+
+    function onMessage(w, msg) {
+      if (!msg || !msg.t) return;
+      if (msg.t === 'boot' || msg.t === 'ready') return;
+      if (msg.t === 'fp') {
+        var j = jobs[msg.jid];
+        if (!j) return;
+        j.rec.id = msg.id;
+        Promise.resolve()
+          .then(function () { return opts.lookup(msg.id, j.meta); })
+          .then(function (cached) {
+            if (cached) { j.cached = cached; w.postMessage({ t: 'resume', jid: msg.jid, skip: true }); }
+            else w.postMessage({ t: 'resume', jid: msg.jid, skip: false });
+          })
+          .catch(function () { w.postMessage({ t: 'resume', jid: msg.jid, skip: false }); });
+        return;
+      }
+      if (msg.t === 'ok') {
+        var job = jobs[msg.jid];
+        delete jobs[msg.jid];
+        w.__busy = null;
+        if (!job) return;
+        var r = msg.res || {};
+        var rec = job.rec;
+        if (r.id) rec.id = r.id;
+        if (r.skipped) {
+          stat.skipped++;
+          var c = job.cached || {};
+          for (var k in c) if (Object.prototype.hasOwnProperty.call(c, k) && c[k] !== undefined) rec[k] = c[k];
+          rec.id = r.id || rec.id;
+          rec.fromCache = true;
+        } else {
+          if (r.kind) rec.kind = r.kind;
+          rec.w = r.w || 0;
+          rec.h = r.h || 0;
+          rec.thumb = r.thumb || null;
+          rec.preview = r.preview || null;
+          rec.phash = r.phash || null;
+          rec.sharp = r.sharp === undefined ? null : r.sharp;
+          rec.err = r.err || null;
+          rec.format = r.format;
+          rec.orientation = r.orientation;
+          rec.orientationApplied = r.orientationApplied;
+          rec.browserAppliesExif = r.browserAppliesExif;
+          rec.orientationSource = r.orientationSource;
+          rec.ms = r.ms;
+        }
+        finish(job, w);
+      }
+    }
+
+    function pump() {
+      while (!dead && idle.length && queue.length) {
+        var w = idle.shift();
+        var job = queue.shift();
+        if (!stat.t0) stat.t0 = (global.performance || Date).now();
+        job.worker = w;
+        w.__busy = job.jid;
+        jobs[job.jid] = job;
+        w.postMessage({ t: 'job', jid: job.jid, file: job.file, meta: job.meta });
+      }
+    }
+
+    for (var i = 0; i < size; i++) spawn();
+
+    var pool = {
+      size: size,
+      libheifUrl: libheifUrl,
+      libheifInline: !!libheifSrc,
+
+      /**
+       * @param {File|FileSystemFileHandle} input
+       * @param {object} [meta] {path, dir, name, kind}
+       * @returns {Promise<object>} a photo record
+       */
+      process: function (input, meta) {
+        meta = meta || {};
+        if (dead) return Promise.reject(new Error('pool terminated'));
+        return Promise.resolve()
+          .then(function () {
+            return input && typeof input.getFile === 'function' ? input.getFile() : input;
+          })
+          .then(function (file) {
+            if (!file || typeof file.arrayBuffer !== 'function') throw new Error('process() needs a File/Blob or FileSystemFileHandle');
+            var m = {
+              name: meta.name || file.name || '',
+              path: meta.path || meta.name || file.name || '',
+              dir: meta.dir,
+              size: file.size,
+              lastMod: meta.lastMod != null ? meta.lastMod : file.lastModified || 0,
+              kind: meta.kind
+            };
+            var rec = global.__PTI.blankRecord(m);
+            return new Promise(function (resolve) {
+              queue.push({ jid: ++seq, file: file, meta: m, rec: rec, resolve: resolve, cached: null });
+              pump();
+            });
+          });
+      },
+
+      /** Force the libheif load now instead of on the first HEIC. */
+      warm: function () {
+        return Promise.all(workers.map(function (w) {
+          return new Promise(function (res) {
+            var h = function (ev) {
+              if (ev.data && ev.data.t === 'warm') { w.removeEventListener('message', h); res(ev.data); }
+            };
+            w.addEventListener('message', h);
+            w.postMessage({ t: 'warm' });
+          });
+        }));
+      },
+
+      /** Per-worker wasm arena size and libheif state. Used by the memory probe. */
+      diag: function () {
+        return Promise.all(workers.map(function (w) {
+          return new Promise(function (res) {
+            var h = function (ev) {
+              if (ev.data && ev.data.t === 'diag') { w.removeEventListener('message', h); res(ev.data); }
+            };
+            w.addEventListener('message', h);
+            w.postMessage({ t: 'diag' });
+          });
+        }));
+      },
+
+      stats: function () {
+        var now = (global.performance || Date).now();
+        var elapsed = stat.t0 ? now - stat.t0 : 0;
+        var handled = stat.done + stat.failed;
+        return {
+          done: stat.done,
+          failed: stat.failed,
+          skipped: stat.skipped,
+          inFlight: Object.keys(jobs).length,
+          queued: queue.length,
+          msPerImage: handled ? Math.round((elapsed / handled) * 10) / 10 : 0
+        };
+      },
+
+      terminate: function () {
+        if (dead) return;
+        dead = true;
+        for (var i = 0; i < workers.length; i++) {
+          try { workers[i].terminate(); } catch (e) { /* already gone */ }
+        }
+        workers.length = 0;
+        idle.length = 0;
+        for (var jid in jobs) {
+          var j = jobs[jid];
+          j.rec.err = '[terminated] ingest pool was shut down';
+          j.resolve(j.rec);
+        }
+        jobs = Object.create(null);
+        while (queue.length) {
+          var q = queue.shift();
+          q.rec.err = '[terminated] ingest pool was shut down';
+          q.resolve(q.rec);
+        }
+        try { URL.revokeObjectURL(blobUrl); } catch (e) { /* already revoked */ }
+        emit('ingest:terminated', null);
+      }
+    };
+
+    log('pool up: ' + size + ' workers, libheif=' + (libheifSrc ? 'inline(' + libheifSrc.length + 'B)' : libheifUrl || 'none'));
+    return pool;
+  };
+})(typeof self !== 'undefined' ? self : this);
+
+/*
+CHANGELOG
+---------
+v1.0 - 2026-07-28 - Samuel Cao
+  Initial release. Blob-URL worker pool for PRD 7.9 ingest.
+  - WORKER_SRC is built by stringifying two real functions rather than being a
+    template literal, so the worker body stays lintable JS with no escaping.
+  - Shared sniff/EXIF/fingerprint code is installed on both the main thread and
+    inside the worker from one source, so fingerprints cannot drift apart.
+  - One HeifDecoder per worker for its whole lifetime, and .free() on every
+    handle decode() returns. Probe 02 measured 6.35 MB/image leaked when either
+    half is missing (~3.2 GB at 500 photos).
+  - libheif loads lazily on the first HEIC, from either an absolute importScripts
+    URL (resolved on the main thread) or injected source text.
+  - Ingest failure is detected on the display() callback receiving null, because
+    a truncated HEIC returns a handle reporting valid dimensions.
+  - Orientation: HEIF irot/imir is left to libheif (measured: an irot=1 fixture
+    decodes with its axes swapped and its pixels genuinely rotated), and EXIF is
+    suppressed when those boxes are present. For JPEG/PNG/WebP the worker runs a
+    one-time 803-byte self-test to find out whether createImageBitmap already
+    applies EXIF, because Chromium ignores imageOrientation:'none' and treats it
+    as 'from-image' - applying the transform on top of that rotates twice.
+  - PT.phash / PT.phash.sharpness are used when the host injects 20_phash.js via
+    createPool({extraSrc}) and the result validates; otherwise the inlined dhash
+    and variance-of-Laplacian are used. No load-order dependency either way.
+  Measurements: tools/probes/03_pipeline/FINDINGS.md
+*/
+
+</script>
+<script>
+/* ===== 20_phash.js ===== */
+/**
+ * @file 20_phash.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description Perceptual hashing, sharpness scoring, near-duplicate clustering and representative nomination for PRD 7.7.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ */
+
+/* eslint-disable no-bitwise */
+(function (global) {
+  'use strict';
+
+  global.PT = global.PT || {};
+  var PT = global.PT;
+
+  // ---------------------------------------------------------------------------
+  // Tuning constants — every number here is measured, see
+  // tools/probes/04_phash/FINDINGS.md
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Recommended Hamming distance for "these are the same shot", calibrated for
+   * phash() (see RECOMMENDED_HASH).
+   *
+   * Measured on a 122-frame corpus, 7,381 labelled pairs: pHash + strict at 14
+   * scored precision 1.000 and recall 1.000 — every burst, expression variant,
+   * re-encode and minor crop/rotation grouped, and not one unrelated pair did.
+   * The first false positive appears at 16; the first false negative at 13.
+   * Full sweep in tools/probes/04_phash/FINDINGS.md.
+   *
+   * dHash needs a different number. Its clean band is 8-10, and it has no
+   * threshold that separates the two populations completely.
+   */
+  var DEFAULT_THRESHOLD = 14;
+
+  /**
+   * Useful span for the PRD 7.7 sensitivity slider. Below 4 only re-encodes of
+   * the same file group; above 20 pHash precision falls under 0.75 and the user
+   * spends more time splitting groups than the grouping saves.
+   *
+   * pHash is a constant-weight code (every hash has exactly 31 one-bits), so
+   * every pHash distance is EVEN and odd thresholds behave identically to the
+   * even one below. Step the slider by 2.
+   */
+  var THRESHOLD_RANGE = [4, 20];
+
+  /** Default linkage for cluster(). See FINDINGS.md section 6. */
+  var DEFAULT_MODE = 'strict';
+
+  /**
+   * Which hash to cluster on. pHash beat dHash on every measure that matters:
+   * complete separation of positives from negatives, 27 non-transitive triples
+   * against dHash's 356, and a precision curve that stays at 1.000 while recall
+   * climbs monotonically, so the sensitivity slider behaves predictably.
+   * dhash() stays exported: it is 1.2x cheaper and useful as a fast pre-filter.
+   */
+  var RECOMMENDED_HASH = 'phash';
+
+  var DHASH_W = 9;   // 9x8 grey -> 8 rows x 8 horizontal comparisons = 64 bits
+  var DHASH_H = 8;
+  var PHASH_N = 32;  // DCT input edge
+  var PHASH_K = 8;   // low-frequency block kept
+  var SHARP_EDGE = 256; // grey plane long edge the sharpness metric works on
+
+  /** Nomination weights. Sharpness dominates; resolution breaks near-ties. */
+  var NOMINATE_SHARP_WEIGHT = 0.70;
+  var NOMINATE_RES_WEIGHT = 0.30;
+
+  // ---------------------------------------------------------------------------
+  // Lookup tables
+  // ---------------------------------------------------------------------------
+
+  var HEXCHARS = '0123456789abcdef';
+
+  /** hex char code -> nibble, -1 for anything else. */
+  var HEXVAL = (function () {
+    var t = new Int8Array(128);
+    for (var i = 0; i < 128; i++) t[i] = -1;
+    for (var d = 0; d < 10; d++) t[48 + d] = d;
+    for (var a = 0; a < 6; a++) { t[97 + a] = 10 + a; t[65 + a] = 10 + a; }
+    return t;
+  })();
+
+  /**
+   * Separable DCT-II basis, orthonormally scaled:
+   * DCT_COS[u*N + x] = s(u) * cos((2x+1) * u * PI / (2N))
+   */
+  var DCT_COS = (function (N) {
+    var c = new Float64Array(N * N);
+    var s0 = Math.sqrt(1 / N);
+    var s = Math.sqrt(2 / N);
+    for (var u = 0; u < N; u++) {
+      var scale = u === 0 ? s0 : s;
+      for (var x = 0; x < N; x++) {
+        c[u * N + x] = scale * Math.cos(((2 * x + 1) * u * Math.PI) / (2 * N));
+      }
+    }
+    return c;
+  })(PHASH_N);
+
+  // Scratch buffers. A worker is single threaded and the app hashes one image
+  // at a time, so reusing these is safe and saves ~9KB of allocation per image.
+  var _dctTmp = new Float64Array(PHASH_N * PHASH_N);
+  var _dctLow = new Float64Array(PHASH_K * PHASH_K);
+  var _medBuf = new Float64Array(PHASH_K * PHASH_K);
+
+  // ---------------------------------------------------------------------------
+  // Pixel helpers
+  // ---------------------------------------------------------------------------
+
+  function isImageData(img) {
+    return !!img && typeof img.width === 'number' && typeof img.height === 'number' &&
+      img.data && typeof img.data.length === 'number' &&
+      img.data.length >= img.width * img.height * 4;
+  }
+
+  function assertImageData(img, who) {
+    if (!isImageData(img)) throw new TypeError('PT.phash.' + who + ': expected an ImageData-like {width,height,data}');
+    if (img.width < 1 || img.height < 1) throw new TypeError('PT.phash.' + who + ': empty ImageData');
+  }
+
+  /**
+   * Rec.601 luma, 0..255, as Float32. Alpha is ignored on purpose: photos are
+   * opaque, and compositing onto an assumed background would make the hash
+   * depend on something the user never sees.
+   * @param {ImageData} img
+   * @returns {Float32Array}
+   */
+  function toGrey(img) {
+    var d = img.data;
+    var n = img.width * img.height;
+    var out = new Float32Array(n);
+    for (var i = 0, p = 0; i < n; i++, p += 4) {
+      out[i] = 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2];
+    }
+    return out;
+  }
+
+  /**
+   * Area-average (box) downsample of a greyscale plane.
+   *
+   * Box averaging rather than point sampling matters a lot here: point-sampling
+   * a 1200px frame down to 32px aliases high-frequency texture into the hash,
+   * and two frames of the same burst alias differently, which shows up directly
+   * as burst-pair distance.
+   *
+   * Implemented as a scatter: one sequential pass over the source accumulating
+   * into output buckets. The obvious gather form (walk the output, sum the
+   * source box) is 3.5x slower at 9x8 output on a 1600px source, because each
+   * output cell strides across ~1MB of source and the next cell walks the same
+   * rows again. Measured, not assumed — see FINDINGS.md section 7.
+   *
+   * @param {Float32Array} src
+   * @param {number} w source width
+   * @param {number} h source height
+   * @param {number} ow target width
+   * @param {number} oh target height
+   * @returns {Float32Array}
+   */
+  function downsampleGrey(src, w, h, ow, oh) {
+    var out = new Float32Array(ow * oh);
+    var x, y;
+
+    // Upsampling has no box to average, so fall back to nearest-neighbour.
+    if (ow > w || oh > h) {
+      for (y = 0; y < oh; y++) {
+        var sy = Math.min(h - 1, Math.floor((y * h) / oh));
+        for (x = 0; x < ow; x++) {
+          out[y * ow + x] = src[sy * w + Math.min(w - 1, Math.floor((x * w) / ow))];
+        }
+      }
+      return out;
+    }
+
+    // Column and row bucket maps, plus how many source pixels land in each.
+    // Both maps are monotonically non-decreasing, which is what lets the inner
+    // loop accumulate in a register and only touch memory at a bucket boundary.
+    var colBucket = new Int32Array(w);
+    var colCount = new Int32Array(ow);
+    for (x = 0; x < w; x++) {
+      var cb = Math.min(ow - 1, Math.floor((x * ow) / w));
+      colBucket[x] = cb;
+      colCount[cb]++;
+    }
+    var rowCount = new Int32Array(oh);
+    for (y = 0; y < h; y++) rowCount[Math.min(oh - 1, Math.floor((y * oh) / h))]++;
+
+    for (y = 0; y < h; y++) {
+      var orow = Math.min(oh - 1, Math.floor((y * oh) / h)) * ow;
+      var srow = y * w;
+      var sum = 0;
+      var bucket = 0;
+      for (x = 0; x < w; x++) {
+        var b = colBucket[x];
+        if (b !== bucket) { out[orow + bucket] += sum; sum = 0; bucket = b; }
+        sum += src[srow + x];
+      }
+      out[orow + bucket] += sum;
+    }
+
+    for (var oy2 = 0; oy2 < oh; oy2++) {
+      for (var ox2 = 0; ox2 < ow; ox2++) {
+        var n = colCount[ox2] * rowCount[oy2];
+        if (n) out[oy2 * ow + ox2] /= n;
+      }
+    }
+    return out;
+  }
+
+  function bytesToHex(bytes) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) {
+      s += HEXCHARS[bytes[i] >> 4] + HEXCHARS[bytes[i] & 15];
+    }
+    return s;
+  }
+
+  // ---------------------------------------------------------------------------
+  // dHash
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 64-bit difference hash. 9x8 greyscale box-downsample, one bit per
+   * horizontal adjacent-pixel comparison. All 64 bits are informative.
+   *
+   * Cheap, and immune to any monotonic exposure change because it only ever
+   * compares neighbours inside the same frame.
+   *
+   * @param {ImageData} imageData RGBA pixels
+   * @returns {string} 16 lowercase hex chars
+   */
+  function dhash(imageData) {
+    assertImageData(imageData, 'dhash');
+    var g = downsampleGrey(toGrey(imageData), imageData.width, imageData.height, DHASH_W, DHASH_H);
+    var bytes = new Uint8Array(8);
+    var bit = 0;
+    for (var y = 0; y < DHASH_H; y++) {
+      var row = y * DHASH_W;
+      for (var x = 0; x < DHASH_W - 1; x++, bit++) {
+        if (g[row + x] > g[row + x + 1]) bytes[bit >> 3] |= 0x80 >> (bit & 7);
+      }
+    }
+    return bytesToHex(bytes);
+  }
+
+  // ---------------------------------------------------------------------------
+  // pHash
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 64-bit DCT hash. 32x32 greyscale box-downsample, separable 2-D DCT-II, the
+   * top-left 8x8 low-frequency block thresholded at the median of its 63
+   * non-DC coefficients.
+   *
+   * The DC bit is forced to 0: DC is always the largest coefficient, so its bit
+   * would be a constant 1 and would carry no information while inflating every
+   * distance by nothing. So the hash is 64 bits wide with 63 informative bits.
+   *
+   * @param {ImageData} imageData RGBA pixels
+   * @returns {string} 16 lowercase hex chars
+   */
+  function phash(imageData) {
+    assertImageData(imageData, 'phash');
+    var g = downsampleGrey(toGrey(imageData), imageData.width, imageData.height, PHASH_N, PHASH_N);
+    var N = PHASH_N, u, x, y, v, sum;
+
+    // Rows: tmp[y][u] = sum_x g[y][x] * cos(u,x)
+    for (y = 0; y < N; y++) {
+      var gr = y * N;
+      for (u = 0; u < N; u++) {
+        sum = 0;
+        var cu = u * N;
+        for (x = 0; x < N; x++) sum += g[gr + x] * DCT_COS[cu + x];
+        _dctTmp[gr + u] = sum;
+      }
+    }
+    // Columns, but only the 8 rows that survive into the hash.
+    for (v = 0; v < PHASH_K; v++) {
+      var cv = v * N;
+      for (u = 0; u < PHASH_K; u++) {
+        sum = 0;
+        for (y = 0; y < N; y++) sum += _dctTmp[y * N + u] * DCT_COS[cv + y];
+        _dctLow[v * PHASH_K + u] = sum;
+      }
+    }
+
+    var m = 0;
+    for (v = 0; v < PHASH_K; v++) {
+      for (u = 0; u < PHASH_K; u++) {
+        if (v === 0 && u === 0) continue;
+        _medBuf[m++] = _dctLow[v * PHASH_K + u];
+      }
+    }
+    var med = medianOf(_medBuf, m);
+
+    var bytes = new Uint8Array(8);
+    var bit = 0;
+    for (v = 0; v < PHASH_K; v++) {
+      for (u = 0; u < PHASH_K; u++, bit++) {
+        if (v === 0 && u === 0) continue;               // DC bit stays 0
+        if (_dctLow[v * PHASH_K + u] > med) bytes[bit >> 3] |= 0x80 >> (bit & 7);
+      }
+    }
+    return bytesToHex(bytes);
+  }
+
+  /** Median of the first n entries of buf. Copies; buf is untouched. */
+  function medianOf(buf, n) {
+    var a = new Array(n);
+    for (var i = 0; i < n; i++) a[i] = buf[i];
+    a.sort(function (p, q) { return p - q; });
+    return (n & 1) ? a[(n - 1) >> 1] : 0.5 * (a[(n >> 1) - 1] + a[n >> 1]);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hamming distance
+  // ---------------------------------------------------------------------------
+
+  /** Population count of a 32-bit word, no table lookup. */
+  function popcnt32(x) {
+    x = x - ((x >>> 1) & 0x55555555);
+    x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+    x = (x + (x >>> 4)) & 0x0f0f0f0f;
+    return (x * 0x01010101) >>> 24;
+  }
+
+  /** Parse 8 hex chars starting at off into an unsigned 32-bit word. */
+  function hexWord(s, off) {
+    var w = 0;
+    for (var i = off; i < off + 8; i++) {
+      var v = HEXVAL[s.charCodeAt(i) & 127];
+      if (v < 0) throw new TypeError('PT.phash.hamming: not a hex hash: ' + s);
+      w = (w << 4) | v;
+    }
+    return w >>> 0;
+  }
+
+  /**
+   * Hamming distance between two 16-char hex hashes, 0..64.
+   *
+   * Called O(n^2) times by cluster(), so it does no allocation: two manual
+   * 8-char hex parses and two branchless popcounts. Measured throughput is in
+   * FINDINGS.md section 7.
+   *
+   * @param {string} hexA
+   * @param {string} hexB
+   * @returns {number} 0..64
+   */
+  function hamming(hexA, hexB) {
+    if (typeof hexA !== 'string' || typeof hexB !== 'string') {
+      throw new TypeError('PT.phash.hamming: expected two hex strings');
+    }
+    if (hexA.length !== 16 || hexB.length !== 16) {
+      throw new TypeError('PT.phash.hamming: expected 16-char hashes, got ' + hexA.length + '/' + hexB.length);
+    }
+    return popcnt32(hexWord(hexA, 0) ^ hexWord(hexB, 0)) +
+           popcnt32(hexWord(hexA, 8) ^ hexWord(hexB, 8));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sharpness
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Contrast-normalised variance of the 4-neighbour Laplacian, measured on a
+   * fixed 256px-long-edge greyscale plane. Higher is sharper.
+   *
+   * Raw variance-of-Laplacian is the textbook blur metric but it is not
+   * comparable between the images that actually land in one near-duplicate
+   * group. It scales with resolution (more pixels per edge means a smaller
+   * per-pixel second derivative) and with scene contrast (a bright high-contrast
+   * frame beats a flat one regardless of focus). A group routinely mixes a
+   * 12MP original with a downscaled re-export, so both corrections are needed:
+   *
+   *   1. resample to a fixed long edge, so resolution does not set the scale
+   *   2. divide by the variance of the grey plane, so contrast does not either
+   *
+   * What is left is edge energy per unit contrast. Resolution then re-enters
+   * the decision deliberately and separately, as a weighted term in nominate().
+   *
+   * @param {ImageData} imageData RGBA pixels
+   * @returns {number} >= 0, higher is sharper
+   */
+  function sharpness(imageData) {
+    assertImageData(imageData, 'sharpness');
+    var w = imageData.width, h = imageData.height;
+    var grey = toGrey(imageData);
+
+    var sw, sh;
+    if (w >= h) { sw = Math.min(SHARP_EDGE, w); sh = Math.max(1, Math.round((h / w) * sw)); }
+    else { sh = Math.min(SHARP_EDGE, h); sw = Math.max(1, Math.round((w / h) * sh)); }
+    var g = (sw === w && sh === h) ? grey : downsampleGrey(grey, w, h, sw, sh);
+
+    if (sw < 3 || sh < 3) return 0;
+
+    var lapSum = 0, lapSq = 0, n = 0;
+    for (var y = 1; y < sh - 1; y++) {
+      var r = y * sw;
+      for (var x = 1; x < sw - 1; x++) {
+        var i = r + x;
+        var lap = 4 * g[i] - g[i - 1] - g[i + 1] - g[i - sw] - g[i + sw];
+        lapSum += lap; lapSq += lap * lap; n++;
+      }
+    }
+    if (n === 0) return 0;
+    var lapMean = lapSum / n;
+    var lapVar = lapSq / n - lapMean * lapMean;
+
+    var gSum = 0, gSq = 0, m = sw * sh;
+    for (var k = 0; k < m; k++) { gSum += g[k]; gSq += g[k] * g[k]; }
+    var gMean = gSum / m;
+    var gVar = gSq / m - gMean * gMean;
+
+    var s = lapVar / Math.max(gVar, 1e-6);
+    return s > 0 ? s : 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Clustering
+  // ---------------------------------------------------------------------------
+
+  function byId(a, b) { return a < b ? -1 : (a > b ? 1 : 0); }
+
+  /**
+   * Group near-duplicates by Hamming distance.
+   *
+   * Perceptual hashes are not transitive: A~B and B~C does not imply A~C. The
+   * linkage rule is therefore a product decision, not an implementation detail,
+   * and it is exposed as `mode`:
+   *
+   *   "union"  single linkage / union-find. Any single edge merges two groups.
+   *            Maximum recall, but chaining is not a corner case: at the
+   *            default threshold of 14 the probe corpus produced a group whose
+   *            own diameter was 26 — members nearly twice the threshold apart,
+   *            in a group the user is told is a set of duplicates.
+   *   "strict" complete linkage. A photo joins a group only if it is within
+   *            `threshold` of EVERY current member, so a group's diameter can
+   *            never exceed the threshold and the slider means exactly what it
+   *            says. This is the default; see FINDINGS.md section 6.
+   *
+   * Determinism: items are processed in sorted-id order and a joining photo
+   * picks the group whose worst-case distance is smallest, so the result never
+   * depends on ingest order. Groups come back sorted by their smallest member
+   * id, ids sorted within each group, singletons included.
+   *
+   * @param {Array<{id:string, hash:string, w?:number, h?:number, sharp?:number}>} items
+   * @param {{threshold?:number, mode?:"union"|"strict"}} [opts]
+   * @returns {Array<Array<string>>} groups of ids
+   */
+  function cluster(items, opts) {
+    if (!items || !items.length) return [];
+    opts = opts || {};
+    var threshold = opts.threshold == null ? DEFAULT_THRESHOLD : opts.threshold;
+    var mode = opts.mode || DEFAULT_MODE;
+    if (mode !== 'union' && mode !== 'strict') {
+      throw new TypeError('PT.phash.cluster: mode must be "union" or "strict", got ' + mode);
+    }
+
+    // Sorted-id order is what makes both modes order-independent.
+    var order = items.slice().sort(function (a, b) { return byId(a.id, b.id); });
+    var n = order.length;
+
+    // Decode every hash once into two 32-bit words. This is the whole reason
+    // cluster() at 500 items is cheap: the O(n^2) inner loop never touches a
+    // string.
+    var hi = new Int32Array(n), lo = new Int32Array(n);
+    for (var i = 0; i < n; i++) {
+      var hx = order[i].hash;
+      if (typeof hx !== 'string' || hx.length !== 16) {
+        throw new TypeError('PT.phash.cluster: item ' + order[i].id + ' has no 16-char hash');
+      }
+      hi[i] = hexWord(hx, 0) | 0;
+      lo[i] = hexWord(hx, 8) | 0;
+    }
+    function dist(a, b) {
+      return popcnt32(hi[a] ^ hi[b]) + popcnt32(lo[a] ^ lo[b]);
+    }
+
+    var groups;
+    if (mode === 'union') {
+      var parent = new Int32Array(n);
+      for (var p = 0; p < n; p++) parent[p] = p;
+      var find = function (a) {
+        while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; }
+        return a;
+      };
+      for (var a1 = 0; a1 < n; a1++) {
+        for (var b1 = a1 + 1; b1 < n; b1++) {
+          if (dist(a1, b1) <= threshold) {
+            var ra = find(a1), rb = find(b1);
+            if (ra !== rb) parent[rb] = ra;
+          }
+        }
+      }
+      var buckets = {};
+      for (var k = 0; k < n; k++) {
+        var root = find(k);
+        (buckets[root] || (buckets[root] = [])).push(k);
+      }
+      groups = [];
+      for (var key in buckets) if (Object.prototype.hasOwnProperty.call(buckets, key)) groups.push(buckets[key]);
+    } else {
+      // Complete linkage, greedy in sorted-id order, best-fit rather than
+      // first-fit so the outcome does not depend on which group happened to be
+      // created first.
+      groups = [];
+      for (var idx = 0; idx < n; idx++) {
+        var bestG = -1, bestWorst = Infinity;
+        for (var g = 0; g < groups.length; g++) {
+          var worst = 0, ok = true;
+          for (var m2 = 0; m2 < groups[g].length; m2++) {
+            var d = dist(idx, groups[g][m2]);
+            if (d > threshold) { ok = false; break; }
+            if (d > worst) worst = d;
+          }
+          if (ok && worst < bestWorst) { bestWorst = worst; bestG = g; }
+        }
+        if (bestG >= 0) groups[bestG].push(idx);
+        else groups.push([idx]);
+      }
+    }
+
+    var out = groups.map(function (grp) {
+      return grp.map(function (ix) { return order[ix].id; }).sort(byId);
+    });
+    out.sort(function (x, y) { return byId(x[0], y[0]); });
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Representative nomination (PRD 7.7)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Pick the representative of a near-duplicate group, per PRD 7.7's
+   * "sharpness and resolution heuristic". One click overrides this in the UI,
+   * so the job is to be right most of the time, not to be right always.
+   *
+   * Both terms are normalised inside the group, so the score is a ranking
+   * within that group and never compares absolute values across groups:
+   *
+   *   score = 0.70 * (sharp / maxSharp) + 0.30 * (pixels / maxPixels)
+   *
+   * Sharpness carries most of the weight because blur is what a human actually
+   * notices. Resolution carries the rest for margin: sharpness() is deliberately
+   * resolution-invariant, so a downscaled crisp re-export lands within 3-13% of
+   * the full-size original it came from, and 3% is inside the noise of JPEG
+   * quality and scene content. The resolution term turns that into a decisive
+   * 0.25 gap. On one earlier corpus, weighting sharpness alone picked the
+   * 480px copy over its 1200px source in 4 of 42 trials. FINDINGS.md section 8
+   * has the numbers and the crossover table.
+   *
+   * Ties break on the smallest id, so the nomination is stable across runs.
+   *
+   * @param {Array<{id:string, w?:number, h?:number, sharp?:number}>} members
+   * @returns {string} the winning id
+   */
+  function nominate(members) {
+    if (!members || !members.length) throw new TypeError('PT.phash.nominate: empty group');
+    if (members.length === 1) return members[0].id;
+
+    var maxS = 0, maxP = 0, i, px;
+    for (i = 0; i < members.length; i++) {
+      var s = +members[i].sharp;
+      if (isFinite(s) && s > maxS) maxS = s;
+      px = (+members[i].w || 0) * (+members[i].h || 0);
+      if (px > maxP) maxP = px;
+    }
+    if (!(maxS > 0)) maxS = 1;
+    if (!(maxP > 0)) maxP = 1;
+
+    var bestId = null, bestScore = -Infinity;
+    for (i = 0; i < members.length; i++) {
+      var sv = +members[i].sharp;
+      if (!isFinite(sv) || sv < 0) sv = 0;
+      px = (+members[i].w || 0) * (+members[i].h || 0);
+      var score = NOMINATE_SHARP_WEIGHT * (sv / maxS) + NOMINATE_RES_WEIGHT * (px / maxP);
+      if (score > bestScore || (score === bestScore && byId(members[i].id, bestId) < 0)) {
+        bestScore = score;
+        bestId = members[i].id;
+      }
+    }
+    return bestId;
+  }
+
+  // ---------------------------------------------------------------------------
+
+  PT.phash = {
+    dhash: dhash,
+    phash: phash,
+    hamming: hamming,
+    sharpness: sharpness,
+    cluster: cluster,
+    nominate: nominate,
+    DEFAULT_THRESHOLD: DEFAULT_THRESHOLD,
+    THRESHOLD_RANGE: THRESHOLD_RANGE,
+    DEFAULT_MODE: DEFAULT_MODE,
+    RECOMMENDED_HASH: RECOMMENDED_HASH,
+    // internals, exposed for the probe harness and for anything that already
+    // holds a greyscale plane
+    _internal: {
+      toGrey: toGrey,
+      downsampleGrey: downsampleGrey,
+      bytesToHex: bytesToHex,
+      popcnt32: popcnt32,
+      NOMINATE_SHARP_WEIGHT: NOMINATE_SHARP_WEIGHT,
+      NOMINATE_RES_WEIGHT: NOMINATE_RES_WEIGHT,
+      SHARP_EDGE: SHARP_EDGE
+    }
+  };
+
+  if (typeof PT.log === 'function') PT.log('phash', 'ready, default threshold', DEFAULT_THRESHOLD, DEFAULT_MODE);
+})(typeof window !== 'undefined' ? window : self);
+
+/*
+ * CHANGELOG
+ * ---------
+ * v1.0 (2026-07-28) — Initial release. dHash (9x8 difference) and pHash
+ *   (32x32 DCT-II, 8x8 low-frequency block, median threshold, DC bit zeroed),
+ *   allocation-free 32-bit Hamming distance, contrast-normalised
+ *   variance-of-Laplacian sharpness at a fixed 256px long edge, union and
+ *   strict linkage clustering with deterministic ordering, and weighted
+ *   sharpness+resolution representative nomination. Thresholds and weights set
+ *   from the measurements in tools/probes/04_phash/FINDINGS.md.
+ */
+
+</script>
+<script>
+/* ===== 30_tree.js ===== */
+/**
+ * @file 30_tree.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description Folder tree model and finalist allocation math for PRD section 4: four allocation states, both math directions, clamping, dead-state detection, and tournament unit derivation.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * This module is pure. It reads photo records and an allocation map and returns a
+ * resolution; it never touches the DOM and never mutates its inputs. That is
+ * deliberate — the allocation rules are the easiest thing in the PRD to get subtly
+ * wrong, and keeping them pure makes them directly testable.
+ *
+ * THE FOUR STATES (PRD 4.2)
+ *   fixed     a number >= 1   parent: children must sum to this   leaf: exactly this many
+ *   excluded  0               entire subtree skipped everywhere
+ *   pooled    blank           competes with blank siblings for the parent's remainder
+ *   uncapped  "*" or Infinity parent: total floats to sum of children   leaf: cull until satisfied
+ *
+ * 0 means EXCLUDED, not unlimited (PRD section 10). Every other value counts survivors.
+ *
+ * DESIGN DECISION NOT IN THE PRD: a folder may hold photos directly AND have
+ * subfolders. The PRD's worked example (4.3) only shows leaf folders holding photos.
+ * Loose photos in a parent are modelled as a synthetic child node with path
+ * "<parent>/loose" so they can carry their own allocation state and compete
+ * as an ordinary sibling. Without this they would either be silently unallocatable
+ * or would force the parent to be both authoritative and a competitor at once.
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+
+  var LOOSE = '__loose__';
+  var LOOSE_LABEL = '(loose files)';
+
+  var MODE = { FIXED: 'fixed', EXCLUDED: 'excluded', POOLED: 'pooled', UNCAPPED: 'uncapped' };
+
+  /* ------------------------------------------------------------------ build */
+
+  /**
+   * @param {Array<object>} photos  photo records with .path and .dir
+   * @returns {{nodes:Object, rootPath:string, order:Array<string>}}
+   */
+  function build(photos) {
+    var nodes = Object.create(null);
+
+    function ensure(path) {
+      if (nodes[path]) return nodes[path];
+      var name = path === '' ? '/' : path.slice(path.lastIndexOf('/') + 1);
+      var parentPath = path === '' ? null : path.slice(0, Math.max(0, path.lastIndexOf('/')));
+      var n = {
+        path: path,
+        name: name === LOOSE ? LOOSE_LABEL : name,
+        parentPath: path === '' ? null : parentPath,
+        childPaths: [],
+        photoIds: [],
+        synthetic: name === LOOSE
+      };
+      nodes[path] = n;
+      if (path !== '') {
+        var p = ensure(parentPath);
+        if (p.childPaths.indexOf(path) < 0) p.childPaths.push(path);
+      }
+      return n;
+    }
+
+    ensure('');
+    photos.forEach(function (p) {
+      ensure(p.dir).photoIds.push(p.id);
+    });
+
+    // Any node holding both direct photos and subfolders gets its loose photos
+    // moved into a synthetic child so every competitor in a pool is a node.
+    Object.keys(nodes).forEach(function (path) {
+      var n = nodes[path];
+      if (n.photoIds.length && n.childPaths.length && !n.synthetic) {
+        var lp = (path === '' ? '' : path) + '/' + LOOSE;
+        var loose = ensure(lp);
+        loose.photoIds = n.photoIds;
+        n.photoIds = [];
+      }
+    });
+
+    var order = [];
+    (function walk(path) {
+      order.push(path);
+      nodes[path].childPaths
+        .slice()
+        .sort(function (a, b) {
+          // Synthetic loose nodes sort last so they read as an addendum.
+          var as = nodes[a].synthetic, bs = nodes[b].synthetic;
+          if (as !== bs) return as ? 1 : -1;
+          return a.localeCompare(b, undefined, { numeric: true });
+        })
+        .forEach(walk);
+    })('');
+
+    Object.keys(nodes).forEach(function (path) {
+      nodes[path].childPaths.sort(function (a, b) {
+        var as = nodes[a].synthetic, bs = nodes[b].synthetic;
+        if (as !== bs) return as ? 1 : -1;
+        return a.localeCompare(b, undefined, { numeric: true });
+      });
+    });
+
+    return { nodes: nodes, rootPath: '', order: order };
+  }
+
+  /* ------------------------------------------------------------ alloc input */
+
+  /**
+   * Parses what the user typed into an allocation state.
+   * @param {string|number|null} raw
+   * @returns {{mode:string, value:number|null}|null}  null means the input is invalid
+   */
+  function parseAlloc(raw) {
+    if (raw === null || raw === undefined) return { mode: MODE.POOLED, value: null };
+    var s = String(raw).trim();
+    if (s === '') return { mode: MODE.POOLED, value: null };
+    if (s === '*' || s === '∞' || s.toLowerCase() === 'inf') return { mode: MODE.UNCAPPED, value: null };
+    if (!/^\d+$/.test(s)) return null;
+    var n = parseInt(s, 10);
+    if (n === 0) return { mode: MODE.EXCLUDED, value: 0 };
+    return { mode: MODE.FIXED, value: n };
+  }
+
+  function allocToInput(alloc) {
+    if (!alloc) return '';
+    if (alloc.mode === MODE.UNCAPPED) return '*';
+    if (alloc.mode === MODE.EXCLUDED) return '0';
+    if (alloc.mode === MODE.FIXED) return String(alloc.value);
+    return '';
+  }
+
+  /* ---------------------------------------------------------------- resolve */
+
+  /**
+   * The whole of PRD section 4 in one pass.
+   *
+   * @param {object} tree   from build()
+   * @param {Object<string,{mode:string,value:number|null}>} allocs  path -> state
+   * @returns {{
+   *   nodes: Object,          per-path derived facts
+   *   issues: Array<object>,  {path, level:'error'|'warn'|'note', code, message}
+   *   units: Array<object>,   tournament units
+   *   projectedTotal: number|null,
+   *   hasErrors: boolean
+   * }}
+   */
+  function resolve(tree, allocs) {
+    allocs = allocs || {};
+    var nodes = tree.nodes;
+    var out = Object.create(null);
+    var issues = [];
+
+    function allocOf(path) {
+      return allocs[path] || { mode: MODE.POOLED, value: null };
+    }
+
+    function isExcluded(path) {
+      var a = allocOf(path);
+      if (a.mode === MODE.EXCLUDED) return true;
+      var p = nodes[path].parentPath;
+      return p === null ? false : isExcluded(p);
+    }
+
+    /**
+     * A blank node is only genuinely pooled if it is competing for something.
+     * A blank node that merely sits between an allocated ancestor and allocated
+     * descendants is a PASS-THROUGH container, not a competitor.
+     *
+     * Without this distinction, PRD 4.1's "no depth cap" collides with PRD 4.5's
+     * dead-state rule: on a tree like a/b/c/d/e/f, allocating the root and the leaf
+     * would light up every intermediate folder as a dead pool, which is noise
+     * rather than a real problem the user needs to fix.
+     */
+    function hasAllocatedDescendant(path) {
+      var kids = nodes[path].childPaths;
+      for (var i = 0; i < kids.length; i++) {
+        var c = kids[i];
+        if (out[c].excluded) continue;
+        var m = out[c].alloc.mode;
+        if (m === MODE.FIXED || m === MODE.UNCAPPED) return true;
+        if (hasAllocatedDescendant(c)) return true;
+      }
+      return false;
+    }
+
+    // Pass 1, bottom-up: photo counts, ignoring excluded subtrees entirely
+    // (PRD 4.5: not ingested, not hashed, not counted in totals).
+    (function count(path) {
+      var n = nodes[path];
+      var self = allocOf(path).mode === MODE.EXCLUDED;
+      var kids = n.childPaths.map(count);
+      var total = self ? 0 : n.photoIds.length + kids.reduce(function (a, b) { return a + b; }, 0);
+      out[path] = {
+        path: path,
+        name: n.name,
+        alloc: allocOf(path),
+        excluded: self || isExcluded(path),
+        ownCount: self ? 0 : n.photoIds.length,
+        subtreeCount: total,
+        childPaths: n.childPaths,
+        synthetic: n.synthetic,
+        target: null,        // number | null (null = uncapped or no target)
+        uncapped: false,
+        clamped: false,
+        pooledShare: null,   // set on pooled nodes that belong to a pool
+        unitId: null
+      };
+      return total;
+    })(tree.rootPath);
+
+    // Pass 2, top-down: resolve targets. A node's meaning depends on its parent's
+    // state (PRD 4.4), so this cannot be folded into the bottom-up pass.
+    var units = [];
+
+    (function assign(path) {
+      var n = nodes[path];
+      var o = out[path];
+      var a = o.alloc;
+
+      if (o.excluded) {
+        o.target = 0;
+        n.childPaths.forEach(assign);
+        return;
+      }
+
+      var kids = n.childPaths.filter(function (c) { return !out[c].excluded; });
+
+      // --- leaf ---------------------------------------------------------
+      if (kids.length === 0) {
+        if (a.mode === MODE.UNCAPPED) {
+          o.uncapped = true;
+          o.target = null;
+          if (o.subtreeCount > 0) {
+            units.push(makeUnit('uncapped', path, [path], null, o));
+          }
+        } else if (a.mode === MODE.FIXED) {
+          o.target = Math.min(a.value, o.subtreeCount);
+          if (a.value > o.subtreeCount) {
+            o.clamped = true;
+            issues.push({
+              path: path, level: 'warn', code: 'clamped',
+              message: 'Asked for ' + a.value + ' but the folder only has ' + o.subtreeCount +
+                       '. Clamped to ' + o.target + '.'
+            });
+          }
+          if (o.target > 0) units.push(makeUnit('fixed', path, [path], o.target, o));
+        }
+        // pooled leaves are claimed by their parent's pool below
+        return;
+      }
+
+      // --- parent -------------------------------------------------------
+      kids.forEach(assign);
+
+      var fixedKids  = kids.filter(function (c) { return out[c].alloc.mode === MODE.FIXED; });
+      var uncapKids  = kids.filter(function (c) { return out[c].alloc.mode === MODE.UNCAPPED; });
+      var pooledKids = kids.filter(function (c) { return out[c].alloc.mode === MODE.POOLED; });
+
+      var fixedSum = fixedKids.reduce(function (s, c) { return s + (out[c].target || 0); }, 0);
+
+      if (a.mode === MODE.UNCAPPED) {
+        // Children are authoritative; the parent total is computed and read-only.
+        o.uncapped = true;
+        o.target = null;
+        // PRD 4.5: pooled under uncapped has no remainder to compete for. Dead
+        // state — but only for genuine competitors, not pass-through containers.
+        pooledKids.forEach(function (c) {
+          if (hasAllocatedDescendant(c)) return;
+          issues.push({
+            path: c, level: 'error', code: 'dead-pool',
+            message: 'Pooled under an uncapped parent, so there is no remainder to compete for. ' +
+                     'Give it a count, or set ' + (nodes[path].name || 'the parent') + ' to a fixed number.'
+          });
+        });
+        return;
+      }
+
+      if (a.mode === MODE.FIXED) {
+        if (fixedSum > a.value) {
+          issues.push({
+            path: path, level: 'error', code: 'oversubscribed',
+            message: 'Children are fixed at ' + fixedSum + ', which is more than this folder’s ' +
+                     a.value + '. Lower a child, or set this folder to uncapped (*).'
+          });
+          o.target = a.value;
+          return;
+        }
+        if (uncapKids.length) {
+          issues.push({
+            path: path, level: 'error', code: 'uncapped-under-fixed',
+            message: 'An uncapped child has no target, so this folder’s fixed total of ' + a.value +
+                     ' cannot be honoured. Set this folder to uncapped (*), or give the child a number.'
+          });
+        }
+
+        var remainder = a.value - fixedSum;
+        o.target = a.value;
+
+        if (pooledKids.length) {
+          var poolCount = pooledKids.reduce(function (s, c) { return s + out[c].subtreeCount; }, 0);
+          var share = Math.min(remainder, poolCount);
+          if (remainder > poolCount) {
+            issues.push({
+              path: path, level: 'warn', code: 'pool-clamped',
+              message: 'The pooled folders hold ' + poolCount + ' photos but ' + remainder +
+                       ' places are open. Only ' + poolCount + ' can survive.'
+            });
+          }
+          if (share > 0) {
+            var u = makeUnit('pooled', path, pooledKids.slice(), share, o);
+            units.push(u);
+            pooledKids.forEach(function (c) { out[c].pooledShare = u.id; out[c].unitId = u.id; });
+          } else {
+            pooledKids.forEach(function (c) {
+              issues.push({
+                path: c, level: 'warn', code: 'no-remainder',
+                message: 'Nothing left to compete for — the fixed siblings already use all ' +
+                         a.value + ' places.'
+              });
+            });
+          }
+        } else if (remainder > 0) {
+          // PRD 4.5: every child fixed under a fixed parent leaves no pooled remainder.
+          issues.push({
+            path: path, level: 'note', code: 'unused-remainder',
+            message: 'Every child has a fixed count summing to ' + fixedSum + ', so ' + remainder +
+                     ' of this folder’s ' + a.value + ' places will go unused.'
+          });
+        }
+        return;
+      }
+
+      // Pooled parent: it is itself a competitor in its own parent's pool, so its
+      // target is decided one level up. Its pooled children have no independent
+      // remainder, which the grandparent's pool already accounts for.
+      o.target = null;
+    })(tree.rootPath);
+
+    // Root special case: a pooled root has no parent to allocate it, so treat it
+    // as one pool over everything — PRD 4.2's "all children pooled: pure best-of".
+    var rootOut = out[tree.rootPath];
+    if (!rootOut.excluded && rootOut.alloc.mode === MODE.POOLED && !units.length && rootOut.subtreeCount > 0) {
+      issues.push({
+        path: tree.rootPath, level: 'note', code: 'root-unallocated',
+        message: 'Nothing is allocated yet. Give the top folder a number, or a count to at least one subfolder.'
+      });
+    }
+
+    var projected = units.some(function (u) { return u.target === null; })
+      ? null
+      : units.reduce(function (s, u) { return s + u.target; }, 0);
+
+    return {
+      nodes: out,
+      issues: issues,
+      units: units,
+      projectedTotal: projected,
+      hasErrors: issues.some(function (i) { return i.level === 'error'; })
+    };
+
+    function makeUnit(kind, ownerPath, memberPaths, target, o) {
+      var ids = [];
+      memberPaths.forEach(function (mp) { collectIds(mp, ids); });
+      var u = {
+        id: kind + ':' + (ownerPath || 'root'),
+        kind: kind,
+        ownerPath: ownerPath,
+        memberPaths: memberPaths,
+        label: kind === 'pooled'
+          ? 'pooled under ' + (nodes[ownerPath].name || 'root')
+          : (nodes[ownerPath].name || 'root'),
+        target: target,
+        photoIds: ids
+      };
+      if (kind !== 'pooled') o.unitId = u.id;
+      return u;
+    }
+
+    function collectIds(path, acc) {
+      if (out[path].excluded) return;
+      nodes[path].photoIds.forEach(function (id) { acc.push(id); });
+      nodes[path].childPaths.forEach(function (c) { collectIds(c, acc); });
+    }
+  }
+
+  /* ------------------------------------------------------------- distribute */
+
+  /**
+   * Top-down suggestion for a fixed parent (PRD 4.4). Default is weighted by photo
+   * count; even split is offered. The result is a suggestion the user may edit per
+   * child, never an applied value.
+   *
+   * Largest-remainder apportionment, so the parts sum exactly to the total rather
+   * than drifting by a photo or two after rounding.
+   *
+   * @returns {Object<string,number>} childPath -> suggested count
+   */
+  function distribute(tree, resolution, parentPath, total, mode) {
+    var kids = tree.nodes[parentPath].childPaths.filter(function (c) {
+      return !resolution.nodes[c].excluded && resolution.nodes[c].subtreeCount > 0;
+    });
+    if (!kids.length) return {};
+
+    var caps = kids.map(function (c) { return resolution.nodes[c].subtreeCount; });
+    var weights = mode === 'even' ? kids.map(function () { return 1; }) : caps.slice();
+    var wsum = weights.reduce(function (a, b) { return a + b; }, 0) || 1;
+
+    var exact = weights.map(function (w) { return (total * w) / wsum; });
+    var base = exact.map(function (x) { return Math.floor(x); });
+    var used = base.reduce(function (a, b) { return a + b; }, 0);
+
+    var order = kids
+      .map(function (c, i) { return { i: i, frac: exact[i] - base[i] }; })
+      .sort(function (a, b) { return b.frac - a.frac; });
+
+    var left = total - used;
+    for (var k = 0; k < order.length && left > 0; k++) { base[order[k].i]++; left--; }
+
+    // Never suggest more finalists than a folder has photos; push the excess to
+    // folders that can still absorb it.
+    var overflow = 0;
+    base.forEach(function (v, i) {
+      if (v > caps[i]) { overflow += v - caps[i]; base[i] = caps[i]; }
+    });
+    // Keep redistributing until the excess is placed or every folder is at
+    // capacity. A bounded number of passes is not enough: pushing 8 surplus
+    // places onto one folder needs 8 increments, not one per pass.
+    while (overflow > 0) {
+      var placed = 0;
+      for (var i = 0; i < kids.length && overflow > 0; i++) {
+        if (base[i] < caps[i]) { base[i]++; overflow--; placed++; }
+      }
+      if (!placed) break; // every folder is full; the total is simply unreachable
+    }
+
+    var res = {};
+    kids.forEach(function (c, i) { res[c] = base[i]; });
+    return res;
+  }
+
+  /* ------------------------------------------------------------------- api */
+
+  PT.tree = {
+    MODE: MODE,
+    LOOSE: LOOSE,
+    build: build,
+    parseAlloc: parseAlloc,
+    allocToInput: allocToInput,
+    resolve: resolve,
+    distribute: distribute
+  };
+})();
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Tree construction with synthetic nodes for
+ *   loose files, allocation parsing for all four states, two-pass resolution with
+ *   clamping and dead-state detection, tournament unit derivation, and
+ *   largest-remainder weighted distribution.
+ */
+
+</script>
+
+<!-- CHANGELOG
+  v1.0 (2026-07-28): Initial release. Shell, screen host, toast and modal
+    containers, and build tokens for CSS, JS and the libheif payload.
+-->

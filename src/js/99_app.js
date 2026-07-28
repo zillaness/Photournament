@@ -1,6 +1,6 @@
 /**
  * @file 99_app.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -185,10 +185,72 @@
 
       var target = screenForSession(session);
       PT.router.go(target.name, target.params);
+
+      // PRD 7.10: new photos detected on resume, with a prompt to fold them in
+      // or start fresh. Deliberately AFTER the screen is mounted — the user is
+      // back where they left off first, and the question arrives as a prompt
+      // over it rather than as a gate in front of it.
+      checkForNewPhotos(session, photos);
     }).catch(function (e) {
       PT.warn('resume', e);
       PT.router.go('welcome');
     });
+  }
+
+  /**
+   * Re-walks the stored folder handle and compares against the photo ids already
+   * in the session. Fingerprints are stable across sessions (content hash plus
+   * path, size and mtime), so anything unrecognised is genuinely new.
+   *
+   * Silent when nothing changed, and silent when there is no handle to walk —
+   * a dropped-files session has nothing to re-read.
+   */
+  function checkForNewPhotos(session, photos) {
+    if (session.sourceKind !== 'handle' || !PT.env.hasFSA) return;
+
+    PT.db.get('handles', 'root').then(function (rec) {
+      if (!rec || !rec.handle) return;
+      return rec.handle.queryPermission({ mode: 'read' }).then(function (p) {
+        // Re-granting needs a user gesture, and this runs without one. Staying
+        // quiet is correct: the alternative is a permission prompt the user did
+        // not ask for, every time they resume.
+        if (p !== 'granted') return;
+        return PT.scanForNew(rec.handle, photos);
+      });
+    }).then(function (found) {
+      if (!found || !found.length) return;
+      promptNewPhotos(found);
+    }).catch(function (e) {
+      PT.warn('resume', 'new-photo check failed', e);
+    });
+  }
+
+  function promptNewPhotos(found) {
+    var body = PT.dom.$('#modal-body');
+    if (!body) return;
+    PT.dom.clear(body);
+    body.appendChild(el('h2', {
+      text: found.length + ' new photo' + (found.length === 1 ? '' : 's') + ' since you started'
+    }));
+    body.appendChild(el('p', { class: 'muted small', text:
+      found.slice(0, 5).map(function (f) { return f.name; }).join(', ') +
+      (found.length > 5 ? ', and ' + (found.length - 5) + ' more' : '') }));
+    body.appendChild(el('p', { class: 'muted small', text:
+      'Folding them in means re-running the folder counts, because the field they ' +
+      'compete in has changed. Your existing decisions are kept either way.' }));
+    body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+      el('button', { class: 'btn', text: 'Ignore them for now', onclick: function () {
+        PT.dom.$('#modal').close();
+      } }),
+      el('button', { class: 'btn btn-primary', text: 'Start fresh with everything',
+        onclick: function () {
+          PT.dom.$('#modal').close();
+          Promise.all([
+            PT.db.clear('sessions'), PT.db.clear('photos'), PT.db.clear('derivatives')
+          ]).then(function () { location.reload(); });
+        } })
+    ]));
+    PT.dom.$('#modal').showModal();
   }
 
   /* -------------------------------------------------------------- boot ---- */
@@ -232,4 +294,9 @@
  *   session resume with an evicted-cache notice, and console diagnostics.
   * v1.1 (2026-07-28): Reopens an in-progress duplicate review on resume, so a
  *   hand edit is never stranded behind a reload.
+ * v1.2 (2026-07-28): PRD 7.10 new-photo detection on resume. Re-walks the stored
+ *   folder handle, compares by fingerprint, and prompts to fold new files in or
+ *   start fresh. Silent when nothing changed, when there is no handle to walk, and
+ *   when read permission would need a fresh gesture — the alternative is a
+ *   permission prompt on every resume that the user never asked for.
 */

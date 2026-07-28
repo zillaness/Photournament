@@ -1,6 +1,6 @@
 /**
  * @file 50_screen_tree.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -266,17 +266,38 @@
 
         footer.appendChild(el('span', { class: 'spacer' }));
 
+        // PRD 7.6. The target sits beside the toggle rather than in a settings
+        // page: enabling the round and saying how big it should be is one
+        // decision, and splitting them leaves a number nobody ever finds.
+        var stageDTarget = el('input', {
+          type: 'text', inputmode: 'numeric', maxlength: '4',
+          class: 'tree-alloc',
+          value: String(s.session.settings.stageDTarget),
+          title: 'How many photos the best-of-the-best round should end up with'
+        });
+        stageDTarget.addEventListener('input', function () {
+          var v = parseInt(stageDTarget.value, 10);
+          if (!(v >= 1)) { stageDTarget.classList.add('invalid'); return; }
+          stageDTarget.classList.remove('invalid');
+          PT.store.dispatch('settings:stageDTarget', function (ss) {
+            ss.session.settings.stageDTarget = v;
+          });
+        });
+        stageDTarget.hidden = !s.session.settings.stageD;
+
         footer.appendChild(el('label', { class: 'check small' }, [
           (function () {
             var cb = el('input', { type: 'checkbox' });
             cb.checked = s.session.settings.stageD;
             cb.addEventListener('change', function () {
               PT.store.dispatch('settings:stageD', function (ss) { ss.session.settings.stageD = cb.checked; });
+              stageDTarget.hidden = !cb.checked;
             });
             return cb;
           })(),
           el('span', { text: 'Also run a best-of-the-best round across all winners' })
         ]));
+        footer.appendChild(stageDTarget);
 
         var go = el('button', {
           class: 'btn btn-primary',
@@ -334,4 +355,6 @@
  *   second paragraph of help became a disclosure.
  * v1.3 (2026-07-28): Routes into the PRD 7.7 duplicate review after the units
  *   are created, when there is anything to review.
+ * v1.4 (2026-07-28): Exposed stageDTarget beside its own toggle. It was the one
+ *   PRD 12 setting with no UI at all — the round could be enabled but not sized.
 */

@@ -18,7 +18,7 @@ import path from 'node:path';
 import os from 'node:os';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const ARTIFACT = path.join(ROOT, 'dist', 'photournament_v0.2.html');
+const ARTIFACT = path.join(ROOT, 'dist', 'photournament_v1.0.html');
 const OUT = path.join(ROOT, 'docs', 'screens');
 mkdirSync(OUT, { recursive: true });
 
@@ -120,7 +120,12 @@ await page.evaluate(() => {
 await shot('04_tree');
 
 await clickText(/Start culling/);
-await page.waitForTimeout(500);
+await page.waitForTimeout(700);
+if ((await screen()) === 'dupes') {
+  await shot('12_duplicate_review');
+  await clickText(/looks right|skip this step/, 3000);
+  await page.waitForTimeout(500);
+}
 await shot('05_grid_config');
 
 await clickText(/Start pass/);
@@ -176,6 +181,11 @@ while (guard++ < 300 && (await screen()) !== 'export') {
     if (await clickText(/continue|next|finish|done|results|duplicates/, 1500)) continue;
     break;
   }
+  if (s === 'dupes') {
+    await shot('12_duplicate_review');
+    if (await clickText(/looks right|skip this step/, 1500)) continue;
+    break;
+  }
   if (s === 'runoff') { await shot('09_duplicates'); if (await clickText(/skip|continue|done/, 1500)) continue; break; }
   if (s === 'rescue') { await shot('10_rescue'); if (await clickText(/skip|continue|done|bracket/, 1500)) continue; break; }
   break;
@@ -190,5 +200,5 @@ console.log('done ->', path.relative(ROOT, OUT));
 /* CHANGELOG
  * v1.0 (2026-07-28): Initial release. Captures entry, ingest, tree, grid
  *   configuration, a live pass, the over-quota state, a bracket matchup, the
- *   duplicates screen and export review.
+ *   duplicate review, the Stage C duplicates screen and export review.
  */

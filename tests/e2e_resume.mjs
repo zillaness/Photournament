@@ -26,7 +26,7 @@ import path from 'node:path';
 import os from 'node:os';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const ARTIFACT = path.join(ROOT, 'dist', 'photournament_v0.2.html');
+const ARTIFACT = path.join(ROOT, 'dist', 'photournament_v1.0.html');
 if (!existsSync(ARTIFACT)) { console.error('run: node tools/build.mjs'); process.exit(1); }
 
 /* ------------------------------------------------------------- png corpus -- */
@@ -134,9 +134,16 @@ await page.evaluate(() => {
   set('Port', '*'); set('A', '3'); set('B', '3');
   const cb = Array.from(document.querySelectorAll('#tree-footer input[type=checkbox]'))[0];
   if (cb && !cb.checked) cb.click();
+  // PRD 12's stageDTarget, which had no UI until now: ask for 4, not the default.
+  const t = document.querySelector('#tree-footer input.tree-alloc');
+  if (t) { t.value = '4'; t.dispatchEvent(new Event('input', { bubbles: true })); }
 });
-const stageDOn = await page.evaluate(() => window.PT.store.get().session.settings.stageD);
-check('Stage D can be enabled from the tree', stageDOn === true, stageDOn);
+const stageDCfg = await page.evaluate(() => {
+  const st = window.PT.store.get().session.settings;
+  return { on: st.stageD, target: st.stageDTarget };
+});
+check('Stage D can be enabled from the tree', stageDCfg.on === true, stageDCfg.on);
+check('the Stage D target is settable from the tree', stageDCfg.target === 4, stageDCfg.target);
 
 await clickText(/Start culling/);
 await page.waitForTimeout(400);
@@ -329,7 +336,8 @@ const end = await page.evaluate(() => {
     stageDWinners: d ? d.winners.length : 0,
     stageDTarget: d ? d.target : null,
     perFolderWinners: perFolder.reduce((a, k) => a + s.session.units[k].winners.length, 0),
-    sets: Object.keys(s.session.units).length
+    sets: Object.keys(s.session.units).length,
+    hasScanForNew: typeof window.PT.scanForNew === 'function'
   };
 });
 
@@ -338,6 +346,11 @@ check('Stage D field is the union of the folder winners',
   end.stageDField === end.perFolderWinners, `${end.stageDField} vs ${end.perFolderWinners}`);
 check('Stage D produced its target', end.stageDWinners === end.stageDTarget,
   `${end.stageDWinners}/${end.stageDTarget}`);
+// The chosen 4 must actually be honoured, not silently replaced by the default.
+check('Stage D honoured the target typed into the tree',
+  end.stageDTarget === Math.min(4, end.perFolderWinners),
+  `target ${end.stageDTarget} from a field of ${end.perFolderWinners}`);
+check('new-photo detection is wired', end.hasScanForNew === true, end.hasScanForNew);
 // PRD 7.6: Stage D ADDS a second set alongside the per-folder winners rather than
 // replacing them, and duplication across the two is intentional.
 check('per-folder winners are kept alongside Stage D', end.perFolderWinners > 0,

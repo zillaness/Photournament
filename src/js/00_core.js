@@ -1,6 +1,6 @@
 /**
  * @file 00_core.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -27,7 +27,7 @@
 
   var PT = (window.PT = window.PT || {});
 
-  PT.VERSION = '0.2';
+  PT.VERSION = '1.0';
 
   /* ---------------------------------------------------------------- logging */
 
@@ -524,4 +524,5 @@
  *   race in dom.releaseImg: revoking an object URL while an <img> was still
  *   decoding aborted the load, surfacing on a file:// origin as "Not allowed to
  *   load local resource". src is now detached before revoking.
+ * v1.2 (2026-07-28): App version to 1.0.
 */

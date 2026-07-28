@@ -22,7 +22,7 @@ import path from 'node:path';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const target = process.argv[2]
   ? path.resolve(process.argv[2])
-  : path.join(ROOT, 'dist', 'photournament_v0.2.html');
+  : path.join(ROOT, 'dist', 'photournament_v1.0.html');
 
 if (!existsSync(target)) {
   console.error('missing ' + target + ' — run: node tools/build.mjs');

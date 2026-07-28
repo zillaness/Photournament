@@ -1,12 +1,12 @@
 {
   "name": "photournament",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Local browser tool that narrows photo sets to a top-N through quota-enforced grid passes and pairwise tournament ranking. Spec: photournament_prd_v1.8.md",
   "author": "Samuel Cao",
   "license": "UNLICENSED",
   "scripts": {
-    "build": "node tools/build.mjs && node tools/build.mjs --no-heic --out photournament_slim_v0.2.html",
+    "build": "node tools/build.mjs && node tools/build.mjs --no-heic --out photournament_slim_v1.0.html",
     "serve": "http-server src -p 8080 -c-1",
     "serve:dist": "http-server dist -p 8081 -c-1",
     "test": "node --test \"tests/**/*_test.mjs\" && node tests/dist_fresh.mjs && node tests/smoke_load.mjs && node tests/smoke_dist.mjs && node tests/e2e_flow.mjs && node tests/e2e_full.mjs && node tests/e2e_resume.mjs"

@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -291,6 +291,35 @@
       el('div', { class: 'error-box', text: (e && e.message) || String(e) })
     );
   }
+
+  /**
+   * PRD 7.10: which files in the folder are not already in this session.
+   *
+   * Compares by FINGERPRINT, not by path — the fingerprint is content plus path,
+   * size and mtime, so a file that was merely renamed still reads as new, and a
+   * file that was moved is genuinely a different photo as far as PRD 4's
+   * per-folder allocation is concerned.
+   *
+   * @param {FileSystemDirectoryHandle} dirHandle
+   * @param {Object} known  id -> photo record
+   * @returns {Promise<Array<{name:string, path:string}>>}
+   */
+  PT.scanForNew = function (dirHandle, known) {
+    return walkHandle(dirHandle, '', [], 0, null).then(function (entries) {
+      var images = entries.filter(function (e) { return PT.isImageKind(PT.kindOf(e.name)); });
+      var out = [];
+      var chain = Promise.resolve();
+      images.forEach(function (e) {
+        chain = chain.then(function () {
+          return e.handle.getFile()
+            .then(function (file) { return PT.fingerprint(file, e.path); })
+            .then(function (id) { if (!known[id]) out.push({ name: e.name, path: e.path }); })
+            .catch(function () { /* an unreadable file is not a new one */ });
+        });
+      });
+      return chain.then(function () { return out; });
+    });
+  };
 
   /* -------------------------------------------------------------- scan ---- */
 
@@ -619,4 +648,6 @@
  *   14 above all — was quietly measuring the wrong hash family. Measured before:
  *   weights spread 30-37 and 55 of 120 distances odd. After: every weight exactly
  *   31, zero odd distances.
+ * v1.4 (2026-07-28): Added PT.scanForNew for PRD 7.10, comparing by fingerprint
+ *   rather than by path so a renamed file reads as new.
 */

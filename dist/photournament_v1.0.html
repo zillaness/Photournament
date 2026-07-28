@@ -1,5 +1,5 @@
 <!--
-  Photournament v0.2 — built 2026-07-28
+  Photournament v1.0 — built 2026-07-28
   GENERATED FILE. Do not edit; edit src/ and re-run: node tools/build.mjs
   12 script(s), 1 stylesheet(s). libheif-js wasm bundle, 1.4 MB, inert until the first HEIC is seen.
   Open by double-clicking. Chromium only: resume and disk-write need the
@@ -2295,7 +2295,7 @@ if (typeof exports === 'object' && typeof module === 'object') {
 /* ===== 00_core.js ===== */
 /**
  * @file 00_core.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -2322,7 +2322,7 @@ if (typeof exports === 'object' && typeof module === 'object') {
 
   var PT = (window.PT = window.PT || {});
 
-  PT.VERSION = '0.2';
+  PT.VERSION = '1.0';
 
   /* ---------------------------------------------------------------- logging */
 
@@ -2819,6 +2819,7 @@ if (typeof exports === 'object' && typeof module === 'object') {
  *   race in dom.releaseImg: revoking an object URL while an <img> was still
  *   decoding aborted the load, surfacing on a file:// origin as "Not allowed to
  *   load local resource". src is now detached before revoking.
+ * v1.2 (2026-07-28): App version to 1.0.
 */
 
 </script>
@@ -5399,7 +5400,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 40_screen_ingest.js ===== */
 /**
  * @file 40_screen_ingest.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -5690,6 +5691,35 @@ v1.0 - 2026-07-28 - Samuel Cao
       el('div', { class: 'error-box', text: (e && e.message) || String(e) })
     );
   }
+
+  /**
+   * PRD 7.10: which files in the folder are not already in this session.
+   *
+   * Compares by FINGERPRINT, not by path — the fingerprint is content plus path,
+   * size and mtime, so a file that was merely renamed still reads as new, and a
+   * file that was moved is genuinely a different photo as far as PRD 4's
+   * per-folder allocation is concerned.
+   *
+   * @param {FileSystemDirectoryHandle} dirHandle
+   * @param {Object} known  id -> photo record
+   * @returns {Promise<Array<{name:string, path:string}>>}
+   */
+  PT.scanForNew = function (dirHandle, known) {
+    return walkHandle(dirHandle, '', [], 0, null).then(function (entries) {
+      var images = entries.filter(function (e) { return PT.isImageKind(PT.kindOf(e.name)); });
+      var out = [];
+      var chain = Promise.resolve();
+      images.forEach(function (e) {
+        chain = chain.then(function () {
+          return e.handle.getFile()
+            .then(function (file) { return PT.fingerprint(file, e.path); })
+            .then(function (id) { if (!known[id]) out.push({ name: e.name, path: e.path }); })
+            .catch(function () { /* an unreadable file is not a new one */ });
+        });
+      });
+      return chain.then(function () { return out; });
+    });
+  };
 
   /* -------------------------------------------------------------- scan ---- */
 
@@ -6018,6 +6048,8 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   14 above all — was quietly measuring the wrong hash family. Measured before:
  *   weights spread 30-37 and 55 of 120 distances odd. After: every weight exactly
  *   31, zero odd distances.
+ * v1.4 (2026-07-28): Added PT.scanForNew for PRD 7.10, comparing by fingerprint
+ *   rather than by path so a renamed file reads as new.
 */
 
 </script>
@@ -7126,7 +7158,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 50_screen_tree.js ===== */
 /**
  * @file 50_screen_tree.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -7392,17 +7424,38 @@ v1.0 - 2026-07-28 - Samuel Cao
 
         footer.appendChild(el('span', { class: 'spacer' }));
 
+        // PRD 7.6. The target sits beside the toggle rather than in a settings
+        // page: enabling the round and saying how big it should be is one
+        // decision, and splitting them leaves a number nobody ever finds.
+        var stageDTarget = el('input', {
+          type: 'text', inputmode: 'numeric', maxlength: '4',
+          class: 'tree-alloc',
+          value: String(s.session.settings.stageDTarget),
+          title: 'How many photos the best-of-the-best round should end up with'
+        });
+        stageDTarget.addEventListener('input', function () {
+          var v = parseInt(stageDTarget.value, 10);
+          if (!(v >= 1)) { stageDTarget.classList.add('invalid'); return; }
+          stageDTarget.classList.remove('invalid');
+          PT.store.dispatch('settings:stageDTarget', function (ss) {
+            ss.session.settings.stageDTarget = v;
+          });
+        });
+        stageDTarget.hidden = !s.session.settings.stageD;
+
         footer.appendChild(el('label', { class: 'check small' }, [
           (function () {
             var cb = el('input', { type: 'checkbox' });
             cb.checked = s.session.settings.stageD;
             cb.addEventListener('change', function () {
               PT.store.dispatch('settings:stageD', function (ss) { ss.session.settings.stageD = cb.checked; });
+              stageDTarget.hidden = !cb.checked;
             });
             return cb;
           })(),
           el('span', { text: 'Also run a best-of-the-best round across all winners' })
         ]));
+        footer.appendChild(stageDTarget);
 
         var go = el('button', {
           class: 'btn btn-primary',
@@ -7460,6 +7513,8 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   second paragraph of help became a disclosure.
  * v1.3 (2026-07-28): Routes into the PRD 7.7 duplicate review after the units
  *   are created, when there is anything to review.
+ * v1.4 (2026-07-28): Exposed stageDTarget beside its own toggle. It was the one
+ *   PRD 12 setting with no UI at all — the round could be enabled but not sized.
 */
 
 </script>
@@ -10723,7 +10778,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 99_app.js ===== */
 /**
  * @file 99_app.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -10908,10 +10963,72 @@ v1.0 - 2026-07-28 - Samuel Cao
 
       var target = screenForSession(session);
       PT.router.go(target.name, target.params);
+
+      // PRD 7.10: new photos detected on resume, with a prompt to fold them in
+      // or start fresh. Deliberately AFTER the screen is mounted — the user is
+      // back where they left off first, and the question arrives as a prompt
+      // over it rather than as a gate in front of it.
+      checkForNewPhotos(session, photos);
     }).catch(function (e) {
       PT.warn('resume', e);
       PT.router.go('welcome');
     });
+  }
+
+  /**
+   * Re-walks the stored folder handle and compares against the photo ids already
+   * in the session. Fingerprints are stable across sessions (content hash plus
+   * path, size and mtime), so anything unrecognised is genuinely new.
+   *
+   * Silent when nothing changed, and silent when there is no handle to walk —
+   * a dropped-files session has nothing to re-read.
+   */
+  function checkForNewPhotos(session, photos) {
+    if (session.sourceKind !== 'handle' || !PT.env.hasFSA) return;
+
+    PT.db.get('handles', 'root').then(function (rec) {
+      if (!rec || !rec.handle) return;
+      return rec.handle.queryPermission({ mode: 'read' }).then(function (p) {
+        // Re-granting needs a user gesture, and this runs without one. Staying
+        // quiet is correct: the alternative is a permission prompt the user did
+        // not ask for, every time they resume.
+        if (p !== 'granted') return;
+        return PT.scanForNew(rec.handle, photos);
+      });
+    }).then(function (found) {
+      if (!found || !found.length) return;
+      promptNewPhotos(found);
+    }).catch(function (e) {
+      PT.warn('resume', 'new-photo check failed', e);
+    });
+  }
+
+  function promptNewPhotos(found) {
+    var body = PT.dom.$('#modal-body');
+    if (!body) return;
+    PT.dom.clear(body);
+    body.appendChild(el('h2', {
+      text: found.length + ' new photo' + (found.length === 1 ? '' : 's') + ' since you started'
+    }));
+    body.appendChild(el('p', { class: 'muted small', text:
+      found.slice(0, 5).map(function (f) { return f.name; }).join(', ') +
+      (found.length > 5 ? ', and ' + (found.length - 5) + ' more' : '') }));
+    body.appendChild(el('p', { class: 'muted small', text:
+      'Folding them in means re-running the folder counts, because the field they ' +
+      'compete in has changed. Your existing decisions are kept either way.' }));
+    body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+      el('button', { class: 'btn', text: 'Ignore them for now', onclick: function () {
+        PT.dom.$('#modal').close();
+      } }),
+      el('button', { class: 'btn btn-primary', text: 'Start fresh with everything',
+        onclick: function () {
+          PT.dom.$('#modal').close();
+          Promise.all([
+            PT.db.clear('sessions'), PT.db.clear('photos'), PT.db.clear('derivatives')
+          ]).then(function () { location.reload(); });
+        } })
+    ]));
+    PT.dom.$('#modal').showModal();
   }
 
   /* -------------------------------------------------------------- boot ---- */
@@ -10955,6 +11072,11 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   session resume with an evicted-cache notice, and console diagnostics.
   * v1.1 (2026-07-28): Reopens an in-progress duplicate review on resume, so a
  *   hand edit is never stranded behind a reload.
+ * v1.2 (2026-07-28): PRD 7.10 new-photo detection on resume. Re-walks the stored
+ *   folder handle, compares by fingerprint, and prompts to fold new files in or
+ *   start fresh. Silent when nothing changed, when there is no handle to walk, and
+ *   when read permission would need a fresh gesture — the alternative is a
+ *   permission prompt on every resume that the user never asked for.
 */
 
 </script>

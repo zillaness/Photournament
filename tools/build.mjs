@@ -1,6 +1,6 @@
 /**
  * file: build.mjs
- * version: 2.2
+ * version: 1.3
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -31,7 +31,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SRC = path.join(ROOT, 'src');
 const DIST = path.join(ROOT, 'dist');
 
-const APP_VERSION = '0.2';
+const APP_VERSION = '1.0';
 const OUT_NAME = `photournament_v${APP_VERSION}.html`;
 
 const argv = process.argv.slice(2);
@@ -191,4 +191,5 @@ console.log(`       ${libheifNote}`);
  * v1.2 (2026-07-28): Emits 20_phash.js twice — once as a live script and once as
  *   inert text — so the ingest worker can be constructed with a real pHash. A
  *   worker cannot importScripts it from a file:// origin.
+ * v1.3 (2026-07-28): App version to 1.0.
 */

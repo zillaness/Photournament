@@ -39,18 +39,32 @@
 -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23171717'/%3E%3Cg fill='%23474747'%3E%3Crect x='8' y='8' width='4' height='4'/%3E%3Crect x='13' y='8' width='4' height='4'/%3E%3Crect x='18' y='8' width='4' height='4'/%3E%3Crect x='8' y='13' width='4' height='4'/%3E%3Crect x='18' y='13' width='4' height='4'/%3E%3Crect x='8' y='18' width='4' height='4'/%3E%3Crect x='13' y='18' width='4' height='4'/%3E%3Crect x='18' y='18' width='4' height='4'/%3E%3Crect x='25' y='8' width='14' height='14'/%3E%3Crect x='42' y='8' width='14' height='14'/%3E%3Crect x='8' y='25' width='14' height='14'/%3E%3Crect x='42' y='25' width='14' height='14'/%3E%3Crect x='8' y='42' width='14' height='14'/%3E%3Crect x='25' y='42' width='14' height='14'/%3E%3Crect x='42' y='42' width='14' height='14'/%3E%3C/g%3E%3Crect x='13' y='13' width='4' height='4' fill='%23F3F3F3'/%3E%3Crect x='25' y='25' width='14' height='14' fill='%23F3F3F3'/%3E%3C/svg%3E">
 
+<!--
+  Applied BEFORE the stylesheet so the first paint is already the right theme.
+  A photographer who chose the light surround should never see a dark frame
+  flash past on load; the whole reason the switch exists is that the surround
+  changes how a photograph reads.
+-->
+<script>
+  try {
+    var t = localStorage.getItem('photournament.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  } catch (e) { /* storage can be blocked; dark is the default anyway */ }
+</script>
+
 <style>
-/* ===== photournament_ui_v2.0.css ===== */
+/* ===== photournament_ui_v2.1.css ===== */
 /**
- * file: photournament_ui_v2.0.css
- * version: 2.0
+ * file: photournament_ui_v2.1.css
+ * version: 2.1
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
  * description: Complete replacement stylesheet for Photournament. Consolidates
  *   src/css/00_base.css, src/css/10_screens.css and the four JS-injected style
  *   blocks (pt-tree-style, pt-grid-style, pt-bracket-style, pt-export-style)
- *   into one file. Vanilla CSS, no external resources, Chromium-only, dark only.
+ *   into one file. Vanilla CSS, no external resources, Chromium-only.
+ *   Dark by default, with a light theme and a match-the-OS theme.
  * ai_update: Update last_updated and version. Rename file to match. Append changelog at bottom.
  *
  * THE RULE THIS FILE IS BUILT AROUND
@@ -60,7 +74,9 @@
  *
  *   1. Every grey is ACHROMATIC. They are written as oklch(L 0 0), so there is
  *      no hue to cast — not a blue-black, not a warm grey, zero chroma by
- *      construction rather than by eyeballing a hex triplet.
+ *      construction rather than by eyeballing a hex triplet. This holds in the
+ *      light theme too, where the well stays a neutral mid-grey and never
+ *      becomes white — see section 1.
  *
  *   2. The kept/chosen state of a PHOTOGRAPH is signalled with --mark, which is
  *      also achromatic. The old design put an accent-blue border directly against
@@ -84,10 +100,23 @@
  */
 
 /* ==========================================================================
-   1. DESIGN TOKENS
+   1. DESIGN TOKENS — DARK (the default)
+   ==========================================================================
+   Plain colours, deliberately. An earlier revision folded both themes into one
+   light-dark(LIGHT, DARK) block, which is tidier to read but silently breaks:
+   Chromium cannot interpolate a light-dark() colour, so any property that also
+   carries a transition — including border-color on the photo mounts — never
+   resolves and falls back to currentColor. That put a near-white mat around
+   every photograph in dark mode and erased the kept / not-kept distinction on
+   the grid pass. Every token here holds a directly interpolable colour.
+
+   The light theme is section 1b. Its values are duplicated there rather than
+   derived; if you retune a neutral, retune its counterpart.
    ========================================================================== */
 
 :root {
+  color-scheme: dark;
+
   /* -- neutral surfaces: zero chroma, so nothing near a photo has a cast ---- */
   --bg:        oklch(0.160 0 0);
   --surface:   oklch(0.205 0 0);
@@ -103,20 +132,53 @@
   /* The well behind photographs. Absolute black, never tinted, never a gradient. */
   --well:      #000;
 
+  /*
+   * ON-PHOTO tokens. These do NOT invert with the theme, and that is deliberate:
+   * a filename caption or a position chip drawn over a photograph sits on image
+   * content, not on chrome, and image content has no theme. A dark scrim with
+   * light text is legible over any photograph in any theme; a theme-inverting
+   * colour on a fixed scrim is legible in one theme and a smudge in the other.
+   * Never point these at --text-*, and never point chrome at these.
+   */
+  --scrim:    oklch(0 0 0 / 0.82);   /* gradient foot under a filename */
+  --chip:     oklch(0 0 0 / 0.62);   /* small plate under an index or tag */
+  --on-photo: oklch(0.920 0 0);      /* anything written on either of those */
+
+  /* Text sitting on the well itself — the bracket caption strips, the missing
+     -image placeholders. Follows the theme, because the well does. */
+  --on-well:    oklch(0.565 0 0);
+  --on-well-dim: oklch(0.440 0 0);
+  --on-well-hi: oklch(0.950 0 0);
+
   /* -- the one accent, and the achromatic mark that replaces it on photos --- */
   --accent:     oklch(0.680 0.072 248);
   --accent-hi:  oklch(0.780 0.072 248);
   --accent-dim: oklch(0.420 0.050 248);
   --on-accent:  oklch(0.150 0 0);
 
-  /* The kept / chosen signal. Achromatic by design — see the header. */
-  --mark:      oklch(0.965 0 0);
-  --mark-edge: oklch(0.480 0 0);
+  /* The kept / chosen signal. Achromatic by design, and always the far pole
+     from --well, in either theme. */
+  --mark:       oklch(0.965 0 0);
+  --mark-edge:  oklch(0.480 0 0);
+  --on-mark:    oklch(0.160 0 0);
+  --cell-hover: oklch(0.340 0 0);
 
   /* Status. Used only in notices and never adjacent to image content. */
-  --good: oklch(0.680 0.080 150);
-  --warn: oklch(0.760 0.090 85);
-  --bad:  oklch(0.640 0.110 25);
+  --good:    oklch(0.680 0.080 150);
+  --warn:    oklch(0.760 0.090 85);
+  --bad:     oklch(0.640 0.110 25);
+  --bad-fg:  oklch(0.880 0.040 25);
+  --warn-fg: oklch(0.900 0.030 85);
+
+  /* Interactive surfaces. */
+  --field:       oklch(0.130 0 0);
+  --field-focus: oklch(0.155 0 0);
+  --hover-line:  oklch(0.470 0 0);
+  --drop-a:      oklch(0.185 0 0);
+  --drop-b:      oklch(0.170 0 0);
+  --drop-over:   oklch(0.205 0 0);
+  --shadow:      oklch(0 0 0 / 0.60);
+  --shadow-lg:   oklch(0 0 0 / 0.70);
 
   /* -- geometry -------------------------------------------------------------- */
   --r:     5px;
@@ -140,9 +202,112 @@
 
   --topbar-h: 60px;
 
-  /* -- motion: state only, never on the hot path ---------------------------- */
+  /* -- motion ----------------------------------------------------------------
+   * NO COLOUR TRANSITIONS ANYWHERE IN THIS FILE. Two reasons, and the second is
+   * the one that will bite you if you add one back:
+   *
+   *   1. This is a speed tool. A 90ms cross-fade on a hover or a kept state is
+   *      90ms of latency on a screen the user hits several hundred times in a
+   *      sitting. State changes here are instant on purpose.
+   *   2. A transitioned property renders its FROM value until the document
+   *      timeline advances. In any host that starts elements before the
+   *      stylesheet's colour applies — or that pauses the timeline outright —
+   *      the from-value is the initial one (currentColor for border-color,
+   *      transparent for background), and the element can stay stuck there.
+   *      That put a near-white mat around every photograph in dark mode and made
+   *      kept and not-kept indistinguishable on the grid pass.
+   *
+   * --t and --t-snap remain for the transitions that are safe and worth having:
+   * width and opacity only (the progress bars, the allocation bars, the bracket
+   * chrome fading up on hover, the filename caption).
+   */
   --t:      90ms;
   --t-snap: 60ms;
+}
+
+/* ==========================================================================
+   1b. DESIGN TOKENS — LIGHT, AND THEME SELECTION
+   ==========================================================================
+   Two states on the root element, and nothing else in the file needs to know
+   which one is active:
+
+     no attribute        dark. The default.
+     data-theme="dark"   dark, explicitly.
+     data-theme="light"  light — mid-grey page, mid-grey well, dark mount.
+
+   The theme is a deliberate choice, not an inference. There is no auto mode and
+   no prefers-color-scheme query: which theme suits depends on the light in the
+   room the culling is happening in, and the OS setting does not know that. A
+   photographer working at night under a dark OS theme may still want the light
+   surround, and the reverse. color-scheme rides along on each block so native
+   scrollbars, focus rings and form controls follow whichever is chosen.
+
+   THE LIGHT THEME IS NOT A WHITE THEME, AND THAT IS THE POINT.
+   A white surround around a photograph is the one thing worse than a tinted one.
+   Simultaneous contrast makes an image against white read darker, flatter and
+   lower in contrast than the same image against mid-grey — which is why every
+   colour-managed viewing standard specifies a neutral mid-grey surround
+   (ISO 3664 puts it near L* 50, around 18–20% reflectance) rather than paper
+   white. So in light mode:
+
+     - --well, the surface photographs actually sit on, is L 0.62 mid-grey.
+       It does NOT invert to white. It is the same neutral judgement surface the
+       dark theme's black well is, moved to the light end of the room.
+     - --mark, the kept / chosen signal, flips from near-white to near-black, so
+       the mounted-print language survives the inversion: in a bright room a
+       keeper reads as a print on dark mount board.
+     - Every grey is still oklch(L 0 0). Zero chroma, no cast, either theme.
+   ========================================================================== */
+
+:root[data-theme="dark"] { color-scheme: dark; }
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg:        oklch(0.845 0 0);
+  --surface:   oklch(0.900 0 0);
+  --surface-2: oklch(0.940 0 0);
+  --surface-3: oklch(0.975 0 0);
+  --line:      oklch(0.780 0 0);
+  --line-2:    oklch(0.680 0 0);
+
+  --text:      oklch(0.240 0 0);
+  --text-dim:  oklch(0.450 0 0);
+  --text-mute: oklch(0.570 0 0);
+
+  /* The judgement surface. Mid-grey, never white. See the note above. */
+  --well:      oklch(0.620 0 0);
+
+  /* --scrim, --chip and --on-photo are NOT overridden here. They sit on
+     photographs, and photographs have no theme. See section 1. */
+  --on-well:    oklch(0.290 0 0);
+  --on-well-dim: oklch(0.395 0 0);
+  --on-well-hi: oklch(0.150 0 0);
+
+  --accent:     oklch(0.520 0.072 248);
+  --accent-hi:  oklch(0.430 0.072 248);
+  --accent-dim: oklch(0.760 0.045 248);
+  --on-accent:  oklch(0.985 0 0);
+
+  --mark:       oklch(0.175 0 0);
+  --mark-edge:  oklch(0.760 0 0);
+  --on-mark:    oklch(0.965 0 0);
+  --cell-hover: oklch(0.470 0 0);
+
+  --good:    oklch(0.500 0.090 150);
+  --warn:    oklch(0.530 0.100 85);
+  --bad:     oklch(0.500 0.140 25);
+  --bad-fg:  oklch(0.330 0.080 25);
+  --warn-fg: oklch(0.330 0.060 85);
+
+  --field:       oklch(0.985 0 0);
+  --field-focus: oklch(1 0 0);
+  --hover-line:  oklch(0.560 0 0);
+  --drop-a:      oklch(0.920 0 0);
+  --drop-b:      oklch(0.885 0 0);
+  --drop-over:   oklch(0.945 0 0);
+  --shadow:      oklch(0.400 0 0 / 0.28);
+  --shadow-lg:   oklch(0.350 0 0 / 0.34);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -183,7 +348,7 @@ a:hover { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
 
 ::selection { background: var(--accent-dim); color: var(--text); }
 
-/* Chromium-only, so the native dark scrollbar is fair game. */
+/* Chromium-only, so the native scrollbar follows color-scheme. */
 * { scrollbar-color: var(--surface-3) transparent; scrollbar-width: thin; }
 
 /* ------------------------------------------------------------------ topbar */
@@ -207,7 +372,7 @@ a:hover { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
  * The hidden ATTRIBUTE has to beat every component's own display rule. The UA
  * stylesheet's [hidden]{display:none} loses to any author rule that sets
  * display, so .btn's inline-flex was making #topbar-stop visible on screens
- * that had explicitly hidden it. This is the general fix, not a per-element one.
+ * that had explicitly hidden it.
  */
 [hidden] { display: none !important; }
 
@@ -237,6 +402,29 @@ a:hover { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
  * text node followed by <b>, and both become flex items, so this needs no
  * change to any screen's JS.
  */
+/*
+ * The theme switch. It lives in the topbar rather than in a settings screen
+ * because the reason to flip is always "does this photograph read differently
+ * against the other surround" — a question you ask mid-judgement, about a
+ * specific image, not once at setup. It is on every screen, it is one keystroke,
+ * and it repaints instantly, since nothing in this file transitions colour.
+ *
+ * The glyph is the two colours it is actually choosing between: the well the
+ * photographs sit on and the mount a keeper gets. No icon font, no SVG. The T
+ * shortcut lives in the title attribute rather than an inline kbd — this button
+ * is pressed once or twice a session by mouse and constantly by key, so the
+ * reminder belongs where it does not take up permanent room in the topbar.
+ */
+#topbar-theme { gap: 7px; }
+#topbar-theme::before {
+  content: "";
+  width: 13px; height: 13px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(to right, var(--well) 0 50%, var(--mark) 50%);
+}
+
 .counters {
   display: flex;
   align-items: stretch;
@@ -283,6 +471,15 @@ p  { margin: 0 0 10px; text-wrap: pretty; max-width: 68ch; }
 
 .muted { color: var(--text-dim); }
 .dim   { color: var(--text-mute); }
+
+/*
+ * The .muted / .dim utilities are tuned against --surface. Inside a --well
+ * container they are wrong in one theme by construction: --text-mute rises as
+ * the theme lightens while --well falls, so the two converge and the text
+ * disappears. Anything inside the well gets on-well values instead. Add new
+ * well-backed containers to this list rather than restyling their contents.
+ */
+#app :is(.bk-cap, .pt-missing, .bk-miss) :is(.muted, .dim, .small) { color: var(--on-well-dim); }
 .small { font-size: var(--fs-small); }
 .mono  { font-family: var(--mono); font-size: 0.92em; letter-spacing: -0.01em; }
 .nums  { font-variant-numeric: tabular-nums; }
@@ -309,9 +506,8 @@ p  { margin: 0 0 10px; text-wrap: pretty; max-width: 68ch; }
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: background var(--t), border-color var(--t), color var(--t);
 }
-.btn:hover:not(:disabled) { background: var(--surface-3); border-color: oklch(0.46 0 0); }
+.btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--hover-line); }
 .btn:active:not(:disabled) { background: var(--surface-2); }
 .btn:disabled { opacity: 0.38; cursor: not-allowed; }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -352,17 +548,16 @@ input[type="text"], input[type="number"], select, textarea {
   font: inherit;
   font-size: var(--fs-small);
   color: var(--text);
-  background: oklch(0.130 0 0);
+  background: var(--field);
   border: 1px solid var(--line-2);
   border-radius: var(--r);
   padding: 8px 10px;
-  transition: border-color var(--t), background var(--t);
 }
-input[type="text"]:hover, input[type="number"]:hover, select:hover { border-color: oklch(0.47 0 0); }
+input[type="text"]:hover, input[type="number"]:hover, select:hover { border-color: var(--hover-line); }
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent);
-  background: oklch(0.155 0 0);
+  background: var(--field-focus);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent);
 }
 input.invalid, input.invalid:focus {
@@ -378,13 +573,12 @@ input[type="checkbox"] {
   margin: 0;
   border: 1px solid var(--line-2);
   border-radius: var(--r-sm);
-  background: oklch(0.130 0 0);
+  background: var(--field);
   cursor: pointer;
   display: grid;
   place-content: center;
-  transition: background var(--t), border-color var(--t);
 }
-input[type="checkbox"]:hover { border-color: oklch(0.50 0 0); }
+input[type="checkbox"]:hover { border-color: var(--hover-line); }
 input[type="checkbox"]::after {
   content: "";
   width: 9px; height: 5px;
@@ -438,15 +632,15 @@ kbd {
 .notice p:last-child { margin: 0; }
 .notice .row { margin-top: 10px; }
 
-.notice-error { border-color: color-mix(in oklch, var(--bad) 40%, var(--line));  border-left-color: var(--bad);  background: color-mix(in oklch, var(--bad) 8%, var(--surface)); color: oklch(0.88 0.04 25); }
-.notice-warn  { border-color: color-mix(in oklch, var(--warn) 35%, var(--line)); border-left-color: var(--warn); background: color-mix(in oklch, var(--warn) 7%, var(--surface)); color: oklch(0.90 0.03 85); }
+.notice-error { border-color: color-mix(in oklch, var(--bad) 40%, var(--line));  border-left-color: var(--bad);  background: color-mix(in oklch, var(--bad) 8%, var(--surface)); color: var(--bad-fg); }
+.notice-warn  { border-color: color-mix(in oklch, var(--warn) 35%, var(--line)); border-left-color: var(--warn); background: color-mix(in oklch, var(--warn) 7%, var(--surface)); color: var(--warn-fg); }
 .notice-note  { border-color: var(--line); border-left-color: var(--line-2); background: var(--surface); color: var(--text-dim); }
 
 .error-box {
   border: 1px solid color-mix(in oklch, var(--bad) 40%, var(--line));
   border-left: 3px solid var(--bad);
   background: color-mix(in oklch, var(--bad) 8%, var(--surface));
-  color: oklch(0.88 0.04 25);
+  color: var(--bad-fg);
   padding: 14px;
   border-radius: var(--r);
 }
@@ -481,9 +675,8 @@ kbd {
   overflow: hidden;
   cursor: pointer;
   aspect-ratio: 3 / 2;
-  transition: border-color var(--t-snap) linear;
 }
-.photo-cell:hover { border-color: oklch(0.34 0 0); }
+.photo-cell:hover { border-color: var(--cell-hover); }
 
 .photo-cell.kept { border-color: var(--mark); }
 .photo-cell.kept:hover { border-color: var(--mark); }
@@ -496,21 +689,22 @@ kbd {
   z-index: 2;
 }
 
-/* Position index. 1-9 map to the number keys, so it stays legible at all times. */
+/* Position index. 1-9 map to the number keys, so it stays legible at all times
+   — which means on-photo tokens, not theme-inverting ones. */
 .photo-cell .idx {
   position: absolute; top: 6px; left: 6px;
   z-index: 3;
   min-width: 22px; height: 22px; padding: 0 6px;
   border-radius: var(--r-sm);
-  background: color-mix(in oklch, var(--well) 70%, transparent);
-  color: var(--text-dim);
+  background: var(--chip);
+  color: var(--on-photo);
   font-size: var(--fs-micro); line-height: 22px; text-align: center;
   font-variant-numeric: tabular-nums;
   backdrop-filter: blur(3px);
 }
 .photo-cell.kept .idx {
   background: var(--mark);
-  color: var(--bg);
+  color: var(--on-mark);
   font-weight: 700;
 }
 
@@ -534,7 +728,7 @@ kbd {
   border-radius: var(--r);
   padding: 11px 16px;
   font-size: var(--fs-small);
-  box-shadow: 0 10px 34px oklch(0 0 0 / 0.6);
+  box-shadow: 0 10px 34px var(--shadow);
 }
 
 #modal {
@@ -545,9 +739,9 @@ kbd {
   padding: 0;
   max-width: 620px;
   width: calc(100vw - 48px);
-  box-shadow: 0 24px 70px oklch(0 0 0 / 0.7);
+  box-shadow: 0 24px 70px var(--shadow-lg);
 }
-#modal::backdrop { background: oklch(0 0 0 / 0.68); backdrop-filter: blur(2px); }
+#modal::backdrop { background: oklch(0 0 0 / 0.55); backdrop-filter: blur(2px); }
 #modal-body { padding: 22px; }
 #modal-body h2 { margin-bottom: 4px; }
 
@@ -622,11 +816,9 @@ kbd {
 .dropzone {
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background:
-    linear-gradient(oklch(0.185 0 0), oklch(0.170 0 0));
+  background: linear-gradient(var(--drop-a), var(--drop-b));
   padding: 44px 28px;
   text-align: center;
-  transition: border-color var(--t), background var(--t);
   position: relative;
 }
 .dropzone::after {
@@ -635,9 +827,8 @@ kbd {
   border: 1px dashed var(--line);
   border-radius: var(--r);
   pointer-events: none;
-  transition: border-color var(--t);
 }
-.dropzone.over { border-color: var(--accent); background: oklch(0.205 0 0); }
+.dropzone.over { border-color: var(--accent); background: var(--drop-over); }
 .dropzone.over::after { border-color: var(--accent); }
 
 .dropzone-inner { display: flex; flex-direction: column; align-items: center; gap: 16px; }
@@ -719,7 +910,6 @@ kbd {
   border: var(--mat) solid var(--well);
   border-radius: var(--r-sm);
   overflow: hidden; cursor: pointer;
-  transition: border-color var(--t-snap) linear;
 }
 .matchup img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .matchup figure:hover { border-color: var(--mark); }
@@ -801,7 +991,6 @@ kbd {
   justify-content: start;
   padding: 5px 8px;
   border-radius: var(--r);
-  transition: background var(--t);
 }
 #app .tree-row:hover { background: var(--surface-2); }
 
@@ -1124,8 +1313,8 @@ kbd {
   font-family: var(--mono);
   letter-spacing: -0.01em;
   padding: 12px 7px 4px;
-  background: linear-gradient(transparent, oklch(0 0 0 / 0.82));
-  color: var(--text-dim);
+  background: linear-gradient(transparent, var(--scrim));
+  color: var(--on-photo);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   pointer-events: none;
   opacity: 0.75;
@@ -1136,7 +1325,7 @@ kbd {
 #app .pt-missing {
   display: flex; align-items: center; justify-content: center;
   height: 100%;
-  color: var(--text-mute);
+  color: var(--on-well);
   font-size: var(--fs-micro);
   text-align: center; padding: 10px;
   background: var(--well);
@@ -1232,12 +1421,11 @@ kbd {
   border: var(--mat) solid var(--well);
   border-radius: var(--r-sm);
   overflow: hidden;
-  transition: border-color var(--t-snap) linear;
 }
 #app .bk-pane:hover { border-color: var(--mark); }
 #app .bk-pane.chosen { border-color: var(--mark); }
-#app .bk-pane:hover .bk-cap { color: var(--text); }
-#app .bk-pane:hover .bk-cap kbd { color: var(--text); border-color: var(--mark-edge); }
+#app .bk-pane:hover .bk-cap { color: var(--on-well-hi); }
+#app .bk-pane:hover .bk-cap kbd { color: var(--on-well-hi); border-color: var(--mark-edge); }
 
 #app .bk-vp { position: relative; flex: 1; min-height: 0; overflow: hidden; cursor: pointer; touch-action: none; }
 #app .bk-vp img { position: absolute; top: 0; left: 0; transform-origin: 0 0; -webkit-user-drag: none; user-select: none; pointer-events: none; }
@@ -1252,22 +1440,27 @@ kbd {
   font-family: var(--mono);
   letter-spacing: -0.01em;
   background: var(--well);
-  color: var(--text-mute);
+  color: var(--on-well);
   border-top: 0;
   white-space: nowrap; overflow: hidden;
-  transition: color var(--t);
 }
 #app .bk-cap .nm { overflow: hidden; text-overflow: ellipsis; }
 #app .bk-cap .px { font-variant-numeric: tabular-nums; }
 
-/* The toolbar: nearly invisible until wanted. */
-#app .bk-bar {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  min-height: 44px;
+/* The toolbar: nearly invisible until wanted. Scoped to the bracket — the
+   duplicates screen reuses .bk-bar, and there the Continue button is the point
+   of the screen rather than chrome to be recessed. */
+#app .screen-bracket .bk-bar {
   opacity: 0.4;
   transition: opacity var(--t);
 }
-#app .bk-bar:hover, #app .bk-bar:focus-within { opacity: 1; }
+#app .screen-bracket .bk-bar:hover,
+#app .screen-bracket .bk-bar:focus-within { opacity: 1; }
+
+#app .bk-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  min-height: 44px;
+}
 #app .bk-bar .small.dim { font-size: 11px; }
 
 /* Zoom cluster: one segmented group instead of four loose buttons. */
@@ -1304,7 +1497,6 @@ kbd {
   display: flex; align-items: center; gap: 14px;
   padding: 8px 6px;
   border-bottom: 1px solid var(--line);
-  transition: background var(--t);
 }
 #app .bk-row:hover { background: var(--surface); }
 #app .bk-row img {
@@ -1340,7 +1532,6 @@ kbd {
   padding: 12px 14px;
   margin-bottom: 10px;
   background: var(--surface);
-  transition: border-color var(--t);
 }
 #app .ro-group:hover { border-color: var(--line-2); }
 #app .ro-group:has(.ro-cell) { background: var(--surface); border-color: var(--line-2); }
@@ -1377,14 +1568,14 @@ kbd {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   text-align: center;
-  background: color-mix(in oklch, var(--well) 78%, transparent);
+  background: var(--chip);
   backdrop-filter: blur(3px);
   border-radius: var(--r-sm);
   padding: 3px 4px;
-  color: var(--text-dim);
+  color: var(--on-photo);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-#app .ro-cell.kept .tag { background: var(--mark); color: var(--bg); font-weight: 700; box-shadow: 0 0 0 1px var(--mark-edge); }
+#app .ro-cell.kept .tag { background: var(--mark); color: var(--on-mark); font-weight: 700; box-shadow: 0 0 0 1px var(--mark-edge); }
 
 /* Already a finalist in its own right: unavailable, and visibly hatched rather
    than merely faded, so it does not read as a rendering failure. */
@@ -1399,6 +1590,180 @@ kbd {
   );
   pointer-events: none;
 }
+
+/* ==========================================================================
+   14. SCREEN: EXPORT REVIEW
+   ==========================================================================
+   The label becomes part of the filename, so the derivation has to be visible:
+   the destination sits directly under the field that produces it, joined by a
+   rail and introduced by an arrow.
+   ========================================================================== */
+
+#app .exp-set { margin-bottom: 20px; padding: 16px 18px; }
+#app .exp-set > .row:first-child { padding-bottom: 12px; margin-bottom: 6px; border-bottom: 1px solid var(--line); gap: 12px; }
+#app .exp-set h2 { font-size: var(--fs-h2); }
+#app .exp-set .mono {
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 3px 8px;
+}
+
+#app .exp-row {
+  display: grid;
+  grid-template-columns: 44px 104px minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 16px;
+  align-items: center;
+  padding: 10px 8px;
+  border-radius: var(--r);
+}
+#app .exp-row:hover { background: var(--surface-2); }
+
+#app .exp-rank {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-mute);
+  text-align: right;
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+#app .exp-row:hover .exp-rank { color: var(--text-dim); }
+
+#app .exp-thumb {
+  width: 104px; height: 70px;
+  object-fit: contain;
+  background: var(--well);
+  border-radius: var(--r-sm);
+}
+
+#app .exp-name { font-size: var(--fs-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#app .exp-row .small.dim { font-family: var(--mono); font-size: 11px; letter-spacing: -0.01em; }
+
+#app .exp-row > div:last-child { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+#app .exp-row input[type="text"] { width: 100%; font-size: var(--fs-small); }
+
+/* The derivation. Rail + arrow, so what you type and what gets written read as
+   one object rather than two lines that happen to be adjacent. */
+#app .exp-dest {
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  color: var(--text-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin-left: 11px;
+  padding: 7px 0 1px 17px;
+  border-left: 1px solid var(--line-2);
+  position: relative;
+}
+#app .exp-dest::before {
+  content: "→";
+  position: absolute; left: 4px; top: 6px;
+  font-family: var(--font);
+  color: var(--line-2);
+  font-size: 11px;
+}
+#app .exp-row:hover .exp-dest,
+#app .exp-row:focus-within .exp-dest { color: var(--text); }
+#app .exp-row:focus-within .exp-dest { border-left-color: var(--accent); }
+#app .exp-row:focus-within .exp-dest::before { color: var(--accent); }
+
+/* The typed part of the filename, once wrapped (see the markup notes). */
+#app .exp-slug { color: var(--text); font-weight: 600; }
+#app .exp-row:focus-within .exp-slug { color: var(--accent-hi); }
+
+#app #exp-total, #app #exp-status { font-variant-numeric: tabular-nums; font-size: var(--fs-small); }
+
+/* ==========================================================================
+   15. MISC
+   ========================================================================== */
+
+.strike { text-decoration: line-through; opacity: 0.5; }
+
+/* Desktop-first by design. This keeps a narrow window usable without spending
+   effort on a phone layout that is not required. */
+/* The grid pass keyboard legend is a reminder, not a control, so it is the first
+   thing to go when the action bar runs out of room. Scoped away from [data-t]
+   because the progress readout is also a .muted.small and it states the quota —
+   the one thing on this screen that must never be the part that disappears. */
+@media (max-width: 1320px) {
+  #app .pt-actions .muted.small:not([data-t]) { display: none; }
+}
+
+@media (max-width: 1100px) {
+  #app .pt-config.locked .small.dim,
+  #app .pt-config.locked .f:has(input[type="checkbox"]) { display: none; }
+}
+
+@media (max-width: 900px) {
+  .grid-12, .grid-16, .grid-6, .grid-9 { grid-template-columns: repeat(2, 1fr); }
+  .screen { padding: 16px 12px; }
+  #app .bk-stage { grid-template-columns: 1fr; }
+  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px 32px 0 0 auto; }
+  #app .tree-bar, #app .tree-state { display: none; }
+  .counters > span { min-width: 64px; padding: 0 9px; }
+  .counters b { font-size: var(--fs-body); }
+}
+
+/** CHANGELOG
+ * v2.1 (2026-07-28): Light theme and a match-the-OS theme, dark still the default.
+ *   - Theme selection is a data-theme attribute on :root (absent or "dark" |
+ *     "light"), with color-scheme riding along so native scrollbars and form
+ *     controls follow. Deliberate toggle only — no auto mode and no
+ *     prefers-color-scheme query, because the right surround depends on the
+ *     light in the room, which the OS setting does not know.
+ *   - The light theme is deliberately NOT white: the well photographs sit on is
+ *     L* 50 mid-grey, per ISO 3664's neutral surround, because a white surround
+ *     makes an image read darker and flatter than mid-grey does.
+ *   - --mark inverts to near-black in light mode, so the mounted-print signal
+ *     stays the far pole from the well in either theme.
+ *   - New tokens so nothing is hardcoded to one theme: --on-mark, --cell-hover,
+ *     --field, --field-focus, --hover-line, --drop-a/-b/-over, --shadow,
+ *     --shadow-lg, --scrim, --bad-fg, --warn-fg.
+ *   - NOTE: an intermediate draft expressed both themes as one light-dark()
+ *     token block. Do not reintroduce it. Chromium cannot interpolate a
+ *     light-dark() colour, so every transitioned property that read one fell
+ *     back to currentColor.
+ *   - Removed every colour transition in the file (background, border-color,
+ *     color). State changes are instant, which is what a tool built around
+ *     several hundred fast judgements wants anyway — and a transitioned colour
+ *     renders its from-value until the document timeline advances, which wrapped
+ *     photographs in a near-white mat and erased the kept / not-kept signal on
+ *     the grid pass. Transitions on width and opacity are kept.
+ *   - Anything drawn ON a photograph (filename caption, position index, the
+ *     duplicate-group tag) now uses fixed --scrim / --chip / --on-photo tokens
+ *     instead of theme-inverting ones. Image content has no theme, so a caption
+ *     coloured from --text-dim over a fixed black scrim was legible in dark mode
+ *     and a smudge in light. Text on the well itself uses --on-well, which does
+ *     follow the theme, because the well does — including the .muted / .dim
+ *     utilities, which are remapped to --on-well-dim inside a well container.
+ *   - The bracket toolbar's resting 40% opacity is scoped to .screen-bracket;
+ *     the duplicates screen reuses .bk-bar and its Continue button is the point
+ *     of that screen, not chrome.
+ *
+ * v2.0 (2026-07-28): Full visual and layout pass, consolidating two stylesheets
+ *   and four injected style blocks into one file.
+ *   - Greys rewritten as achromatic oklch, so no surface near a photograph has a
+ *     hue to cast. Accent desaturated further and kept away from image content.
+ *   - New --mark token: the kept / chosen state of a photograph is signalled by
+ *     an achromatic near-white mount with a mid-grey hairline, like a mounted
+ *     print, replacing the accent-blue border that sat directly against images.
+ *   - Folder tree rebuilt as a fixed left-clustered column track with hairline
+ *     hierarchy rails, a keep:has proportion bar, quiet lowercase state text, a
+ *     visible split action, and a display-size live total.
+ *   - Grid pass now fills the viewport: explicit fractional rows replace the
+ *     aspect-ratio letterbox and the 100vh calc caps, and non-kept photos recede
+ *     in luminance once anything on the screen is kept. The locked config row
+ *     collapses to a single line and hands its height to the photographs. The
+ *     over-quota refusal is colourless and high-contrast rather than an error.
+ *   - Bracket chrome falls to low contrast until hovered or focused; hovering a
+ *     pane raises its mount to --mark. Caption strips moved into the well.
+ *   - Duplicate groups gained a stack edge and a hatched unavailable state.
+ *   - Export rows join the label field to the destination filename with a rail
+ *     and an arrow.
+ *   - Topbar counters became labelled stat blocks. Base size 15px -> 18px.
+ */
 
 /* ==========================================================================
    13b. SCREEN: NEAR-DUPLICATE REVIEW  (PRD 7.7)
@@ -1624,13 +1989,30 @@ kbd {
  *   would leave three dangling references to fix a purely additive change.
  */
 
+/* ========================================================================
+
 /* ==========================================================================
    14. BRAND MARK
    ==========================================================================
-   The recursive identity mark, referenced from the sprite in the shell. Its
-   own palette is fixed by the identity spec (#474747 cells, #F3F3F3 selected)
-   rather than tokenised — it is a logo, not a UI surface, and it never sits
-   adjacent to a photograph where a cast would matter.
+   The recursive identity mark, referenced from the sprite in the shell.
+
+   It carries its OWN ground rather than sitting on --surface, and that is not
+   an oversight. The mark's palette is fixed by the identity spec (#171717
+   ground, #474747 cells, #F3F3F3 selected) and its selected cell is the whole
+   concept — but #F3F3F3 against the light theme's page measures 1.45:1, which
+   is invisible. Giving it the ground the identity already specifies keeps the
+   mark identical in both themes instead of letting the surround eat it. The
+   identity README says as much: "use the dark-background logo as the primary
+   lockup".
+
+   The ground is composed into the sprite rather than applied as CSS padding,
+   because percentage padding resolves against the PARENT's width, not the
+   element's — 12.5% became 74px and blew the box out. Proportions taken from
+   the app icon: inset 8/64 = 12.5%, corner radius 14/64 = 21.9%.
+
+   These literals are the LOGO's colours, not UI tokens. They are deliberately
+   not themed, for the same reason the mark is not: a logo that changes with
+   the surround is not a logo.
    ========================================================================== */
 
 #app .pt-brandmark {
@@ -1640,10 +2022,10 @@ kbd {
   flex: none;
 }
 
-#app .screen-welcome .pt-brandmark { width: 56px; height: 56px; margin-bottom: 4px; }
+#app .screen-welcome .pt-brandmark { width: 60px; height: 60px; margin-bottom: 4px; }
 
 @media (max-width: 720px) {
-  #app .pt-brandmark { width: 36px; height: 36px; }
+  #app .pt-brandmark { width: 38px; height: 38px; }
 }
 
 </style>
@@ -1715,6 +2097,10 @@ kbd {
       </g>
       <rect x="34" y="34" width="32" height="32" rx="3" fill="#F3F3F3"/>
   </symbol>
+  <symbol id="ptm-mark-plate" viewBox="0 0 100 100">
+    <rect width="100" height="100" rx="21.9" fill="#171717"/>
+    <use href="#ptm-mark" x="12.5" y="12.5" width="75" height="75"/>
+  </symbol>
 </svg>
 
 <div id="app">
@@ -1725,6 +2111,7 @@ kbd {
     </div>
     <div class="topbar-right">
       <span id="topbar-counters" class="counters"></span>
+      <button id="topbar-theme" class="btn btn-quiet" type="button"></button>
       <button id="topbar-stop" class="btn btn-quiet" hidden>Stop early</button>
     </div>
   </header>
@@ -5503,7 +5890,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 40_screen_ingest.js ===== */
 /**
  * @file 40_screen_ingest.js
- * @version 1.5
+ * @version 1.6
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -5552,7 +5939,7 @@ v1.0 - 2026-07-28 - Samuel Cao
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', 'Photournament');
     var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-    use.setAttribute('href', '#ptm-mark');
+    use.setAttribute('href', '#ptm-mark-plate');
     svg.appendChild(use);
     return svg;
   }
@@ -5609,6 +5996,12 @@ v1.0 - 2026-07-28 - Samuel Cao
       root.appendChild(extras);
       root.appendChild(el('div', { id: 'entry-msg' }));
       root.appendChild(el('div', { class: 'small dim', id: 'entry-diag', style: 'margin-top:14px' }));
+
+      // The topbar is hidden on this screen, so the theme control needs a home
+      // here too — otherwise the surround cannot be chosen until after ingest.
+      root.appendChild(el('div', { class: 'row', style: 'margin-top:10px' }, [
+        PT.theme.attach(el('button', { class: 'btn btn-quiet btn-sm', type: 'button' }))
+      ]));
 
       /**
        * One button that always works. It reaches for the File System Access API
@@ -6177,6 +6570,9 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   referenced from the sprite defined once in the shell. The nine animated CSS
  *   cells stay as the ingest activity indicator — animating the identity artwork
  *   would turn a logo into a spinner.
+ * v1.6 (2026-07-28): Theme control on the entry screen, where the topbar is
+ *   hidden, and the brand mark now uses the plated sprite so it keeps its own
+ *   ground in both themes.
 */
 
 </script>
@@ -10905,7 +11301,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 99_app.js ===== */
 /**
  * @file 99_app.js
- * @version 1.2
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -10949,6 +11345,85 @@ v1.0 - 2026-07-28 - Samuel Cao
       });
     }
   });
+
+  /* -------------------------------------------------------------- theme --- */
+
+  /**
+   * Dark by default, light on request. A DELIBERATE choice, never inferred:
+   * there is no auto mode and no prefers-color-scheme query, because which
+   * surround suits depends on the light in the room the culling is happening in
+   * and the operating system does not know that.
+   *
+   * The light theme is a mid-grey page with an L*50 well, not a white one. A
+   * white surround makes a photograph read darker, flatter and lower in contrast
+   * than the same photograph against mid-grey — precisely the interference the
+   * app exists to avoid. ISO 3664 specifies mid-grey for a viewing surround.
+   *
+   * The shell applies the stored theme before first paint; this only handles
+   * changing it afterwards.
+   */
+  var THEME_KEY = 'photournament.theme';
+
+  function currentTheme() {
+    return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  }
+
+  function applyTheme(next) {
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* storage may be blocked */ }
+
+    syncThemeColor();
+    PT.dom.$$('.theme-toggle, #topbar-theme').forEach(paintToggle);
+    PT.bus.emit('theme:change', next);
+  }
+
+  /**
+   * Keeps the browser chrome matching the page it frames, reading the resolved
+   * --bg rather than hard-coding either theme's value so the two cannot drift.
+   *
+   * Resolved by PAINTING and reading the pixel back. Setting canvas fillStyle and
+   * reading it again returns the oklch string verbatim, and meta[theme-color]
+   * does not accept oklch — the chrome would silently keep the previous colour.
+   */
+  function syncThemeColor() {
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    var css = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    if (!css) return;
+    try {
+      var c = document.createElement('canvas');
+      c.width = c.height = 1;
+      var x = c.getContext('2d');
+      x.fillStyle = css;
+      x.fillRect(0, 0, 1, 1);
+      var d = x.getImageData(0, 0, 1, 1).data;
+      meta.setAttribute('content', '#' + [d[0], d[1], d[2]]
+        .map(function (v) { return v.toString(16).padStart(2, '0'); }).join(''));
+    } catch (e) { /* leave the existing value rather than writing a broken one */ }
+  }
+
+  /** Labelled with the theme it switches TO, which is what the user is choosing. */
+  function paintToggle(btn) {
+    if (!btn) return;
+    var to = currentTheme() === 'dark' ? 'light' : 'dark';
+    btn.textContent = to === 'light' ? 'Light' : 'Dark';
+    btn.title = 'Switch to the ' + to + ' surround  (T)';
+    btn.setAttribute('aria-label', 'Switch to the ' + to + ' surround');
+  }
+
+  PT.theme = {
+    get: currentTheme,
+    set: applyTheme,
+    toggle: function () { applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'); },
+    /** Screens call this for their own copy of the control. */
+    attach: function (btn) {
+      if (!btn) return btn;
+      btn.classList.add('theme-toggle');
+      btn.addEventListener('click', function () { PT.theme.toggle(); });
+      paintToggle(btn);
+      return btn;
+    }
+  };
 
   /* ------------------------------------------------------------ routing --- */
 
@@ -11172,6 +11647,29 @@ v1.0 - 2026-07-28 - Samuel Cao
       stop.addEventListener('click', function () { PT.bus.emit('stage:stop-early'); });
     }
 
+    PT.theme.attach(PT.dom.$('#topbar-theme'));
+    // The shell applied the stored theme before first paint, but nothing has
+    // brought the chrome colour and the control labels into line with it yet.
+    syncThemeColor();
+
+    /*
+     * T, globally. The reason to switch is never "I prefer light mode" — it is
+     * "does this photograph read differently against the other surround", asked
+     * mid-judgement about one specific image. Having to leave the keyboard and
+     * find a button means the question stops being asked. T is free in every
+     * screen: the grid pass uses 0-9, Enter, U and the arrows; the bracket uses
+     * the arrows, D and U.
+     */
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 't' && e.key !== 'T') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' ||
+                t.isContentEditable)) return;
+      e.preventDefault();
+      PT.theme.toggle();
+    });
+
     tryResume().then(function (session) {
       if (session) offerResume(session);
       else PT.router.go('welcome');
@@ -11204,6 +11702,13 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   start fresh. Silent when nothing changed, when there is no handle to walk, and
  *   when read permission would need a fresh gesture — the alternative is a
  *   permission prompt on every resume that the user never asked for.
+ * v1.3 (2026-07-28): Added the dark/light surround toggle. Deliberate choice
+ *   only — no auto mode and no prefers-color-scheme, because which surround suits
+ *   depends on the light in the room and the OS does not know that. Bound to T
+ *   globally, since the question is asked mid-judgement about one photograph and
+ *   leaving the keyboard means it stops being asked. Chrome colour is resolved by
+ *   painting --bg and reading the pixel: fillStyle returns oklch verbatim and
+ *   meta[theme-color] does not accept it.
 */
 
 </script>

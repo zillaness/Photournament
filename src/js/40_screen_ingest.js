@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.5
+ * @version 1.6
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -49,7 +49,7 @@
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', 'Photournament');
     var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-    use.setAttribute('href', '#ptm-mark');
+    use.setAttribute('href', '#ptm-mark-plate');
     svg.appendChild(use);
     return svg;
   }
@@ -106,6 +106,12 @@
       root.appendChild(extras);
       root.appendChild(el('div', { id: 'entry-msg' }));
       root.appendChild(el('div', { class: 'small dim', id: 'entry-diag', style: 'margin-top:14px' }));
+
+      // The topbar is hidden on this screen, so the theme control needs a home
+      // here too — otherwise the surround cannot be chosen until after ingest.
+      root.appendChild(el('div', { class: 'row', style: 'margin-top:10px' }, [
+        PT.theme.attach(el('button', { class: 'btn btn-quiet btn-sm', type: 'button' }))
+      ]));
 
       /**
        * One button that always works. It reaches for the File System Access API
@@ -674,4 +680,7 @@
  *   referenced from the sprite defined once in the shell. The nine animated CSS
  *   cells stay as the ingest activity indicator — animating the identity artwork
  *   would turn a logo into a spinner.
+ * v1.6 (2026-07-28): Theme control on the entry screen, where the topbar is
+ *   hidden, and the brand mark now uses the plated sprite so it keeps its own
+ *   ground in both themes.
 */

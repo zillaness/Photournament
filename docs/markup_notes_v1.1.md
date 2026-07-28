@@ -1,16 +1,16 @@
 ---
-file: markup_notes_v1.0.md
-version: 1.0
+file: markup_notes_v1.1.md
+version: 1.1
 author: Samuel Cao
 created: 2026-07-28
 last_updated: 2026-07-28
-description: The JS and markup changes `photournament_ui_v2.0.css` expects, described in words. Companion to the stylesheet; no JavaScript is rewritten here.
+description: The JS and markup changes `photournament_ui_v2.1.css` expects, described in words. Companion to the stylesheet; no JavaScript is rewritten here.
 ai_update: Update last_updated and version. Rename file to match. Append changelog at bottom.
 ---
 
-# Markup notes for photournament_ui_v2.0.css
+# Markup notes for photournament_ui_v2.1.css
 
-Nine changes. Two are required, seven are improvements the stylesheet is already
+Ten changes. Two are required, eight are improvements the stylesheet is already
 written for and degrades gracefully without. Nothing here touches behaviour,
 wording, element ids, or any of the state-carrying class names.
 
@@ -23,7 +23,7 @@ wording, element ids, or any of the state-carrying class names.
 `src/css/00_base.css`, `src/css/10_screens.css`, and the `injectStyle()`
 functions plus their `STYLE_ID` constants in `50_screen_tree.js`,
 `60_screen_grid.js`, `70_screen_bracket.js` and `80_screen_export.js`. Remove the
-four `injectStyle()` call sites too. Load `photournament_ui_v2.0.css` in the
+four `injectStyle()` call sites too. Load `photournament_ui_v2.1.css` in the
 `<!--BUILD:CSS-->` block instead.
 
 Every selector those blocks defined is in the new file. It is written under `#app`
@@ -128,6 +128,47 @@ Nine cells with one marked — the product in one glyph. The `pt-mark-live` vari
 walks the cells on a keyframe loop as the ingest activity indicator, monochrome
 and small, and stops entirely under `prefers-reduced-motion`. Purely additive.
 
+### 10. The theme switch
+
+Two states. The only JS is setting one attribute on the root element:
+
+    document.documentElement.dataset.theme = 'dark' | 'light';
+
+- **absent or `dark`** — dark. The default; nothing to do if you never add a switch.
+- **`light`** — the light theme.
+
+Deliberate toggle only. There is no auto mode and no `prefers-color-scheme`
+query: which surround suits depends on the light in the room the culling is
+happening in, and the OS setting does not know that.
+
+Persist the choice in `localStorage` alongside the other prefs and apply it before
+first paint (an inline `<script>` in `<head>`, or the existing prefs load if it runs
+early enough) so there is no flash of the wrong theme.
+
+Where to put the control: the topbar right cluster, before `#topbar-stop`, with
+id `#topbar-theme` — the stylesheet styles it already, including a glyph drawn
+from the two colours it is choosing between (the well and the mount). Put the same
+button on the entry screen, since the topbar is hidden there. Label it with the
+theme it switches *to*, and put the shortcut in the `title` attribute rather than
+an inline `<kbd>` — permanent room in the topbar is expensive.
+
+Bind a key to it, and make it global rather than per-screen. The reason to switch
+is never "I prefer light mode" — it is "does this photograph read differently
+against the other surround", asked mid-judgement about one specific image. If the
+user has to leave the keyboard and find a button, they will stop asking. `T` is
+free in every screen's handler (the grid pass uses `0`–`9`, `Enter`, `U` and `←`;
+the bracket uses the arrows, `D` and `U`). Nothing in the stylesheet transitions
+colour, so the repaint is immediate and the two states can be flipped between as
+fast as the key repeats.
+
+**One thing worth not "fixing" about the light theme:** it is deliberately not a
+white theme. The page is a light neutral grey and the well photographs sit on is
+L\* 50 mid-grey, which is what ISO 3664 specifies for a viewing surround. A white
+surround makes an image read darker, flatter and lower in contrast than the same
+image against mid-grey — exactly the interference the app's one unbreakable rule
+exists to prevent. If white ever looks more finished: it does, and it is also
+wrong for the task.
+
 ---
 
 ## Left alone, as asked
@@ -142,5 +183,7 @@ state-carrying class: `.photo-cell` / `.kept`, `.tree-row` / `.excluded` /
 `.grid` with `.grid-6 .grid-9 .grid-12 .grid-16`. No renames.
 
 CHANGELOG
+v1.1 (2026-07-28): Added note 10, the theme switch (dark default plus a light
+  theme, deliberate toggle only), and repointed the stylesheet filename to v2.1.
 v1.0 (2026-07-28): Initial release. Two required changes (delete the old style
   sources; reorder the tree row) and seven optional ones.

@@ -1,6 +1,6 @@
 /**
  * @file 99_app.js
- * @version 1.2
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -44,6 +44,85 @@
       });
     }
   });
+
+  /* -------------------------------------------------------------- theme --- */
+
+  /**
+   * Dark by default, light on request. A DELIBERATE choice, never inferred:
+   * there is no auto mode and no prefers-color-scheme query, because which
+   * surround suits depends on the light in the room the culling is happening in
+   * and the operating system does not know that.
+   *
+   * The light theme is a mid-grey page with an L*50 well, not a white one. A
+   * white surround makes a photograph read darker, flatter and lower in contrast
+   * than the same photograph against mid-grey — precisely the interference the
+   * app exists to avoid. ISO 3664 specifies mid-grey for a viewing surround.
+   *
+   * The shell applies the stored theme before first paint; this only handles
+   * changing it afterwards.
+   */
+  var THEME_KEY = 'photournament.theme';
+
+  function currentTheme() {
+    return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  }
+
+  function applyTheme(next) {
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* storage may be blocked */ }
+
+    syncThemeColor();
+    PT.dom.$$('.theme-toggle, #topbar-theme').forEach(paintToggle);
+    PT.bus.emit('theme:change', next);
+  }
+
+  /**
+   * Keeps the browser chrome matching the page it frames, reading the resolved
+   * --bg rather than hard-coding either theme's value so the two cannot drift.
+   *
+   * Resolved by PAINTING and reading the pixel back. Setting canvas fillStyle and
+   * reading it again returns the oklch string verbatim, and meta[theme-color]
+   * does not accept oklch — the chrome would silently keep the previous colour.
+   */
+  function syncThemeColor() {
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    var css = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    if (!css) return;
+    try {
+      var c = document.createElement('canvas');
+      c.width = c.height = 1;
+      var x = c.getContext('2d');
+      x.fillStyle = css;
+      x.fillRect(0, 0, 1, 1);
+      var d = x.getImageData(0, 0, 1, 1).data;
+      meta.setAttribute('content', '#' + [d[0], d[1], d[2]]
+        .map(function (v) { return v.toString(16).padStart(2, '0'); }).join(''));
+    } catch (e) { /* leave the existing value rather than writing a broken one */ }
+  }
+
+  /** Labelled with the theme it switches TO, which is what the user is choosing. */
+  function paintToggle(btn) {
+    if (!btn) return;
+    var to = currentTheme() === 'dark' ? 'light' : 'dark';
+    btn.textContent = to === 'light' ? 'Light' : 'Dark';
+    btn.title = 'Switch to the ' + to + ' surround  (T)';
+    btn.setAttribute('aria-label', 'Switch to the ' + to + ' surround');
+  }
+
+  PT.theme = {
+    get: currentTheme,
+    set: applyTheme,
+    toggle: function () { applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'); },
+    /** Screens call this for their own copy of the control. */
+    attach: function (btn) {
+      if (!btn) return btn;
+      btn.classList.add('theme-toggle');
+      btn.addEventListener('click', function () { PT.theme.toggle(); });
+      paintToggle(btn);
+      return btn;
+    }
+  };
 
   /* ------------------------------------------------------------ routing --- */
 
@@ -267,6 +346,29 @@
       stop.addEventListener('click', function () { PT.bus.emit('stage:stop-early'); });
     }
 
+    PT.theme.attach(PT.dom.$('#topbar-theme'));
+    // The shell applied the stored theme before first paint, but nothing has
+    // brought the chrome colour and the control labels into line with it yet.
+    syncThemeColor();
+
+    /*
+     * T, globally. The reason to switch is never "I prefer light mode" — it is
+     * "does this photograph read differently against the other surround", asked
+     * mid-judgement about one specific image. Having to leave the keyboard and
+     * find a button means the question stops being asked. T is free in every
+     * screen: the grid pass uses 0-9, Enter, U and the arrows; the bracket uses
+     * the arrows, D and U.
+     */
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 't' && e.key !== 'T') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' ||
+                t.isContentEditable)) return;
+      e.preventDefault();
+      PT.theme.toggle();
+    });
+
     tryResume().then(function (session) {
       if (session) offerResume(session);
       else PT.router.go('welcome');
@@ -299,4 +401,11 @@
  *   start fresh. Silent when nothing changed, when there is no handle to walk, and
  *   when read permission would need a fresh gesture — the alternative is a
  *   permission prompt on every resume that the user never asked for.
+ * v1.3 (2026-07-28): Added the dark/light surround toggle. Deliberate choice
+ *   only — no auto mode and no prefers-color-scheme, because which surround suits
+ *   depends on the light in the room and the OS does not know that. Bound to T
+ *   globally, since the question is asked mid-judgement about one photograph and
+ *   leaving the keyboard means it stops being asked. Chrome colour is resolved by
+ *   painting --bg and reading the pixel: fillStyle returns oklch verbatim and
+ *   meta[theme-color] does not accept it.
 */

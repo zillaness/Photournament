@@ -1,6 +1,6 @@
 /**
  * file: smoke_dist.mjs
- * version: 1.2
+ * version: 1.3
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -69,6 +69,18 @@ const r = await page.evaluate(async () => {
       return !!l && /^data:image\/svg\+xml/.test(l.getAttribute('href'));
     })(),
     themeColor: (document.querySelector('meta[name="theme-color"]') || {}).content || null,
+    // Resolve --bg by painting: oklch read back from fillStyle stays oklch, and
+    // meta[theme-color] does not accept it.
+    bgHex: (function () {
+      var c = document.createElement('canvas'); c.width = c.height = 1;
+      var x = c.getContext('2d');
+      x.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+      x.fillRect(0, 0, 1, 1);
+      var d = x.getImageData(0, 0, 1, 1).data;
+      return '#' + [d[0], d[1], d[2]].map(function (v) { return v.toString(16).padStart(2, '0'); }).join('');
+    })(),
+    themeDefault: document.documentElement.dataset.theme || 'dark',
+    hasThemeToggle: !!document.getElementById("topbar-theme"),
     // The mark is a <use> of a sprite symbol; an unresolved reference lays out
     // as a zero-sized box, so measuring it proves the reference actually bound.
     brandMark: (function () {
@@ -117,8 +129,11 @@ check('no build tokens left in output', r.tokensLeft === 0, r.tokensLeft);
 check('favicon is embedded as a data URI', r.iconIsDataUri === true, r.iconIsDataUri);
 // Must match the stylesheet's --bg, not the identity package's own background —
 // otherwise the browser chrome is a different colour from the page under it.
-check('theme colour matches the page background', r.themeColor === '#0d0d0d', r.themeColor);
+check('theme colour matches the page background', r.themeColor === r.bgHex,
+  r.themeColor + ' vs --bg ' + r.bgHex);
 check('the recursive brand mark renders', r.brandMark === true, r.brandMark);
+check('dark is the default theme', r.themeDefault === 'dark', r.themeDefault);
+check('the theme control exists', r.hasThemeToggle === true, r.hasThemeToggle);
 check('libheif payload embedded', r.heicPayloadBytes > 1000000, (r.heicPayloadBytes / 1048576).toFixed(2) + ' MB');
 check('libheif NOT executed at boot', r.heicNotExecuted === true, r.heicNotExecuted);
 check('worker spawns from inlined source', r.workerFromInlineSrc === 'alive', r.workerFromInlineSrc);
@@ -144,4 +159,6 @@ process.exit(failed === 0 ? 0 : 1);
  * v1.2 (2026-07-28): Theme colour asserted against the stylesheet's own --bg
  *   rather than a literal from the identity package, and the brand mark measured
  *   so an unresolved sprite reference cannot pass as rendered.
+ * v1.3 (2026-07-28): Chrome colour asserted against the resolved --bg rather
+ *   than a literal, plus the theme default and control.
 */

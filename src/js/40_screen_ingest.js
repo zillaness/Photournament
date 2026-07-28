@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.2
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -504,10 +504,22 @@
       if (node && node.textContent && node.textContent.length > 1000) libheifSrc = node.textContent;
     }
 
+    // Without this the worker falls back to its own inlined dHash while still
+    // writing the result to a field called `phash`, so everything calibrated for
+    // pHash — notably the threshold of 14 — is quietly measuring the wrong hash
+    // family. The shim exists because a Worker has no `window` and 20_phash.js
+    // attaches to it.
+    var phashSrc = null;
+    var phashNode = document.getElementById('phash-src');
+    if (phashNode && phashNode.textContent && phashNode.textContent.length > 1000) {
+      phashSrc = 'var window = self;\n' + phashNode.textContent;
+    }
+
     var pool = PT.ingest.createPool({
       previewPx: PREVIEW_PX,
       libheifSrc: libheifSrc,
-      libheifUrl: libheifSrc ? null : undefined
+      libheifUrl: libheifSrc ? null : undefined,
+      extraSrc: phashSrc
     });
     PT._pool = pool;
 
@@ -601,4 +613,10 @@
  * v1.2 (2026-07-28): Adopted photournament_ui_v2.0.css. Removed the injected
  *   style block, split the ingest count from its time estimate so the count can
  *   carry display size, and added the CSS-drawn nine-square mark.
+ * v1.3 (2026-07-28): Feeds 20_phash.js into the ingest worker. Without it the
+ *   worker fell back to its own inlined dHash while still writing the result to a
+ *   field called `phash`, so everything calibrated for pHash — the threshold of
+ *   14 above all — was quietly measuring the wrong hash family. Measured before:
+ *   weights spread 30-37 and 55 of 120 distances odd. After: every weight exactly
+ *   31, zero odd distances.
 */

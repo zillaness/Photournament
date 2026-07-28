@@ -1,6 +1,6 @@
 /**
  * @file 50_screen_tree.js
- * @version 1.2
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -302,7 +302,12 @@
           s.session.activeUnitId = pending.length ? pending[0].id : null;
         });
         var id = PT.store.get().session.activeUnitId;
-        if (id) PT.router.go('grid', { unitId: id });
+        if (!id) return;
+        // PRD 7.7: review the near-duplicate grouping before the first grid
+        // pass, but only when there is something to review. PT.dupes.route owns
+        // that decision and falls through to the grid when there is not.
+        if (PT.dupes && PT.dupes.route) PT.dupes.route(id);
+        else PT.router.go('grid', { unitId: id });
       }
     },
 
@@ -327,4 +332,6 @@
  *   has 36, keep 8" — instead of stranding the field at the far right. Depth moved
  *   to a --d custom property so CSS owns the indent and hierarchy rails, and the
  *   second paragraph of help became a disclosure.
+ * v1.3 (2026-07-28): Routes into the PRD 7.7 duplicate review after the units
+ *   are created, when there is anything to review.
 */

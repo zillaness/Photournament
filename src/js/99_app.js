@@ -1,6 +1,6 @@
 /**
  * @file 99_app.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -54,6 +54,9 @@
    */
   function screenForSession(session) {
     if (!session) return { name: 'welcome' };
+    // PRD 7.7: a review that was open when the tab closed reopens, so a hand
+    // edit is never stranded behind a reload.
+    if (session.groups && session.groups.status === 'review') return { name: 'dupes' };
     switch (session.stage) {
       case 'tree':   return { name: 'tree' };
       case 'export': return { name: 'export' };
@@ -227,4 +230,6 @@
  * v1.0 (2026-07-28): Initial release. Toasts, modal dismissal, stage routing
  *   with per-phase screen selection, unit advance including the optional Stage D,
  *   session resume with an evicted-cache notice, and console diagnostics.
- */
+  * v1.1 (2026-07-28): Reopens an in-progress duplicate review on resume, so a
+ *   hand edit is never stranded behind a reload.
+*/

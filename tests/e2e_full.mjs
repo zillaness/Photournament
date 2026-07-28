@@ -161,7 +161,8 @@ check('two tournament units derived', units === 2, units);
 
 check('start culling is available', await clickText(/Start culling/), '');
 await page.waitForTimeout(500);
-check('reached a stage screen', ['grid', 'bracket'].includes(await screenNow()), await screenNow());
+check('reached a stage screen', ['grid', 'bracket', 'dupes'].includes(await screenNow()),
+  await screenNow());
 
 /* ------------------------------------------------------- drive the stages -- */
 
@@ -244,6 +245,16 @@ while (steps++ < MAX_STEPS) {
     }
     if (await clickText(/continue|next|finish|done|results|export/, 2000)) { await page.waitForTimeout(200); continue; }
     await dumpButtons('bracket'); break;
+  }
+
+  if (scr === 'dupes') {
+    // The review opens whenever the set genuinely has near-duplicates. This
+    // corpus is procedurally generated and does, so the flow must pass through
+    // it rather than the gate being weakened to keep the test simple.
+    if (await clickText(/looks right|skip this step|start culling/, 2500)) {
+      await page.waitForTimeout(250); continue;
+    }
+    await dumpButtons('dupes'); break;
   }
 
   if (scr === 'runoff') {

@@ -57,6 +57,14 @@
 -->
 <script type="text/plain" id="libheif-src"><!--BUILD:LIBHEIF--></script>
 
+<!--
+  The same trick for the perceptual hash. A Worker has no `window`, so
+  20_phash.js cannot simply be importScripts'd; the ingest pool prepends a
+  `window = self` shim and this source, so the worker computes a real pHash
+  rather than falling back to its own inlined dHash.
+-->
+<script type="text/plain" id="phash-src"><!--BUILD:PHASH--></script>
+
 <!--BUILD:JS-->
 <script src="js/00_core.js"></script>
 <script src="js/10_ingest_worker.js"></script>

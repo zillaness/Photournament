@@ -1,6 +1,6 @@
 /**
  * file: build.mjs
- * version: 1.1
+ * version: 2.2
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -138,9 +138,17 @@ const banner =
 html = html.replace(/<!--BUILD:CSS-->[\s\S]*?<!--\/BUILD:CSS-->/, () => cssBlock);
 html = html.replace(/<!--BUILD:JS-->[\s\S]*?<!--\/BUILD:JS-->/, () => jsBlock);
 html = html.replace('<!--BUILD:LIBHEIF-->', () => libheif);
+
+// 20_phash.js is emitted TWICE on purpose: once as a live script for the page,
+// and once as inert text so the ingest worker can be constructed with it. A
+// worker cannot importScripts it from a file:// origin, and without it the
+// worker silently falls back to a different hash family.
+const phashFile = js.find((f) => /phash/.test(f.name));
+if (!phashFile) throw new Error('no phash module found in src/js');
+html = html.replace('<!--BUILD:PHASH-->', () => safeForInlineScript(phashFile.body));
 html = banner + '\n' + html;
 
-for (const token of ['BUILD:CSS', 'BUILD:JS', 'BUILD:LIBHEIF']) {
+for (const token of ['BUILD:CSS', 'BUILD:JS', 'BUILD:LIBHEIF', 'BUILD:PHASH']) {
   if (html.includes(`<!--${token}-->`)) throw new Error(`build token ${token} was not replaced`);
 }
 
@@ -180,4 +188,7 @@ console.log(`       ${libheifNote}`);
  *   String.replace expands $$, $&, $`, $' and $1 in a replacement string and was
  *   silently rewriting source during assembly. Added a guard asserting every
  *   source file survives into the artifact verbatim.
+ * v1.2 (2026-07-28): Emits 20_phash.js twice — once as a live script and once as
+ *   inert text — so the ingest worker can be constructed with a real pHash. A
+ *   worker cannot importScripts it from a file:// origin.
 */

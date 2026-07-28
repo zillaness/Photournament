@@ -1358,6 +1358,73 @@ kbd {
 }
 
 /* ==========================================================================
+   13b. SCREEN: NEAR-DUPLICATE REVIEW  (PRD 7.7)
+   ==========================================================================
+   Reuses the runoff group card wholesale — .ro-group / .ro-head / .ro-body /
+   .ro-cell are the same object here, a group of frames with one of them raised.
+   Only four things are genuinely new: the sensitivity slider, a scroll region
+   that keeps the toolbar fixed above it, a selection state on a cell, and a
+   pinned-together state on a group.
+
+   Note the checkbox override. --accent is banned from touching image content,
+   and the base input[type=checkbox]:checked rule paints accent blue. A tick
+   sitting on top of a photograph therefore uses --mark like every other
+   photo-level signal in this file.
+   ========================================================================== */
+
+#app .screen-dupes { min-height: 0; }
+#app .screen-dupes h1 { font-size: var(--fs-h2); font-weight: 500; }
+
+#app .dupe-list { flex: 1; min-height: 0; overflow: auto; padding-right: 4px; }
+
+#app .dupe-range {
+  appearance: none;
+  flex: 1;
+  max-width: 340px;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+#app .dupe-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  /* One visible stop per usable step, so the step of 2 is legible standing
+     still rather than only discoverable by dragging. */
+  background:
+    repeating-linear-gradient(to right,
+      var(--line-2) 0 1px, transparent 1px 12.5%) ,
+    var(--surface-2);
+}
+#app .dupe-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px; height: 16px;
+  margin-top: -6.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1px solid var(--accent-hi);
+}
+#app .dupe-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+#app .dupe-mode { font-size: var(--fs-micro); padding: 6px 8px; }
+
+#app .dupe-group.confirmed { border-color: var(--mark-edge); }
+#app .dupe-rep-thumb { cursor: default; }
+#app .dupe-rep-name { font-size: var(--fs-body); }
+
+#app .dupe-grid { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); }
+#app .dupe-group .ro-body { margin-top: 10px; padding-top: 10px; }
+#app .dupe-cell.picked { border-color: var(--line-2); }
+#app .dupe-pick {
+  position: absolute; top: 6px; right: 6px;
+  z-index: 4;
+  width: 20px; height: 20px;
+  background: color-mix(in oklch, var(--well) 70%, transparent);
+  backdrop-filter: blur(3px);
+}
+#app .dupe-pick:checked { background: var(--mark); border-color: var(--mark-edge); }
+#app .dupe-pick:checked::after { border-left-color: var(--bg); border-bottom-color: var(--bg); }
+
+/* ==========================================================================
    14. SCREEN: EXPORT REVIEW
    ==========================================================================
    The label becomes part of the filename, so the derivation has to be visible:
@@ -1496,4 +1563,20 @@ kbd {
  *   - Export rows join the label field to the destination filename with a rail
  *     and an arrow.
  *   - Topbar counters became labelled stat blocks. Base size 15px -> 18px.
+ * v2.0a (2026-07-28): Added section 13b for the PRD 7.7 near-duplicate review
+ *   screen (45_screen_dupes.js). Additive only — no existing selector was
+ *   changed. It needed four things this file did not have: the sensitivity
+ *   slider (input[type=range] was unstyled), a scroll region that keeps the
+ *   toolbar fixed above it, a selection state on a photo cell, and a
+ *   pinned-together state on a group. Everything else on that screen reuses
+ *   .card / .btn / .notice / .grid / .photo-cell / .ro-group / .ro-head /
+ *   .ro-body / .ro-cell / .thumb / .tag as they stand.
+ *
+ *   The selection checkbox overrides input[type=checkbox]:checked to paint
+ *   --mark rather than --accent, because that tick sits directly on top of a
+ *   photograph and this file's first rule is that --accent never does.
+ *
+ *   The file is deliberately NOT renamed to v2.1: docs/markup_notes_v1.0.md,
+ *   docs/handoff_v1.0.md and this file's own header all name it, and a rename
+ *   would leave three dangling references to fix a purely additive change.
  */

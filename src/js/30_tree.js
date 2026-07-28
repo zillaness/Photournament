@@ -4,7 +4,7 @@
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
- * @description Folder tree model and finalist allocation math for PRD section 4: four allocation states, both math directions, clamping, dead-state detection, and tournament unit derivation.
+ * @description Folder tree model and finalist allocation math for PRD section 4: five allocation states, both math directions, clamping, dead-state detection, and tournament unit derivation.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
  * This module is pure. It reads photo records and an allocation map and returns a

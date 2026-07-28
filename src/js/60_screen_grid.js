@@ -1,6 +1,6 @@
 /**
  * @file 60_screen_grid.js
- * @version 1.5
+ * @version 1.6
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -330,7 +330,15 @@
       }, [
         img,
         el('span', { class: 'stack-name', text: photoName(mid) }),
-        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'showing' }) : null
+        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'showing' }) : null,
+        el('button', {
+          class: 'expand-btn', type: 'button', text: '\u2922',
+          title: 'View large \u2014 arrows step through the group',
+          onclick: function (ev) {
+            ev.stopPropagation();
+            PT.lightbox.open(members.slice(), members.indexOf(mid));
+          }
+        })
       ]);
       grid.appendChild(opt);
     });
@@ -862,7 +870,12 @@
     var unit = getUnit(G.unitId);
     if (!unit || unit.phase === 'done') return;
     var standing = standingIds(unit);
-    if (!standing.length) return;
+    if (!standing.length) {
+      // Reachable — a pass may legally keep zero — and the topbar stop is
+      // still visible then, so it must answer rather than silently do nothing.
+      toast('Nothing is standing to keep. Rescue something from the cut pile, or move on.');
+      return;
+    }
 
     var p = unit.currentPass;
     var judged = 0;
@@ -1309,4 +1322,6 @@
  * v1.5 (2026-07-28): Rotate/flip on every grid cell, revealed on hover. The
  *   correction redraws the cached derivative pixels (PT.orient), so it follows
  *   the photo to every later screen.
+ * v1.6 (2026-07-28): Expand chip in the burst picker, opening the lightbox
+ *   over the group's members.
 */

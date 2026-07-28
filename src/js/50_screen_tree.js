@@ -154,12 +154,25 @@
                 : { mode: 'pooled', value: null });
               return;
             }
-            // One decimal of precision, so the flip re-expresses the SAME
-            // count: 2 of 300 becomes 0.7%, which resolves back to 2 — a
-            // whole-number 1% would resolve to 3 and the row would jump.
-            var share = (node.eff.mode === 'fixed' && node.subtreeCount > 0)
-              ? Math.max(0.1, Math.min(100, Math.round((node.eff.value / node.subtreeCount) * 1000) / 10))
-              : 10;
+            // The flip must re-express the SAME count. The shortest decimal
+            // that resolves back to it is found by widening precision until
+            // percentToCount round-trips — one decimal covers ordinary
+            // folders (2 of 300 -> 0.7%), and "keep 1 of 30,000" gets the
+            // extra places it needs instead of silently becoming 30.
+            var share = 10;
+            if (node.eff.mode === 'fixed' && node.subtreeCount > 0) {
+              var exact = (node.eff.value * 100) / node.subtreeCount;
+              for (var d = 0; d <= 6; d++) {
+                var pow = Math.pow(10, d);
+                var cand = Math.round(exact * pow) / pow;
+                if (cand > 0 && cand <= 100 &&
+                    PT.tree.percentToCount(cand, node.subtreeCount) === node.eff.value) {
+                  share = cand;
+                  break;
+                }
+                if (d === 6) share = Math.min(100, Math.max(exact, 1e-6));
+              }
+            }
             setAlloc(path, { mode: 'percent', value: share });
           }
         });

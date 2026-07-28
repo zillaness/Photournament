@@ -16,14 +16,14 @@ this repository.
 ---
 
 You are picking up **Photournament**, a local single-file HTML photo-culling tool.
-It is a working prototype at v0.2 and the whole spine runs end to end. Your job is
+It shipped as v1.0 and the whole spine runs end to end. Your job is
 the open queue at the bottom.
 
 ## Orient yourself first
 
 Read in this order:
 
-1. `photournament_prd_v1.8.md` — the spec. Cite section numbers in commits.
+1. `photournament_prd_v1.9.md` — the spec. Cite section numbers in commits.
 2. `docs/handoff_v1.0.md` — this file.
 3. `tools/probes/01_capability_matrix/FINDINGS.md` and
    `tools/probes/02_heic/FINDINGS.md` — **measured** facts about the runtime.
@@ -34,8 +34,8 @@ Read in this order:
 
 ```
 npm install                 # libheif-js only
-node tools/build.mjs        # -> dist/photournament_v0.2.html
-npm test                    # unit + freshness + 2 smokes + 2 E2E, all must stay green
+node tools/build.mjs        # -> dist/photournament_v1.0.html
+npm test                    # unit + freshness + 2 smokes + 12 E2E runs, all must stay green
 node tools/screenshots.mjs  # -> docs/screens/*.png, all ten screens
 ```
 
@@ -91,6 +91,29 @@ a `file://` URL.
 ## What is NOT built — the open queue
 
 Ordered by value. Items 1 and 2 are the real gaps; the rest are smaller.
+
+> **Status note (2026-07-28):** item 1 shipped (45_screen_dupes.js and the
+> burst bundling that followed it), as did much of what sat below it. The
+> queue is kept for its measured context; check the changelogs before
+> starting anything listed here.
+
+### 0. User feedback, tabled — not yet designed
+
+- **"The initial culling rounds run long."** (Samuel, 2026-07-28, after a real
+  742-photo run.) Deliberately parked, not acted on. Candidate directions when
+  it is picked up: a tighter default quota for pass 1, larger grids for the
+  first pass only, projecting how many passes the current quota implies before
+  the pass starts, or letting Stage A hand over to the bracket earlier when the
+  field is already near the target. Stop early (now shipped) softens this but
+  does not shorten the rounds themselves.
+- **King-of-the-hill sort.** (Samuel, 2026-07-28.) A different comparison mode:
+  a champion holds the screen and challengers arrive one at a time — beat the
+  champion to take its place. Parked by request. Fit to think through later:
+  it is a natural alternative BRACKET mode (the engine's op log and positional
+  match ids could support it as a third sub-bracket shape), and possibly a
+  Stage A alternative for small pools; it trades the bracket's balanced-draw
+  fairness for speed and a very legible mental model, so the second-chance
+  round matters more, not less, if it lands.
 
 ### 1. Near-duplicate grouping review (PRD 7.7) — the largest gap
 

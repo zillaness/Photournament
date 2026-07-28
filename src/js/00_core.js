@@ -1,6 +1,6 @@
 /**
  * @file 00_core.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -602,6 +602,127 @@
     return { bump: bump, reapply: reapply };
   })();
 
+  /* ----------------------------------------------------------- lightbox -- */
+
+  /**
+   * The expand view for anywhere photos are judged from thumbnails — the
+   * duplicate review, the best-of-duplicates round, the burst pickers. Opens
+   * the cached PREVIEW (~1280px) in its own <dialog>, arrows step through the
+   * set it was opened over, a click toggles 1:1 on the preview pixels.
+   *
+   * Its own dialog element rather than #modal, because it has to be able to
+   * open ON TOP of the burst-picker modal — two users of one element cannot
+   * nest, two dialogs stack natively. The screens' document-level key handlers
+   * are already inert while any dialog is open, so the arrow keys are free.
+   *
+   * The preview is the ceiling here, as it is in the bracket: 1:1 means one
+   * PREVIEW pixel per screen pixel. The originals never enter the page.
+   */
+  PT.lightbox = (function () {
+    var L = null;   // { ids, idx, els } while open
+
+    function host() { return document.getElementById('lightbox'); }
+
+    function blobFor(id) {
+      var s = PT.store.get();
+      var d = s && s.derivatives && s.derivatives[id];
+      return d ? (d.preview || d.thumb || null) : null;
+    }
+
+    function nameFor(id) {
+      var s = PT.store.get();
+      var p = s && s.photos && s.photos[id];
+      return (p && (p.name || p.path)) || id;
+    }
+
+    function render() {
+      if (!L) return;
+      var id = L.ids[L.idx];
+      L.els.name.textContent = nameFor(id);
+      L.els.count.textContent = (L.idx + 1) + ' / ' + L.ids.length;
+      L.els.prev.disabled = L.ids.length < 2;
+      L.els.next.disabled = L.ids.length < 2;
+      L.els.wrap.classList.remove('zoomed');
+      L.els.zoom.textContent = 'Zoom 1:1';
+
+      PT.dom.releaseImg(L.els.img);
+      var b = blobFor(id);
+      if (b) { PT.dom.setImg(L.els.img, b); return; }
+      // The store's copy can be evicted while IndexedDB still holds it.
+      PT.db.get('derivatives', id).then(function (rec) {
+        if (!L || L.ids[L.idx] !== id || !rec) return;
+        var b2 = rec.preview || rec.thumb;
+        if (b2) PT.dom.setImg(L.els.img, b2);
+      }).catch(function () { /* the empty frame says it plainly enough */ });
+    }
+
+    function step(d) {
+      if (!L || L.ids.length < 2) return;
+      L.idx = (L.idx + d + L.ids.length) % L.ids.length;
+      render();
+    }
+
+    function toggleZoom() {
+      if (!L) return;
+      var on = L.els.wrap.classList.toggle('zoomed');
+      L.els.zoom.textContent = on ? 'Fit' : 'Zoom 1:1';
+      if (on) {
+        // Land centred, not on the top-left corner.
+        var w = L.els.wrap;
+        w.scrollLeft = (w.scrollWidth - w.clientWidth) / 2;
+        w.scrollTop = (w.scrollHeight - w.clientHeight) / 2;
+      }
+    }
+
+    function build(dlg) {
+      var img = PT.dom.el('img', { alt: '' });
+      var wrap = PT.dom.el('div', { class: 'lb-wrap', onclick: function (e) {
+        // The backdrop of the image area closes; the image itself zooms.
+        if (e.target === img) toggleZoom();
+      } }, [img]);
+      var name = PT.dom.el('span', { class: 'lb-name' });
+      var count = PT.dom.el('span', { class: 'lb-count nums' });
+      var prev = PT.dom.el('button', { class: 'btn btn-sm', text: '\u2190', title: 'Previous (left arrow)',
+        onclick: function () { step(-1); } });
+      var next = PT.dom.el('button', { class: 'btn btn-sm', text: '\u2192', title: 'Next (right arrow)',
+        onclick: function () { step(1); } });
+      var zoom = PT.dom.el('button', { class: 'btn btn-sm', text: 'Zoom 1:1',
+        title: 'One preview pixel per screen pixel \u2014 or click the photo',
+        onclick: toggleZoom });
+      var close = PT.dom.el('button', { class: 'btn btn-sm btn-quiet', text: 'Close (esc)',
+        onclick: function () { dlg.close(); } });
+      var bar = PT.dom.el('div', { class: 'lb-bar' }, [prev, next, name, count,
+        PT.dom.el('span', { class: 'spacer' }), zoom, close]);
+      dlg.appendChild(wrap);
+      dlg.appendChild(bar);
+
+      dlg.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+        else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); toggleZoom(); }
+      });
+      dlg.addEventListener('close', function () {
+        if (L) PT.dom.releaseImg(L.els.img);
+        L = null;
+      });
+      return { img: img, wrap: wrap, name: name, count: count, prev: prev, next: next, zoom: zoom };
+    }
+
+    return {
+      /** Open over a set of photo ids, starting at `at` (default 0). */
+      open: function (ids, at) {
+        var dlg = host();
+        if (!dlg || !ids || !ids.length) return;
+        if (!dlg._ptEls) dlg._ptEls = build(dlg);
+        L = { ids: ids.slice(), idx: Math.max(0, ids.indexOf(ids[at || 0])), els: dlg._ptEls };
+        L.idx = (at >= 0 && at < ids.length) ? at : 0;
+        render();
+        dlg.showModal();
+      },
+      isOpen: function () { var d = host(); return !!(d && d.open); }
+    };
+  })();
+
   PT.log('core', 'ready', {
     version: PT.VERSION,
     origin: location.protocol,
@@ -625,4 +746,7 @@
  * v1.3 (2026-07-28): PT.orient — manual rotate/flip for wrong-EXIF and mirrored
  *   photos, applied to the cached derivative pixels so every screen inherits it,
  *   with the accumulated dihedral state on the photo record for re-derivation.
+ * v1.4 (2026-07-28): PT.lightbox — the expand view for every screen that judges
+ *   photos from thumbnails, with arrow navigation and 1:1 preview zoom, in its
+ *   own dialog so it stacks over the burst pickers.
 */

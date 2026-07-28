@@ -1,6 +1,6 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.5
+ * @version 1.6
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -1011,7 +1011,15 @@
       }, [
         img,
         el('span', { class: 'stack-name', text: nameOf(mid) }),
-        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'competing' }) : null
+        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'competing' }) : null,
+        el('button', {
+          class: 'expand-btn', type: 'button', text: '\u2922',
+          title: 'View large \u2014 arrows step through the group',
+          onclick: function (ev) {
+            ev.stopPropagation();
+            PT.lightbox.open(members.slice(), members.indexOf(mid));
+          }
+        })
       ]));
     });
     body.appendChild(grid);
@@ -1207,6 +1215,21 @@
       S.head.appendChild(el('span', {
         class: 'small dim',
         text: 'The rest are ranked by how far they got and how many comparisons they won.'
+      }));
+    }
+
+    // A fixed target is a promise the PRD makes in photos, and grouping can
+    // leave fewer DISTINCT photos than that: 10 survivors in 4 bundles cannot
+    // seat 6 competitors. Under-filling silently would break the promise, so
+    // the gap is named and pointed at the round that can close it — keeping
+    // extra frames out of a burst is exactly what the runoff is for.
+    if (u.target != null && list.length < u.target && (u.pool || []).length > list.length) {
+      S.head.appendChild(el('div', { class: 'notice notice-warn', dataset: { t: 'underfill' }, text:
+        'This folder asked for ' + u.target + ' finalists, but after grouping only ' + list.length +
+        ' distinct photo' + (list.length === 1 ? '' : 's') + ' competed. ' +
+        (u.pool.length - list.length) + ' more frame' + (u.pool.length - list.length === 1 ? '' : 's') +
+        ' still stand inside the duplicate groups \u2014 keep some in the next step to reach ' +
+        u.target + ', or carry on with ' + list.length + '.'
       }));
     }
     if (E.derived) {
@@ -1529,6 +1552,16 @@
       if (id === nominee) tags.push('sharpest');
       if (taken) tags.push('already a finalist');
       if (tags.length) cell.appendChild(el('span', { class: 'tag', text: tags.join(' · ') }));
+            // Judge the runoff at preview size, not thumbnail size.
+      cell.appendChild(el('button', {
+        class: 'expand-btn', type: 'button', text: '\u2922', dataset: { t: 'expand' },
+        title: 'View large \u2014 arrows step through the group',
+        onclick: function (ev) {
+          ev.stopPropagation();
+          PT.lightbox.open(row.group.slice(), row.group.indexOf(id));
+        }
+      }));
+
       grid.appendChild(cell);
 
       var bb = blobFor(id, false);
@@ -1612,4 +1645,6 @@
  * v1.5 (2026-07-28): Rotate/flip per pane in the caption. The pane reloads the
  *   redrawn blob and the fit math reads the new natural dimensions, so the dual
  *   zoom just works on the corrected pixels.
+ * v1.6 (2026-07-28): Expand chips on the runoff cells and the burst picker,
+ *   opening the lightbox over the group.
 */

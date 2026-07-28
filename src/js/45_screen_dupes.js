@@ -1,6 +1,6 @@
 /**
  * @file 45_screen_dupes.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -900,6 +900,11 @@
 
     var repImg = el('img', { alt: '', class: 'dupe-rep-thumb' });
     setImgFor(repImg, gr.rep);
+    repImg.style.cursor = 'zoom-in';
+    repImg.title = 'View large';
+    repImg.addEventListener('click', function () {
+      PT.lightbox.open(gr.ids.slice(), Math.max(0, gr.ids.indexOf(gr.rep)));
+    });
 
     var facts = gr.ids.length + ' photos · up to ' + gr.diameter + ' bits apart';
     if (gr.unitLabel) facts += ' · ' + gr.unitLabel;
@@ -976,6 +981,18 @@
 
       var img = el('img', { class: 'thumb', alt: '' });
       cell.appendChild(img);
+
+      // Judging near-duplicates from thumbnails is exactly where a bigger look
+      // matters. The chip opens the whole group in the lightbox at this frame;
+      // clicking the cell still nominates it, so the chip must not bubble.
+      cell.appendChild(el('button', {
+        class: 'expand-btn', type: 'button', text: '\u2922', dataset: { t: 'expand' },
+        title: 'View large \u2014 arrows step through the group',
+        onclick: function (ev) {
+          ev.stopPropagation();
+          PT.lightbox.open(gr.ids.slice(), gr.ids.indexOf(id));
+        }
+      }));
 
       var pick = el('input', { type: 'checkbox', class: 'dupe-pick', dataset: { pick: id },
         title: 'Select for split, merge or remove' });
@@ -1104,4 +1121,7 @@
   * v1.1 (2026-07-28): The list keeps its scroll position across the rebuild
  *   every edit triggers — confirming a group halfway down no longer throws the
  *   user back to the top.
+ * v1.2 (2026-07-28): Expand. Every member cell and the group head open the
+ *   lightbox over the whole group, so near-duplicates are judged at preview
+ *   size instead of from thumbnails.
 */

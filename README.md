@@ -36,7 +36,7 @@ browser profile.
 ```
 npm install
 npm run build     # -> dist/photournament_v1.0.html  (and a slim, no-HEIC build)
-npm test          # unit tests, artifact smoke, and ten end-to-end runs
+npm test          # unit tests, artifact smoke, and eleven end-to-end runs
 ```
 
 The build concatenates `src/` into one self-contained HTML file. That is not a
@@ -62,8 +62,9 @@ for the measured constraint table.
 3. **Duplicates** — near-identical shots are grouped so a burst costs one
    decision rather than several: the grid deals one cell per group and the
    bracket seats one competitor per group, each wearing a badge with the member
-   count. Open the badge anywhere to switch which frame stands for the group;
-   split, merge and remove by hand when the grouping itself is wrong.
+   count. Open the badge anywhere to switch which frame stands for the group,
+   expand any frame to judge it at preview size, and split, merge or remove by
+   hand when the grouping itself is wrong.
 4. **Grid passes** — a screen of photos at a time, keeping at most the quota you
    committed to before the pass started. The cap does not move mid-pass; that is
    the entire point. **Stop early** in the top bar ends the folder whenever you

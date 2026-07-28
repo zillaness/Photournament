@@ -2157,6 +2157,89 @@ kbd {
 }
 #app .stack-badge-cap:hover { background: var(--surface-2); }
 
+/* --------------------------------------------------------------------------
+   THE LIGHTBOX
+   --------------------------------------------------------------------------
+   One photo, big, over whatever asked for it. The surround is the well colour
+   for the same reason the well exists: judgement happens against neutral grey.
+   -------------------------------------------------------------------------- */
+
+#lightbox {
+  width: min(94vw, 1500px);
+  height: 92vh;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#lightbox:not([open]) { display: none; }
+#lightbox::backdrop { background: oklch(0 0 0 / 0.62); backdrop-filter: blur(2px); }
+
+#lightbox .lb-wrap {
+  flex: 1;
+  min-height: 0;
+  background: var(--well);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+#lightbox .lb-wrap img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+/* 1:1 on the preview pixels: the container scrolls, the image goes natural. */
+#lightbox .lb-wrap.zoomed { display: block; overflow: auto; }
+#lightbox .lb-wrap.zoomed img {
+  max-width: none; max-height: none;
+  cursor: zoom-out;
+}
+
+#lightbox .lb-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+#lightbox .lb-name {
+  font-size: var(--fs-small);
+  color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
+}
+#lightbox .lb-count { font-size: var(--fs-small); color: var(--text-mute); }
+
+/*
+ * The expand chip. Same fixed-dark on-photo language as the index, stack and
+ * orient chips; bottom-left so it never collides with any of them.
+ */
+#app .expand-btn {
+  position: absolute; bottom: 6px; left: 6px;
+  z-index: 3;
+  min-width: 22px; height: 22px; padding: 0 5px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--chip);
+  color: var(--on-photo);
+  font: inherit; font-size: 12px; line-height: 22px;
+  backdrop-filter: blur(3px);
+  cursor: zoom-in;
+  opacity: 0;
+  transition: opacity var(--t, 120ms);
+}
+#app .photo-cell:hover .expand-btn,
+#app .stack-opt:hover .expand-btn,
+#app .expand-btn:focus-visible { opacity: 1; }
+#app .expand-btn:hover { background: oklch(0 0 0 / 0.78); }
+
 /*
  * Rotate / flip. On a grid cell they surface on hover only — two more always-on
  * chips would make every cell read as a control panel. Same fixed-dark chip
@@ -2458,6 +2541,9 @@ kbd {
   <dialog id="modal">
     <div id="modal-body"></div>
   </dialog>
+  <!-- The expand view (PT.lightbox). Its own element so it can stack OVER
+       #modal — the burst pickers open it on top of themselves. -->
+  <dialog id="lightbox"></dialog>
 </div>
 
 <noscript>
@@ -3110,7 +3196,7 @@ kbd {
 /* ===== 00_core.js ===== */
 /**
  * @file 00_core.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -3712,6 +3798,127 @@ kbd {
     return { bump: bump, reapply: reapply };
   })();
 
+  /* ----------------------------------------------------------- lightbox -- */
+
+  /**
+   * The expand view for anywhere photos are judged from thumbnails — the
+   * duplicate review, the best-of-duplicates round, the burst pickers. Opens
+   * the cached PREVIEW (~1280px) in its own <dialog>, arrows step through the
+   * set it was opened over, a click toggles 1:1 on the preview pixels.
+   *
+   * Its own dialog element rather than #modal, because it has to be able to
+   * open ON TOP of the burst-picker modal — two users of one element cannot
+   * nest, two dialogs stack natively. The screens' document-level key handlers
+   * are already inert while any dialog is open, so the arrow keys are free.
+   *
+   * The preview is the ceiling here, as it is in the bracket: 1:1 means one
+   * PREVIEW pixel per screen pixel. The originals never enter the page.
+   */
+  PT.lightbox = (function () {
+    var L = null;   // { ids, idx, els } while open
+
+    function host() { return document.getElementById('lightbox'); }
+
+    function blobFor(id) {
+      var s = PT.store.get();
+      var d = s && s.derivatives && s.derivatives[id];
+      return d ? (d.preview || d.thumb || null) : null;
+    }
+
+    function nameFor(id) {
+      var s = PT.store.get();
+      var p = s && s.photos && s.photos[id];
+      return (p && (p.name || p.path)) || id;
+    }
+
+    function render() {
+      if (!L) return;
+      var id = L.ids[L.idx];
+      L.els.name.textContent = nameFor(id);
+      L.els.count.textContent = (L.idx + 1) + ' / ' + L.ids.length;
+      L.els.prev.disabled = L.ids.length < 2;
+      L.els.next.disabled = L.ids.length < 2;
+      L.els.wrap.classList.remove('zoomed');
+      L.els.zoom.textContent = 'Zoom 1:1';
+
+      PT.dom.releaseImg(L.els.img);
+      var b = blobFor(id);
+      if (b) { PT.dom.setImg(L.els.img, b); return; }
+      // The store's copy can be evicted while IndexedDB still holds it.
+      PT.db.get('derivatives', id).then(function (rec) {
+        if (!L || L.ids[L.idx] !== id || !rec) return;
+        var b2 = rec.preview || rec.thumb;
+        if (b2) PT.dom.setImg(L.els.img, b2);
+      }).catch(function () { /* the empty frame says it plainly enough */ });
+    }
+
+    function step(d) {
+      if (!L || L.ids.length < 2) return;
+      L.idx = (L.idx + d + L.ids.length) % L.ids.length;
+      render();
+    }
+
+    function toggleZoom() {
+      if (!L) return;
+      var on = L.els.wrap.classList.toggle('zoomed');
+      L.els.zoom.textContent = on ? 'Fit' : 'Zoom 1:1';
+      if (on) {
+        // Land centred, not on the top-left corner.
+        var w = L.els.wrap;
+        w.scrollLeft = (w.scrollWidth - w.clientWidth) / 2;
+        w.scrollTop = (w.scrollHeight - w.clientHeight) / 2;
+      }
+    }
+
+    function build(dlg) {
+      var img = PT.dom.el('img', { alt: '' });
+      var wrap = PT.dom.el('div', { class: 'lb-wrap', onclick: function (e) {
+        // The backdrop of the image area closes; the image itself zooms.
+        if (e.target === img) toggleZoom();
+      } }, [img]);
+      var name = PT.dom.el('span', { class: 'lb-name' });
+      var count = PT.dom.el('span', { class: 'lb-count nums' });
+      var prev = PT.dom.el('button', { class: 'btn btn-sm', text: '\u2190', title: 'Previous (left arrow)',
+        onclick: function () { step(-1); } });
+      var next = PT.dom.el('button', { class: 'btn btn-sm', text: '\u2192', title: 'Next (right arrow)',
+        onclick: function () { step(1); } });
+      var zoom = PT.dom.el('button', { class: 'btn btn-sm', text: 'Zoom 1:1',
+        title: 'One preview pixel per screen pixel \u2014 or click the photo',
+        onclick: toggleZoom });
+      var close = PT.dom.el('button', { class: 'btn btn-sm btn-quiet', text: 'Close (esc)',
+        onclick: function () { dlg.close(); } });
+      var bar = PT.dom.el('div', { class: 'lb-bar' }, [prev, next, name, count,
+        PT.dom.el('span', { class: 'spacer' }), zoom, close]);
+      dlg.appendChild(wrap);
+      dlg.appendChild(bar);
+
+      dlg.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+        else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); toggleZoom(); }
+      });
+      dlg.addEventListener('close', function () {
+        if (L) PT.dom.releaseImg(L.els.img);
+        L = null;
+      });
+      return { img: img, wrap: wrap, name: name, count: count, prev: prev, next: next, zoom: zoom };
+    }
+
+    return {
+      /** Open over a set of photo ids, starting at `at` (default 0). */
+      open: function (ids, at) {
+        var dlg = host();
+        if (!dlg || !ids || !ids.length) return;
+        if (!dlg._ptEls) dlg._ptEls = build(dlg);
+        L = { ids: ids.slice(), idx: Math.max(0, ids.indexOf(ids[at || 0])), els: dlg._ptEls };
+        L.idx = (at >= 0 && at < ids.length) ? at : 0;
+        render();
+        dlg.showModal();
+      },
+      isOpen: function () { var d = host(); return !!(d && d.open); }
+    };
+  })();
+
   PT.log('core', 'ready', {
     version: PT.VERSION,
     origin: location.protocol,
@@ -3735,6 +3942,9 @@ kbd {
  * v1.3 (2026-07-28): PT.orient — manual rotate/flip for wrong-EXIF and mirrored
  *   photos, applied to the cached derivative pixels so every screen inherits it,
  *   with the accumulated dihedral state on the photo record for re-derivation.
+ * v1.4 (2026-07-28): PT.lightbox — the expand view for every screen that judges
+ *   photos from thumbnails, with arrow navigation and 1:1 preview zoom, in its
+ *   own dialog so it stacks over the burst pickers.
 */
 
 </script>
@@ -5583,7 +5793,7 @@ v1.0 - 2026-07-28 - Samuel Cao
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
- * @description Folder tree model and finalist allocation math for PRD section 4: four allocation states, both math directions, clamping, dead-state detection, and tournament unit derivation.
+ * @description Folder tree model and finalist allocation math for PRD section 4: five allocation states, both math directions, clamping, dead-state detection, and tournament unit derivation.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
  * This module is pure. It reads photo records and an allocation map and returns a
@@ -7253,7 +7463,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 45_screen_dupes.js ===== */
 /**
  * @file 45_screen_dupes.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -8153,6 +8363,11 @@ v1.0 - 2026-07-28 - Samuel Cao
 
     var repImg = el('img', { alt: '', class: 'dupe-rep-thumb' });
     setImgFor(repImg, gr.rep);
+    repImg.style.cursor = 'zoom-in';
+    repImg.title = 'View large';
+    repImg.addEventListener('click', function () {
+      PT.lightbox.open(gr.ids.slice(), Math.max(0, gr.ids.indexOf(gr.rep)));
+    });
 
     var facts = gr.ids.length + ' photos · up to ' + gr.diameter + ' bits apart';
     if (gr.unitLabel) facts += ' · ' + gr.unitLabel;
@@ -8229,6 +8444,18 @@ v1.0 - 2026-07-28 - Samuel Cao
 
       var img = el('img', { class: 'thumb', alt: '' });
       cell.appendChild(img);
+
+      // Judging near-duplicates from thumbnails is exactly where a bigger look
+      // matters. The chip opens the whole group in the lightbox at this frame;
+      // clicking the cell still nominates it, so the chip must not bubble.
+      cell.appendChild(el('button', {
+        class: 'expand-btn', type: 'button', text: '\u2922', dataset: { t: 'expand' },
+        title: 'View large \u2014 arrows step through the group',
+        onclick: function (ev) {
+          ev.stopPropagation();
+          PT.lightbox.open(gr.ids.slice(), gr.ids.indexOf(id));
+        }
+      }));
 
       var pick = el('input', { type: 'checkbox', class: 'dupe-pick', dataset: { pick: id },
         title: 'Select for split, merge or remove' });
@@ -8357,6 +8584,9 @@ v1.0 - 2026-07-28 - Samuel Cao
   * v1.1 (2026-07-28): The list keeps its scroll position across the rebuild
  *   every edit triggers — confirming a group halfway down no longer throws the
  *   user back to the top.
+ * v1.2 (2026-07-28): Expand. Every member cell and the group head open the
+ *   lightbox over the whole group, so near-duplicates are judged at preview
+ *   size instead of from thumbnails.
 */
 
 </script>
@@ -8518,12 +8748,25 @@ v1.0 - 2026-07-28 - Samuel Cao
                 : { mode: 'pooled', value: null });
               return;
             }
-            // One decimal of precision, so the flip re-expresses the SAME
-            // count: 2 of 300 becomes 0.7%, which resolves back to 2 — a
-            // whole-number 1% would resolve to 3 and the row would jump.
-            var share = (node.eff.mode === 'fixed' && node.subtreeCount > 0)
-              ? Math.max(0.1, Math.min(100, Math.round((node.eff.value / node.subtreeCount) * 1000) / 10))
-              : 10;
+            // The flip must re-express the SAME count. The shortest decimal
+            // that resolves back to it is found by widening precision until
+            // percentToCount round-trips — one decimal covers ordinary
+            // folders (2 of 300 -> 0.7%), and "keep 1 of 30,000" gets the
+            // extra places it needs instead of silently becoming 30.
+            var share = 10;
+            if (node.eff.mode === 'fixed' && node.subtreeCount > 0) {
+              var exact = (node.eff.value * 100) / node.subtreeCount;
+              for (var d = 0; d <= 6; d++) {
+                var pow = Math.pow(10, d);
+                var cand = Math.round(exact * pow) / pow;
+                if (cand > 0 && cand <= 100 &&
+                    PT.tree.percentToCount(cand, node.subtreeCount) === node.eff.value) {
+                  share = cand;
+                  break;
+                }
+                if (d === 6) share = Math.min(100, Math.max(exact, 1e-6));
+              }
+            }
             setAlloc(path, { mode: 'percent', value: share });
           }
         });
@@ -8770,7 +9013,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 60_screen_grid.js ===== */
 /**
  * @file 60_screen_grid.js
- * @version 1.5
+ * @version 1.6
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -9100,7 +9343,15 @@ v1.0 - 2026-07-28 - Samuel Cao
       }, [
         img,
         el('span', { class: 'stack-name', text: photoName(mid) }),
-        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'showing' }) : null
+        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'showing' }) : null,
+        el('button', {
+          class: 'expand-btn', type: 'button', text: '\u2922',
+          title: 'View large \u2014 arrows step through the group',
+          onclick: function (ev) {
+            ev.stopPropagation();
+            PT.lightbox.open(members.slice(), members.indexOf(mid));
+          }
+        })
       ]);
       grid.appendChild(opt);
     });
@@ -9632,7 +9883,12 @@ v1.0 - 2026-07-28 - Samuel Cao
     var unit = getUnit(G.unitId);
     if (!unit || unit.phase === 'done') return;
     var standing = standingIds(unit);
-    if (!standing.length) return;
+    if (!standing.length) {
+      // Reachable — a pass may legally keep zero — and the topbar stop is
+      // still visible then, so it must answer rather than silently do nothing.
+      toast('Nothing is standing to keep. Rescue something from the cut pile, or move on.');
+      return;
+    }
 
     var p = unit.currentPass;
     var judged = 0;
@@ -10079,6 +10335,8 @@ v1.0 - 2026-07-28 - Samuel Cao
  * v1.5 (2026-07-28): Rotate/flip on every grid cell, revealed on hover. The
  *   correction redraws the cached derivative pixels (PT.orient), so it follows
  *   the photo to every later screen.
+ * v1.6 (2026-07-28): Expand chip in the burst picker, opening the lightbox
+ *   over the group's members.
 */
 
 </script>
@@ -10086,7 +10344,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 70_screen_bracket.js ===== */
 /**
  * @file 70_screen_bracket.js
- * @version 1.5
+ * @version 1.6
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -11097,7 +11355,15 @@ v1.0 - 2026-07-28 - Samuel Cao
       }, [
         img,
         el('span', { class: 'stack-name', text: nameOf(mid) }),
-        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'competing' }) : null
+        mid === faceId ? el('span', { class: 'tag stack-tag', text: 'competing' }) : null,
+        el('button', {
+          class: 'expand-btn', type: 'button', text: '\u2922',
+          title: 'View large \u2014 arrows step through the group',
+          onclick: function (ev) {
+            ev.stopPropagation();
+            PT.lightbox.open(members.slice(), members.indexOf(mid));
+          }
+        })
       ]));
     });
     body.appendChild(grid);
@@ -11293,6 +11559,21 @@ v1.0 - 2026-07-28 - Samuel Cao
       S.head.appendChild(el('span', {
         class: 'small dim',
         text: 'The rest are ranked by how far they got and how many comparisons they won.'
+      }));
+    }
+
+    // A fixed target is a promise the PRD makes in photos, and grouping can
+    // leave fewer DISTINCT photos than that: 10 survivors in 4 bundles cannot
+    // seat 6 competitors. Under-filling silently would break the promise, so
+    // the gap is named and pointed at the round that can close it — keeping
+    // extra frames out of a burst is exactly what the runoff is for.
+    if (u.target != null && list.length < u.target && (u.pool || []).length > list.length) {
+      S.head.appendChild(el('div', { class: 'notice notice-warn', dataset: { t: 'underfill' }, text:
+        'This folder asked for ' + u.target + ' finalists, but after grouping only ' + list.length +
+        ' distinct photo' + (list.length === 1 ? '' : 's') + ' competed. ' +
+        (u.pool.length - list.length) + ' more frame' + (u.pool.length - list.length === 1 ? '' : 's') +
+        ' still stand inside the duplicate groups \u2014 keep some in the next step to reach ' +
+        u.target + ', or carry on with ' + list.length + '.'
       }));
     }
     if (E.derived) {
@@ -11615,6 +11896,16 @@ v1.0 - 2026-07-28 - Samuel Cao
       if (id === nominee) tags.push('sharpest');
       if (taken) tags.push('already a finalist');
       if (tags.length) cell.appendChild(el('span', { class: 'tag', text: tags.join(' · ') }));
+            // Judge the runoff at preview size, not thumbnail size.
+      cell.appendChild(el('button', {
+        class: 'expand-btn', type: 'button', text: '\u2922', dataset: { t: 'expand' },
+        title: 'View large \u2014 arrows step through the group',
+        onclick: function (ev) {
+          ev.stopPropagation();
+          PT.lightbox.open(row.group.slice(), row.group.indexOf(id));
+        }
+      }));
+
       grid.appendChild(cell);
 
       var bb = blobFor(id, false);
@@ -11698,6 +11989,8 @@ v1.0 - 2026-07-28 - Samuel Cao
  * v1.5 (2026-07-28): Rotate/flip per pane in the caption. The pane reloads the
  *   redrawn blob and the fit math reads the new natural dimensions, so the dual
  *   zoom just works on the corrected pixels.
+ * v1.6 (2026-07-28): Expand chips on the runoff cells and the burst picker,
+ *   opening the lightbox over the group.
 */
 
 </script>

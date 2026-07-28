@@ -73,16 +73,24 @@ The folder tree is how the user expresses **whether they want the best photos or
 
 On ingest, the folder structure is displayed as a tree at **whatever depth the source has**. There is no depth cap; the tree mirrors the folder structure being culled. Every node shows its photo count and carries an allocation state.
 
-### 4.2 Four allocation states
+### 4.2 Five allocation states
 
 Each node answers one question: *how many finalists come out of this folder?*
 
 | State | Entry | Parent node meaning | Leaf node meaning |
 |---|---|---|---|
 | **Fixed** | a number ≥ 1 | Children must sum to this; parent is authoritative | Exactly this many guaranteed |
-| **Excluded** | `0` | Entire subtree skipped | Folder skipped; no photos enter any tournament |
+| **Percent** | a share like `5%`, **or** a % toggle | Resolves against this folder's own photo count, then behaves as Fixed | Same — `5%` of 746 photos is 37, then behaves as Fixed |
+| **Excluded** | `0` (and `0%`) | Entire subtree skipped | Folder skipped; no photos enter any tournament |
 | **Pooled** | left blank | Competes with blank siblings for the parent's remainder | Competes with blank siblings; no guarantee any survive |
 | **Uncapped** | `*` typed, **or** an ∞ toggle | **Total floats to the sum of its children**; children become authoritative | Cull until satisfied; no target, user stops when happy |
+
+**Percent is a way of SAYING a fixed number, not a fifth kind of arithmetic.**
+It resolves against the folder's *own* count — never the parent's remainder — as
+soon as the counts are known, and everything downstream sees an ordinary Fixed
+allocation. The field keeps showing what was typed (`5%`), the state column
+shows what it came to (`= 37`), and rounding is to nearest but never silently
+to zero: exclusion is a state the user has to ask for by name.
 
 **`0` means excluded, not unlimited.** Every other value counts survivors, so 5 means five survive and 0 means none survive. Overloading 0 to mean its own opposite inverts the scale at one point. Uncapped is not a number and gets its own affordances.
 
@@ -373,7 +381,7 @@ What does work on `file://`, all verified: IndexedDB in full, including Blob, Fi
 | Phase | Deliverable | Proves |
 |---|---|---|
 | 1 | Folder ingest, tree construction, worker thumbnailer, HEIC WASM decode, `_sidecars` writer, progress UI, IndexedDB cache | The riskiest part (HEIC at volume) works before anything depends on it |
-| 2 | Tree UI: four allocation states, dual uncapped entry, both math directions, weighted distribution, conflict, clamp, and dead-state rules | Allocation is correct before any culling depends on it |
+| 2 | Tree UI: five allocation states, dual uncapped entry, both math directions, weighted distribution, conflict, clamp, and dead-state rules | Allocation is correct before any culling depends on it |
 | 3 | Stage A grid pass: paging, quota lock, shuffle, keyboard, undo, counters, low cull rate warning | Highest-leverage stage; usable on its own |
 | 4 | Perceptual hashing, group review, sensitivity slider, representative nomination | Field shrinks correctly before ranking |
 | 5 | Cut pile rescue with its own quota | Makes Stage A safe to trust |
@@ -420,3 +428,6 @@ Every option below is user-configurable; defaults shown.
 - v1.7 (2026-07-28): Resolved all remaining open questions. Set the under-cut warning floor to a configurable 50% and rewrote §7.2 to distinguish it from early-stop. Added export review with per-finalist intent labels embedded in filenames, with originals retained and mapping recorded in the decision JSON. Made ordered prefixes a default-on toggle. Removed the nesting depth cap so the tree mirrors source structure at any depth, and made output structure default to mirroring with a flatten option. Set top-down distribution to weight by photo count by default, and recorded why "whatever survives" cannot work. Confirmed `_sidecars` as the default sidecar location. Gave uncapped both typed `*` and toggle entry. Added §12 settings summary. Marked the document ready for sign-off review.
 - v1.8 (2026-07-28): Renamed "under-cut warning" to "low cull rate warning" after confirming the original term was invented rather than standard; cull rate and keeper rate are the terms photographers actually use. Revised the warning floor default from 50% to 25% and noted that 0 disables it.
 - v1.9 (2026-07-28): Corrected against a working implementation. Replaced the estimated source material in §3 with a measured inventory — 746 stills rather than "roughly 500", GIF added, and 175 video files at 79% of the bytes made a recognised skipped category rather than an error. Rewrote §7.7's accuracy risk: expression does not reproduce as a failure, geometry does, and the measured defaults are pHash, strict mode, threshold 14, with a slider that must step by 2 because pHash is a constant-weight code. Recorded that §7.9's unsupported-file detection cannot hang off the decoder's return value, since a truncated HEIC reports valid dimensions and only fails at the display callback. Added §8 rows for the libheif heap leak that reaches ~3.2GB at volume, and for sidecars measuring larger than the originals they come from. Replaced §8's "plus an asset folder if needed" with the measured file:// constraint matrix that rules it out.
+v1.9a (2026-07-28): §4.2 grows the Percent state — a share of the folder's own
+  count, resolved to Fixed once counts are known. Shipped in v1.0 of the app;
+  recorded here so the spec and the tool agree on how many states there are.

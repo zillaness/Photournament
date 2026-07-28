@@ -61,8 +61,13 @@
       '.pt-config input[type="number"]{width:72px;}',
       '.pt-config.locked{opacity:.8;}',
       '.pt-lock{font-size:12px;border:1px solid var(--warn);color:var(--warn);border-radius:4px;padding:2px 8px;white-space:nowrap;}',
-      '.pt-grid{flex:1 1 auto;min-height:0;overflow-y:auto;align-content:start;}',
-      '.pt-pile{flex:1 1 auto;min-height:0;overflow-y:auto;}',
+      // The viewport cap is not cosmetic. #app is min-height:100%, so a tall grid
+      // grows the document instead of scrolling inside its own box — which would
+      // put every cut-pile thumbnail permanently "in view" and defeat the
+      // IntersectionObserver that keeps object URLs bounded. Measured: without the
+      // cap, all 40 pile thumbnails held URLs at once.
+      '.pt-grid{flex:1 1 auto;min-height:0;max-height:calc(100vh - 210px);overflow-y:auto;align-content:start;}',
+      '.pt-pile{flex:1 1 auto;min-height:0;max-height:calc(100vh - 250px);overflow-y:auto;align-content:start;}',
       '.pt-cell-name{position:absolute;left:0;right:0;bottom:0;font-size:11px;padding:3px 6px;' +
         'background:linear-gradient(transparent,rgba(0,0,0,.85));color:var(--text-dim);' +
         'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}',
@@ -597,7 +602,7 @@
     } else {
       G.els.advance.disabled = false;
       G.els.advance.textContent = last
-        ? 'Finish pass ' + pass.n + ' · keep ' + sel.length
+        ? 'Finish pass ' + pass.n + ' and continue'
         : 'Keep ' + sel.length + ' · continue';
       G.els.hint.textContent = '';
     }
@@ -879,6 +884,9 @@
             editUnit(R.unitId, 'rescue:lockLimit', function (u) {
               u.rescueLimit = lim;
               u.rescueSel = u.rescueSel || [];
+              // The phase moves too, so a reload during the review comes back
+              // into the review rather than to the pass setup (PRD 7.10).
+              u.phase = 'rescue';
             });
             renderRescue();
           }
@@ -1013,6 +1021,7 @@
       u.rescued = (u.rescued || []).concat(sel);
       u.rescueSel = [];
       u.rescueDone = true;
+      u.phase = 'gridA';
     });
     if (sel.length) toast(sel.length + ' photo' + (sel.length === 1 ? '' : 's') + ' back in the pool.');
     goSafe('grid', { unitId: R.unitId });

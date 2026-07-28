@@ -1,7 +1,7 @@
 <!--
   Photournament v0.1 — built 2026-07-28
   GENERATED FILE. Do not edit; edit src/ and re-run: node tools/build.mjs
-  4 script(s), 1 stylesheet(s). omitted (--no-heic): HEIC files will be flagged as unsupported.
+  11 script(s), 2 stylesheet(s). omitted (--no-heic): HEIC files will be flagged as unsupported.
   Open by double-clicking. Chromium only: resume and disk-write need the
   File System Access API, which Chromium alone implements.
 -->
@@ -58,7 +58,7 @@
 
   /* Desaturated so it never competes with a photograph for attention. */
   --accent:    #5b8dd6;
-  --accent-dim:#2f4a६e;
+  --accent-dim:#2f4a6e;
   --good:      #5fa87a;
   --warn:      #c9a227;
   --bad:       #c05a51;
@@ -292,6 +292,59 @@ kbd {
  * v1.0 (2026-07-28): Initial release. Neutral dark tokens chosen so nothing
  *   around a photo biases judgement, reset, buttons, inputs, cards, notices,
  *   photo cells and grid sizes, toasts and modal.
+ */
+
+/* ===== 10_screens.css ===== */
+/**
+ * file: 10_screens.css
+ * version: 1.0
+ * author: Samuel Cao
+ * created: 2026-07-28
+ * last_updated: 2026-07-28
+ * description: Screen-specific styles for Photournament: entry dropzone, ingest progress, and shared stage layout.
+ * ai_update: Update last_updated and version. Append changelog comment at bottom.
+ */
+
+/* ---------------------------------------------------------------- entry -- */
+
+.screen-welcome { max-width: 720px; margin: 0 auto; width: 100%; justify-content: center; }
+
+.dropzone {
+  border: 2px dashed var(--line-2);
+  border-radius: var(--r-lg);
+  padding: 48px 24px;
+  text-align: center;
+  transition: border-color 120ms, background 120ms;
+}
+.dropzone.over { border-color: var(--accent); background: rgba(91, 141, 214, 0.06); }
+.dropzone-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.drop-title { font-size: 17px; font-weight: 600; }
+
+/* --------------------------------------------------------------- ingest -- */
+
+.screen-ingest .card { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------------------------------------------------------- stage shared -- */
+
+/*
+ * Stage screens are full-bleed: the photos are the interface, so the surrounding
+ * chrome gets as little room as it can survive on.
+ */
+.screen-grid, .screen-bracket, .screen-rescue, .screen-runoff { padding: 12px; gap: 10px; }
+
+.stage-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.stage-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.matchup { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.matchup figure { margin: 0; position: relative; background: #000; border-radius: var(--r); overflow: hidden; cursor: pointer; }
+.matchup img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.matchup figure:hover { box-shadow: inset 0 0 0 2px var(--line-2); }
+
+.cutpile { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; overflow: auto; }
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Entry dropzone, ingest layout, and shared
+ *   full-bleed stage layout with matchup and cut-pile grids.
  */
 
 </style>
@@ -648,9 +701,20 @@ kbd {
 
   var EXT_KIND = {
     jpg: 'jpeg', jpeg: 'jpeg', jpe: 'jpeg',
-    png: 'png', webp: 'webp',
+    png: 'png', webp: 'webp', gif: 'gif',
     heic: 'heic', heif: 'heic', hif: 'heic',
-    cr2: 'raw', nef: 'raw', arw: 'raw', dng: 'raw', raf: 'raw', orf: 'raw', rw2: 'raw'
+
+    // Out of scope but EXPECTED, and that distinction matters. A real phone-photo
+    // folder is mostly video by weight — one measured set had 175 clips at 6GB
+    // against 746 stills at 1.6GB. Lumping those in with corrupt files would
+    // produce 175 alarming "unsupported" rows describing something entirely
+    // normal, so video and raw are named categories that get counted and
+    // reported, not errors. PRD 9 puts both out of scope for v1.
+    mp4: 'video', mov: 'video', m4v: 'video', avi: 'video', mkv: 'video',
+    webm: 'video', mpg: 'video', mpeg: 'video', '3gp': 'video', wmv: 'video',
+
+    cr2: 'raw', cr3: 'raw', nef: 'raw', arw: 'raw', dng: 'raw',
+    raf: 'raw', orf: 'raw', rw2: 'raw', pef: 'raw', srw: 'raw'
   };
 
   /** PRD 7.9: flag unsupported files at load rather than dropping them silently. */
@@ -660,8 +724,22 @@ kbd {
     return EXT_KIND[m[1].toLowerCase()] || 'unsupported';
   };
 
+  /**
+   * GIF is included because it decodes natively in Chromium and real folders
+   * contain a few. Only the first frame is used; nothing here animates.
+   */
   PT.isImageKind = function (kind) {
-    return kind === 'jpeg' || kind === 'png' || kind === 'webp' || kind === 'heic';
+    return kind === 'jpeg' || kind === 'png' || kind === 'webp' || kind === 'gif' || kind === 'heic';
+  };
+
+  /** Recognised, deliberately not culled. Reported as a count, never as an error. */
+  PT.isSkippedKind = function (kind) {
+    return kind === 'video' || kind === 'raw';
+  };
+
+  PT.KIND_LABEL = {
+    jpeg: 'JPEG', png: 'PNG', webp: 'WebP', gif: 'GIF', heic: 'HEIC',
+    video: 'video', raw: 'RAW', unsupported: 'unrecognised'
   };
 
   /* ------------------------------------------------------------ dom helpers */
@@ -688,7 +766,7 @@ kbd {
       return n;
     },
     $: function (sel, root) { return (root || document).querySelector(sel); },
-    $: function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); },
+    $$: function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); },
     clear: function (node) { while (node.firstChild) node.removeChild(node.firstChild); return node; },
 
     /**
@@ -697,13 +775,35 @@ kbd {
      * PRD section 8 depends on.
      */
     setImg: function (img, blob) {
-      if (img._ptUrl) URL.revokeObjectURL(img._ptUrl);
-      if (!blob) { img.removeAttribute('src'); img._ptUrl = null; return; }
-      img._ptUrl = URL.createObjectURL(blob);
-      img.src = img._ptUrl;
+      var old = img._ptUrl;
+      if (!blob) {
+        img.removeAttribute('src');
+        img._ptUrl = null;
+        if (old) URL.revokeObjectURL(old);
+        return;
+      }
+      var url = URL.createObjectURL(blob);
+      img._ptUrl = url;
+      img.src = url;
+      // Safe now: the element no longer references the old URL.
+      if (old) URL.revokeObjectURL(old);
     },
+
+    /**
+     * Detaches the source BEFORE revoking. Revoking a URL that an <img> is still
+     * decoding aborts that load, and on a file:// origin the aborted request
+     * surfaces as "Not allowed to load local resource: blob:null/..." in the
+     * console. Clearing src first cancels the load cleanly instead.
+     *
+     * This matters because screens re-render faster than large previews decode,
+     * so the race is the normal case rather than an edge one.
+     */
     releaseImg: function (img) {
-      if (img && img._ptUrl) { URL.revokeObjectURL(img._ptUrl); img._ptUrl = null; }
+      if (!img || !img._ptUrl) return;
+      var url = img._ptUrl;
+      img._ptUrl = null;
+      img.removeAttribute('src');
+      URL.revokeObjectURL(url);
     }
   };
 
@@ -3097,6 +3197,4181 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   loose files, allocation parsing for all four states, two-pass resolution with
  *   clamping and dead-state detection, tournament unit derivation, and
  *   largest-remainder weighted distribution.
+ */
+
+</script>
+<script>
+/* ===== 35_session.js ===== */
+/**
+ * @file 35_session.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description Session model and stage flow for Photournament: settings defaults, tournament unit state, quota resolution, pass bookkeeping, and persistence shaping.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * The single source of truth for where the user is and what they have decided.
+ * Screens read from here and dispatch through here; they never hold stage state
+ * of their own. That is what makes PRD 7.10's mid-pass resume possible — the
+ * position within a Stage A pass lives in the store, not in a screen's closure.
+ *
+ * Blobs (thumbnails, previews) are deliberately NOT part of the persisted
+ * session. They live in the `derivatives` object store keyed by photo id, so a
+ * save stays small at 500 photos, and an evicted cache costs re-derivation
+ * rather than lost decisions.
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+
+  /** PRD section 12 settings summary. Every default here is from that table. */
+  var DEFAULTS = {
+    gridSize: 9,                 // 6 | 9 | 12 | 16
+    quotaMode: 'half',           // 'one' | 'half' | 'custom' | 'unlimited'
+    quotaCustom: 4,
+    shuffle: true,
+    cullFloor: 0.25,             // 0 disables (PRD 7.2)
+    stageD: false,               // cross-category final, off by default
+    stageDTarget: 10,
+    prefixes: true,              // ordered filename prefixes
+    outputStructure: 'mirror',   // 'mirror' | 'flat'
+    distribution: 'weighted',    // 'weighted' | 'even'
+    sidecarLocation: 'subfolder',// '_sidecars' subfolder | 'alongside'
+    exportHeicAs: 'ask',         // decided per export
+    dupeThreshold: 14,           // measured in tools/probes/04_phash/FINDINGS.md
+    dupeMode: 'strict'
+  };
+
+  var PHASES = ['gridA', 'rescue', 'dupes', 'bracket', 'runoff', 'done'];
+
+  function newSession(rootName, sourceKind) {
+    return {
+      id: 'sess-' + Date.now().toString(36),
+      createdAt: Date.now(),
+      rootName: rootName || 'photos',
+      sourceKind: sourceKind || 'files',   // 'handle' = can resume and write to disk
+      settings: Object.assign({}, DEFAULTS),
+      allocs: {},                          // path -> {mode, value}
+      stage: 'ingest',                     // ingest | tree | unit | stageD | export | done
+      activeUnitId: null,
+      units: {},                           // unitId -> unit state
+      stageDUnit: null,
+      finished: false
+    };
+  }
+
+  /**
+   * Fresh per-unit state. `pool` is the live field; `cut` is everything Stage A
+   * has rejected, which the rescue screen reads (PRD 7.5).
+   */
+  function newUnit(u) {
+    return {
+      id: u.id,
+      kind: u.kind,                // fixed | pooled | uncapped
+      label: u.label,
+      target: u.target,            // null when uncapped
+      allIds: u.photoIds.slice(),
+      pool: u.photoIds.slice(),
+      cut: [],
+      rescued: [],
+      phase: 'gridA',
+      passes: [],                  // completed pass summaries
+      currentPass: null,           // live pass, persisted so resume works mid-pass
+      groups: null,                // near-duplicate groups once reviewed
+      bracket: null,
+      winners: [],
+      startedAt: Date.now(),
+      comparisons: 0
+    };
+  }
+
+  /**
+   * PRD 7.1 quota, resolved for a given screen size.
+   * Returns Infinity for unlimited so callers can compare without special-casing.
+   */
+  function resolveQuota(settings, screenCount) {
+    switch (settings.quotaMode) {
+      case 'one':       return 1;
+      case 'half':      return Math.max(1, Math.floor(screenCount / 2));
+      case 'custom':    return Math.max(1, Math.min(settings.quotaCustom, screenCount));
+      case 'unlimited': return Infinity;
+      default:          return Math.max(1, Math.floor(screenCount / 2));
+    }
+  }
+
+  function quotaLabel(settings) {
+    switch (settings.quotaMode) {
+      case 'one':       return 'Keep 1';
+      case 'half':      return 'Keep up to half';
+      case 'custom':    return 'Keep up to ' + settings.quotaCustom;
+      case 'unlimited': return 'Unlimited';
+      default:          return 'Keep up to half';
+    }
+  }
+
+  /**
+   * Deterministic shuffle so a resumed pass deals the same screens in the same
+   * order. A Math.random() shuffle would reorder the remaining photos on reload
+   * and silently show some twice and others never.
+   */
+  function seededShuffle(ids, seed) {
+    var a = ids.slice();
+    var s = seed >>> 0 || 1;
+    for (var i = a.length - 1; i > 0; i--) {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      var j = s % (i + 1);
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  /**
+   * Begin a Stage A pass. Configuration locks here for the duration (PRD section 2):
+   * the settings are COPIED into the pass, so changing a setting mid-pass cannot
+   * loosen the quota the user committed to.
+   */
+  function startPass(unit, settings) {
+    var seed = (Date.now() ^ (unit.passes.length * 2654435761)) >>> 0;
+    return {
+      n: unit.passes.length + 1,
+      gridSize: settings.gridSize,
+      quotaMode: settings.quotaMode,
+      quotaCustom: settings.quotaCustom,
+      shuffled: settings.shuffle,
+      seed: seed,
+      order: settings.shuffle ? seededShuffle(unit.pool, seed) : unit.pool.slice(),
+      index: 0,               // screens completed
+      kept: [],               // ids kept so far this pass
+      startedAt: Date.now(),
+      fieldAtStart: unit.pool.length
+    };
+  }
+
+  function screenAt(pass, i) {
+    var start = i * pass.gridSize;
+    return pass.order.slice(start, start + pass.gridSize);
+  }
+
+  function screensTotal(pass) {
+    return Math.ceil(pass.order.length / pass.gridSize);
+  }
+
+  /**
+   * Fold a completed pass back into the unit and produce the summary PRD 7.2
+   * reports on. Everything not kept is cut, which is the forcing function the
+   * whole tool exists to provide.
+   */
+  function finishPass(unit, pass) {
+    var keptSet = Object.create(null);
+    pass.kept.forEach(function (id) { keptSet[id] = 1; });
+
+    var cutNow = pass.order.filter(function (id) { return !keptSet[id]; });
+    var before = pass.fieldAtStart;
+    var after = pass.kept.length;
+
+    var summary = {
+      n: pass.n,
+      gridSize: pass.gridSize,
+      quotaMode: pass.quotaMode,
+      quotaCustom: pass.quotaCustom,
+      shuffled: pass.shuffled,
+      before: before,
+      after: after,
+      cut: cutNow.length,
+      cutPct: before ? cutNow.length / before : 0,
+      screens: screensTotal(pass),
+      ms: Date.now() - pass.startedAt
+    };
+
+    unit.pool = pass.kept.slice();
+    unit.cut = unit.cut.concat(cutNow);
+    unit.passes.push(summary);
+    unit.currentPass = null;
+    return summary;
+  }
+
+  /**
+   * PRD 7.2: the low cull rate warning fires at the end of a completed pass, and
+   * is unrelated to stopping early. A floor of 0 disables it.
+   */
+  function lowCullRate(summary, settings) {
+    if (!settings.cullFloor) return false;
+    return summary.cutPct < settings.cullFloor;
+  }
+
+  /**
+   * PRD 7.1 handoff: for a fixed target, suggest moving to the bracket at roughly
+   * 2 to 3 times the target. Uncapped units get no suggestion.
+   */
+  function bracketSuggestion(unit) {
+    if (unit.target == null) return null;
+    var lo = unit.target * 2, hi = unit.target * 3;
+    if (unit.pool.length <= hi) {
+      return {
+        ready: true,
+        message: unit.pool.length + ' left against a target of ' + unit.target +
+                 '. That is small enough for a bracket.'
+      };
+    }
+    return {
+      ready: false,
+      message: unit.pool.length + ' left. Another pass or two gets you toward ' + lo + '–' + hi + '.'
+    };
+  }
+
+  /** The units still needing work, in a stable order. */
+  function pendingUnits(session) {
+    return Object.keys(session.units)
+      .map(function (k) { return session.units[k]; })
+      .filter(function (u) { return u.phase !== 'done'; });
+  }
+
+  function allUnitsDone(session) {
+    var ks = Object.keys(session.units);
+    return ks.length > 0 && ks.every(function (k) { return session.units[k].phase === 'done'; });
+  }
+
+  /** Union of every unit's winners — the field for the optional Stage D (PRD 7.6). */
+  function allWinners(session) {
+    var out = [];
+    Object.keys(session.units).forEach(function (k) {
+      session.units[k].winners.forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); });
+    });
+    return out;
+  }
+
+  /**
+   * What gets written to IndexedDB. Photo records are stripped of their Blobs;
+   * derivatives live in their own store. PRD 7.10 needs decisions to survive even
+   * when the evictable cache does not.
+   */
+  PT.serializeSession = function (state) {
+    return state.session;
+  };
+
+  PT.session = {
+    DEFAULTS: DEFAULTS,
+    PHASES: PHASES,
+    newSession: newSession,
+    newUnit: newUnit,
+    resolveQuota: resolveQuota,
+    quotaLabel: quotaLabel,
+    seededShuffle: seededShuffle,
+    startPass: startPass,
+    screenAt: screenAt,
+    screensTotal: screensTotal,
+    finishPass: finishPass,
+    lowCullRate: lowCullRate,
+    bracketSuggestion: bracketSuggestion,
+    pendingUnits: pendingUnits,
+    allUnitsDone: allUnitsDone,
+    allWinners: allWinners
+  };
+})();
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Settings defaults from PRD section 12,
+ *   unit state, quota resolution, deterministic seeded shuffle so a resumed pass
+ *   deals identically, pass lifecycle with locked configuration, low cull rate
+ *   check, and bracket handoff suggestion.
+ */
+
+</script>
+<script>
+/* ===== 40_screen_ingest.js ===== */
+/**
+ * @file 40_screen_ingest.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description PRD 7.9 ingest: folder entry by picker or drag, recursive scan, format triage, worker-pool derivative generation with progress, and cache reporting.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * Registers two screens: 'welcome' (entry) and 'ingest' (scan + process).
+ *
+ * SIZING, from a real measured folder rather than the PRD's estimate: 746 stills
+ * (601 JPEG, 137 HEIC, 3 PNG, 3 WebP, 2 GIF) alongside 175 video files. PRD 3
+ * says "roughly 500 photos"; the real figure was 50% higher, and video — which
+ * PRD 9 puts out of scope — accounted for 79% of the bytes. Both drive design
+ * here: previews are capped at 1280px so the derivative cache stays near 190MB
+ * rather than 400MB against a quota measured as low as 0.96GB, and video is a
+ * named, counted category rather than an error.
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+  var el = PT.dom.el;
+
+  /**
+   * Runtime-only handle map, id -> File | FileSystemFileHandle. Never persisted:
+   * File objects are not meaningfully revivable and handles are re-walked from
+   * the stored directory handle on resume.
+   */
+  PT.sources = PT.sources || Object.create(null);
+
+  var PREVIEW_PX = 1280;
+
+  /* ------------------------------------------------------------- entry ---- */
+
+  PT.router.register('welcome', {
+    mount: function (root) {
+      PT.dom.$('#topbar').hidden = true;
+
+      var card = el('div', { class: 'card' }, [
+        el('h1', { text: 'Photournament' }),
+        el('p', { class: 'muted', text:
+          'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
+          'passes, then ranks what survives head to head.' })
+      ]);
+
+      var drop = el('div', { class: 'dropzone', id: 'dropzone' }, [
+        el('div', { class: 'dropzone-inner' }, [
+          el('div', { class: 'drop-title', text: 'Drop a folder here' }),
+          el('div', { class: 'muted small', text: 'or' }),
+          el('button', { class: 'btn btn-primary', id: 'pick-folder', text: 'Choose a folder' }),
+          el('div', { class: 'small dim', id: 'fallback-note' })
+        ])
+      ]);
+
+      // A webkitdirectory input yields webkitRelativePath on every file, so the
+      // folder tree survives even without the File System Access API. It cannot
+      // write results back to disk, but it is a far better fallback than a flat
+      // file list: the whole allocation model in PRD 4 depends on structure.
+      var dirInput = el('input', {
+        type: 'file', id: 'dir-files', multiple: true, style: 'display:none'
+      });
+      dirInput.setAttribute('webkitdirectory', '');
+
+      var loose = el('div', { class: 'row small' }, [
+        dirInput,
+        el('input', { type: 'file', id: 'loose-files', multiple: true, accept: 'image/*', style: 'display:none' }),
+        el('button', {
+          class: 'btn btn-quiet btn-sm', text: 'Choose a folder without disk output',
+          title: 'Keeps the folder structure, but results must be downloaded rather than written back',
+          onclick: function () { dirInput.click(); }
+        }),
+        el('button', {
+          class: 'btn btn-quiet btn-sm', text: 'Pick individual files',
+          onclick: function () { PT.dom.$('#loose-files').click(); }
+        })
+      ]);
+
+      root.appendChild(card);
+      root.appendChild(drop);
+      root.appendChild(loose);
+      root.appendChild(el('div', { id: 'entry-msg' }));
+
+      // PRD 8: state the degraded mode plainly rather than failing quietly.
+      var note = PT.dom.$('#fallback-note');
+      if (!PT.env.hasFSA) {
+        note.appendChild(el('div', { class: 'notice notice-warn', html:
+          '<b>This browser cannot write results to disk or resume a session.</b><br>' +
+          'The File System Access API is Chromium-only. In Chrome, Edge, Brave or Opera you get ' +
+          'resume and disk output. Here you can still cull, but results must be downloaded ' +
+          'and the session ends when you close the tab.' }));
+        PT.dom.$('#pick-folder').disabled = true;
+      }
+
+      PT.dom.$('#pick-folder').addEventListener('click', function () {
+        // Must be inside the user gesture. AbortError is a cancelled dialog,
+        // which is an ordinary outcome, not a failure (probe 01).
+        window.showDirectoryPicker({ mode: 'readwrite' })
+          .then(function (handle) { beginFromHandle(handle); })
+          .catch(function (e) {
+            if (e && e.name === 'AbortError') return;
+            showEntryError(e);
+          });
+      });
+
+      PT.dom.$('#loose-files').addEventListener('change', function (ev) {
+        var files = Array.prototype.slice.call(ev.target.files || []);
+        if (files.length) beginFromFiles(files);
+      });
+
+      dirInput.addEventListener('change', function (ev) {
+        var files = Array.prototype.slice.call(ev.target.files || []);
+        if (!files.length) return;
+        // webkitRelativePath is "<chosen folder>/a/b/file.jpg", so the first
+        // segment names the root the user picked.
+        var first = files[0].webkitRelativePath || '';
+        beginFromFiles(files, first.split('/')[0] || 'photos');
+      });
+
+      wireDragDrop(drop);
+    },
+
+    unmount: function () {
+      window.removeEventListener('dragover', swallow);
+      window.removeEventListener('drop', swallow);
+    }
+  });
+
+  function swallow(e) { e.preventDefault(); }
+
+  function wireDragDrop(drop) {
+    // Without these, dropping anywhere navigates the tab to the file.
+    window.addEventListener('dragover', swallow);
+    window.addEventListener('drop', swallow);
+
+    drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
+
+    drop.addEventListener('drop', function (e) {
+      e.preventDefault();
+      drop.classList.remove('over');
+      var items = Array.prototype.slice.call(e.dataTransfer.items || []);
+
+      // A dragged folder yields a real directory handle in Chromium, which is
+      // what makes resume and disk-write possible. Prefer it over a file list.
+      var first = items[0];
+      if (first && typeof first.getAsFileSystemHandle === 'function') {
+        Promise.all(items.map(function (it) { return it.getAsFileSystemHandle(); }))
+          .then(function (handles) {
+            var dir = handles.filter(Boolean).filter(function (h) { return h.kind === 'directory'; })[0];
+            if (dir) return beginFromHandle(dir);
+            var files = Array.prototype.slice.call(e.dataTransfer.files || []);
+            if (files.length) return beginFromFiles(files);
+            showEntryError(new Error('Drop a folder, not a shortcut or a link.'));
+          })
+          .catch(showEntryError);
+        return;
+      }
+      var files = Array.prototype.slice.call(e.dataTransfer.files || []);
+      if (files.length) beginFromFiles(files);
+    });
+  }
+
+  function showEntryError(e) {
+    var host = PT.dom.$('#entry-msg');
+    if (!host) return;
+    PT.dom.clear(host).appendChild(
+      el('div', { class: 'error-box', text: (e && e.message) || String(e) })
+    );
+  }
+
+  /* -------------------------------------------------------------- scan ---- */
+
+  function beginFromHandle(dirHandle) {
+    var session = PT.session.newSession(dirHandle.name, 'handle');
+    PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
+    PT.db.put('handles', { key: 'root', handle: dirHandle }).catch(function (e) {
+      PT.warn('ingest', 'could not persist the folder handle; resume will not work', e);
+    });
+    PT.router.go('ingest', { source: { type: 'handle', handle: dirHandle } });
+  }
+
+  function beginFromFiles(files, rootName) {
+    var session = PT.session.newSession(rootName || 'dropped files', 'files');
+    PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
+    PT.router.go('ingest', { source: { type: 'files', files: files } });
+  }
+
+  /**
+   * Walks a directory handle, building source-relative paths.
+   * Depth is uncapped so the tree mirrors the source structure (PRD 4.1), but a
+   * limit guards against a symlink cycle taking the tab down.
+   */
+  function walkHandle(dirHandle, prefix, out, depth, onTick) {
+    if (depth > 32) return Promise.resolve(out);
+    var entries = [];
+    return (async function () {
+      for await (var entry of dirHandle.values()) entries.push(entry);
+    })().then(function () {
+      var chain = Promise.resolve();
+      entries.forEach(function (entry) {
+        // Our own output folders must never be re-ingested on a second run.
+        if (entry.kind === 'directory' && /^_(finalists|sidecars)/.test(entry.name)) return;
+        if (entry.name.charAt(0) === '.') return;
+
+        chain = chain.then(function () {
+          var path = prefix ? prefix + '/' + entry.name : entry.name;
+          if (entry.kind === 'directory') {
+            return walkHandle(entry, path, out, depth + 1, onTick);
+          }
+          out.push({ name: entry.name, path: path, dir: prefix, handle: entry });
+          if (out.length % 50 === 0 && onTick) onTick(out.length);
+          return null;
+        });
+      });
+      return chain.then(function () { return out; });
+    });
+  }
+
+  function fromFileList(files) {
+    return files.map(function (f) {
+      var rel = f.webkitRelativePath || f.name;
+      var i = rel.lastIndexOf('/');
+      return {
+        name: f.name,
+        path: rel,
+        dir: i < 0 ? '' : rel.slice(0, i),
+        file: f
+      };
+    });
+  }
+
+  /** Split a flat entry list into what we cull, what we skip, and what is broken. */
+  function triage(entries) {
+    var images = [], skipped = [], unknown = [], counts = {};
+    entries.forEach(function (e) {
+      var kind = PT.kindOf(e.name);
+      counts[kind] = (counts[kind] || 0) + 1;
+      e.kind = kind;
+      if (PT.isImageKind(kind)) images.push(e);
+      else if (PT.isSkippedKind(kind)) skipped.push(e);
+      else unknown.push(e);
+    });
+    return { images: images, skipped: skipped, unknown: unknown, counts: counts };
+  }
+
+  /* ------------------------------------------------------------ ingest ---- */
+
+  PT.router.register('ingest', {
+    mount: function (root, params) {
+      var topbar = PT.dom.$('#topbar');
+      topbar.hidden = false;
+      PT.dom.$('#topbar-context').textContent = PT.store.get().session.rootName;
+
+      var status = el('div', { class: 'muted', text: 'Reading the folder…' });
+      var bar = el('div', { class: 'bar' }, [el('i', { style: 'width:0%' })]);
+      var detail = el('div', { class: 'small dim nums' });
+      var summary = el('div', { id: 'ingest-summary' });
+      var actions = el('div', { class: 'row', id: 'ingest-actions' });
+
+      root.appendChild(el('div', { class: 'card screen-narrow' }, [
+        el('h1', { text: 'Reading photos' }), status, bar, detail, summary, actions
+      ]));
+
+      var setProgress = function (done, total, note) {
+        bar.firstChild.style.width = (total ? (done / total) * 100 : 0) + '%';
+        detail.textContent = done + ' / ' + total + (note ? '   ' + note : '');
+      };
+
+      var scan = params.source.type === 'handle'
+        ? walkHandle(params.source.handle, '', [], 0, function (n) {
+            status.textContent = 'Reading the folder… ' + n + ' files';
+          })
+        : Promise.resolve(fromFileList(params.source.files));
+
+      scan
+        .then(function (entries) {
+          var t = triage(entries);
+          renderTriage(summary, t, entries.length);
+
+          if (!t.images.length) {
+            status.textContent = 'No photos found here.';
+            actions.appendChild(el('button', {
+              class: 'btn', text: 'Choose a different folder',
+              onclick: function () { PT.router.go('welcome'); }
+            }));
+            return null;
+          }
+
+          status.textContent = 'Building thumbnails…';
+          return processAll(t.images, setProgress, status)
+            .then(function () {
+              status.textContent = 'Ready.';
+              return reportCache(summary);
+            })
+            .then(function () {
+              PT.dom.clear(actions).appendChild(el('button', {
+                class: 'btn btn-primary', text: 'Set finalist counts →',
+                onclick: function () {
+                  PT.store.dispatch('stage:tree', function (s) { s.session.stage = 'tree'; });
+                  PT.router.go('tree');
+                }
+              }));
+            });
+        })
+        .catch(function (e) {
+          PT.warn('ingest', e);
+          status.textContent = '';
+          summary.appendChild(el('div', { class: 'error-box', text: 'Ingest failed: ' + e.message }));
+        });
+    },
+
+    unmount: function () {
+      if (PT._pool) { PT._pool.terminate(); PT._pool = null; }
+    }
+  });
+
+  /**
+   * PRD 7.9 requires unsupported files be flagged rather than dropped silently.
+   * Video and RAW get their own line because they are expected and out of scope
+   * (PRD 9) — showing 175 clips as "unsupported" would read as 175 problems.
+   */
+  function renderTriage(host, t, total) {
+    PT.dom.clear(host);
+    var rows = [];
+    ['jpeg', 'heic', 'png', 'webp', 'gif'].forEach(function (k) {
+      if (t.counts[k]) rows.push(PT.KIND_LABEL[k] + ' ' + t.counts[k]);
+    });
+
+    host.appendChild(el('div', { class: 'row small', style: 'margin-top:10px' }, [
+      el('b', { text: t.images.length + ' photos' }),
+      el('span', { class: 'muted', text: rows.join(' · ') })
+    ]));
+
+    if (t.skipped.length) {
+      var vids = t.skipped.filter(function (e) { return e.kind === 'video'; }).length;
+      var raws = t.skipped.length - vids;
+      var parts = [];
+      if (vids) parts.push(vids + ' video file' + (vids === 1 ? '' : 's'));
+      if (raws) parts.push(raws + ' RAW file' + (raws === 1 ? '' : 's'));
+      host.appendChild(el('div', { class: 'notice notice-note small', style: 'margin-top:8px', text:
+        parts.join(' and ') + ' skipped. Photournament does not cull video or RAW; ' +
+        'they are left exactly where they are.' }));
+    }
+
+    if (t.unknown.length) {
+      host.appendChild(el('div', { class: 'notice notice-warn small', style: 'margin-top:8px', text:
+        t.unknown.length + ' file' + (t.unknown.length === 1 ? '' : 's') +
+        ' not recognised as an image: ' +
+        t.unknown.slice(0, 4).map(function (e) { return e.name; }).join(', ') +
+        (t.unknown.length > 4 ? ', …' : '') }));
+    }
+
+    host.appendChild(el('div', { class: 'small dim', style: 'margin-top:6px',
+      text: total + ' files seen in total.' }));
+  }
+
+  function processAll(images, setProgress, status) {
+    var libheifSrc = null;
+    var heicCount = images.filter(function (e) { return e.kind === 'heic'; }).length;
+    if (heicCount) {
+      var node = document.getElementById('libheif-src');
+      if (node && node.textContent && node.textContent.length > 1000) libheifSrc = node.textContent;
+    }
+
+    var pool = PT.ingest.createPool({
+      previewPx: PREVIEW_PX,
+      libheifSrc: libheifSrc,
+      libheifUrl: libheifSrc ? null : undefined
+    });
+    PT._pool = pool;
+
+    var total = images.length;
+    var done = 0;
+    var t0 = Date.now();
+    var records = [];
+    var derivatives = [];
+
+    setProgress(0, total, heicCount ? heicCount + ' HEIC will take the longest' : '');
+
+    // Sequential dispatch into the pool's own queue. The pool bounds concurrency,
+    // so this cannot put 746 full-resolution decodes in flight at once.
+    var chain = Promise.resolve();
+    images.forEach(function (e) {
+      chain = chain.then(function () {
+        return pool.process(e.handle || e.file, {
+          name: e.name, path: e.path, dir: e.dir, kind: e.kind
+        }).then(function (rec) {
+          done++;
+          PT.sources[rec.id] = e.handle || e.file;
+
+          if (rec.thumb || rec.preview) {
+            derivatives.push({ id: rec.id, thumb: rec.thumb, preview: rec.preview });
+          }
+          var lean = {};
+          Object.keys(rec).forEach(function (k) {
+            if (k !== 'thumb' && k !== 'preview') lean[k] = rec[k];
+          });
+          records.push(lean);
+
+          if (done % 5 === 0 || done === total) {
+            var rate = (Date.now() - t0) / done;
+            var left = Math.round((rate * (total - done)) / 1000);
+            setProgress(done, total, left > 1 ? '~' + PT.fmt.duration(left * 1000) + ' left' : '');
+          }
+        });
+      });
+    });
+
+    return chain.then(function () {
+      status.textContent = 'Saving…';
+      var failed = records.filter(function (r) { return r.err; });
+
+      PT.store.dispatch('ingest:done', function (s) {
+        records.forEach(function (r) { s.photos[r.id] = r; });
+        derivatives.forEach(function (d) { s.derivatives[d.id] = d; });
+        s.tree = PT.tree.build(records.filter(function (r) { return !r.err; }));
+      });
+
+      if (failed.length) {
+        PT.bus.emit('toast', failed.length + ' file' + (failed.length === 1 ? '' : 's') +
+          ' could not be read and will be left out.');
+      }
+
+      return PT.db.putAll('photos', records)
+        .then(function () { return PT.db.putAll('derivatives', derivatives); })
+        .then(function () { return PT.db.requestPersistence(); });
+    });
+  }
+
+  /** PRD 8 mitigation: show cache size, and say something useful if it is large. */
+  function reportCache(host) {
+    return PT.db.usage().then(function (u) {
+      if (!u.supported) return;
+      var line = el('div', { class: 'small dim', style: 'margin-top:8px', text:
+        'Cached thumbnails and previews: ' + PT.fmt.bytes(u.idb || u.usage) +
+        (u.quota ? ' of ' + PT.fmt.bytes(u.quota) + ' available' : '') });
+      host.appendChild(line);
+
+      if (u.quota && (u.idb || u.usage) / u.quota > 0.6) {
+        host.appendChild(el('div', { class: 'notice notice-warn small', style: 'margin-top:6px', text:
+          'That is a large share of this browser profile’s storage. Everything cached here can be ' +
+          'rebuilt from the originals, so clearing it costs time rather than decisions.' }));
+      }
+    }).catch(function () { /* usage reporting is never worth failing ingest over */ });
+  }
+})();
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Folder picker and drag-drop entry with a
+ *   stated loose-file fallback, recursive scan at uncapped depth, format triage
+ *   separating out-of-scope video and RAW from genuinely unrecognised files,
+ *   worker-pool processing with progress and time estimate, and cache reporting.
+ */
+
+</script>
+<script>
+/* ===== 50_screen_tree.js ===== */
+/**
+ * @file 50_screen_tree.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description PRD 4 allocation tree UI: four states per node, both math directions, live totals, weighted distribution, and the section 4.5 conflict, clamp and dead-state messages.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * All the arithmetic lives in 30_tree.js, which is pure and unit-tested. This
+ * file is only the surface over it: render, capture input, re-resolve, re-render.
+ * Every keystroke re-resolves the whole tree, which at a few hundred nodes is far
+ * cheaper than maintaining incremental state and getting it subtly wrong.
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+  var el = PT.dom.el;
+
+  var STYLE_ID = 'pt-tree-style';
+
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    var css =
+      '.tree-row{display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:6px}' +
+      '.tree-row:hover{background:var(--surface-2)}' +
+      '.tree-row.excluded .tree-name{text-decoration:line-through;opacity:.45}' +
+      '.tree-row.has-error{box-shadow:inset 0 0 0 1px #5c2f2b}' +
+      '.tree-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.tree-count{color:var(--text-mute);font-size:12px;font-variant-numeric:tabular-nums;min-width:62px;text-align:right}' +
+      '.tree-alloc{width:62px;text-align:center;font-variant-numeric:tabular-nums}' +
+      '.tree-state{font-size:11px;min-width:74px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.4px}' +
+      '.tree-inf{padding:2px 7px;font-size:13px;line-height:1.3}' +
+      '.tree-inf.on{background:var(--accent);border-color:var(--accent);color:#0b0b0c}' +
+      '.tree-issues{display:flex;flex-direction:column;gap:6px;margin-top:10px}' +
+      '.totals{display:flex;gap:18px;align-items:baseline;font-variant-numeric:tabular-nums}' +
+      '.totals b{font-size:22px}';
+    document.head.appendChild(el('style', { id: STYLE_ID, text: css }));
+  }
+
+  PT.router.register('tree', {
+    mount: function (root) {
+      injectStyle();
+      var st = PT.store.get();
+      PT.dom.$('#topbar').hidden = false;
+      PT.dom.$('#topbar-context').textContent = st.session.rootName;
+
+      if (!st.tree) {
+        root.appendChild(el('div', { class: 'error-box', text: 'No photos loaded yet.' }));
+        return;
+      }
+
+      root.appendChild(el('div', { class: 'row' }, [
+        el('h1', { text: 'How many finalists from each folder?' })
+      ]));
+
+      root.appendChild(el('div', { class: 'muted small', html:
+        'Type a number for a guaranteed count, <b>0</b> to skip a folder entirely, ' +
+        '<b>*</b> (or the ∞ button) to cull without a target, or leave it blank to let a folder ' +
+        'compete with its blank siblings for whatever its parent has left over.' }));
+
+      var treeHost = el('div', { class: 'card', id: 'tree-host' });
+      var issuesHost = el('div', { class: 'tree-issues', id: 'tree-issues' });
+      var footer = el('div', { class: 'card row', id: 'tree-footer' });
+
+      root.appendChild(treeHost);
+      root.appendChild(issuesHost);
+      root.appendChild(footer);
+
+      render();
+
+      function render() {
+        var s = PT.store.get();
+        var res = PT.tree.resolve(s.tree, s.session.allocs);
+        s.resolution = res;
+
+        PT.dom.clear(treeHost);
+        s.tree.order.forEach(function (path) {
+          var node = res.nodes[path];
+          if (!node) return;
+          // A root wrapper with a single child adds a level of indent and no
+          // information; skip it unless it holds photos of its own.
+          if (path === '' && s.tree.nodes[''].childPaths.length === 1 && !node.ownCount) return;
+          treeHost.appendChild(rowFor(s, res, path, node));
+        });
+
+        renderIssues(res);
+        renderFooter(res);
+      }
+
+      function rowFor(s, res, path, node) {
+        var depth = path === '' ? 0 : path.split('/').length;
+        var hasError = res.issues.some(function (i) { return i.path === path && i.level === 'error'; });
+
+        var input = el('input', {
+          type: 'text',
+          class: 'tree-alloc' + (hasError ? ' invalid' : ''),
+          value: PT.tree.allocToInput(node.alloc),
+          placeholder: '—',
+          title: 'number, 0 to skip, * for uncapped, or blank to pool'
+        });
+
+        input.addEventListener('input', function () {
+          var parsed = PT.tree.parseAlloc(input.value);
+          if (!parsed) { input.classList.add('invalid'); return; }
+          input.classList.remove('invalid');
+          setAlloc(path, parsed);
+        });
+
+        var infOn = node.alloc.mode === 'uncapped';
+        var inf = el('button', {
+          class: 'btn btn-sm tree-inf' + (infOn ? ' on' : ''),
+          text: '∞',
+          title: 'Cull until satisfied, with no target',
+          onclick: function () {
+            setAlloc(path, infOn ? { mode: 'pooled', value: null } : { mode: 'uncapped', value: null });
+          }
+        });
+
+        var stateWord = node.excluded ? 'skipped'
+          : node.alloc.mode === 'uncapped' ? 'uncapped'
+          : node.alloc.mode === 'fixed' ? (node.clamped ? 'clamped ' + node.target : 'fixed')
+          : node.unitId ? 'pooled' : 'pooled';
+
+        var row = el('div', {
+          class: 'tree-row' + (node.excluded ? ' excluded' : '') + (hasError ? ' has-error' : '')
+        }, [
+          el('span', { class: 'tree-name', style: 'padding-left:' + depth * 16 + 'px',
+                       text: (path === '' ? s.session.rootName : node.name) }),
+          el('span', { class: 'tree-count', text: node.subtreeCount + ' photo' + (node.subtreeCount === 1 ? '' : 's') }),
+          el('span', { class: 'tree-state', text: stateWord }),
+          input,
+          inf
+        ]);
+
+        // Offer top-down distribution only where it is meaningful (PRD 4.4).
+        if (node.alloc.mode === 'fixed' && s.tree.nodes[path].childPaths.length) {
+          row.appendChild(el('button', {
+            class: 'btn btn-sm btn-quiet', text: 'split',
+            title: 'Suggest a split of ' + node.alloc.value + ' across the subfolders',
+            onclick: function () { offerSplit(path, node.alloc.value); }
+          }));
+        }
+        return row;
+      }
+
+      function setAlloc(path, parsed) {
+        PT.store.dispatch('tree:alloc', function (s) { s.session.allocs[path] = parsed; });
+        render();
+      }
+
+      function offerSplit(path, total) {
+        var s = PT.store.get();
+        var mode = s.session.settings.distribution;
+        var sug = PT.tree.distribute(s.tree, s.resolution, path, total, mode);
+        var names = Object.keys(sug);
+        if (!names.length) return;
+
+        var body = PT.dom.$('#modal-body');
+        PT.dom.clear(body);
+        body.appendChild(el('h2', { text: 'Split ' + total + ' across ' + names.length + ' subfolders' }));
+
+        var listHost = el('div', { style: 'margin:12px 0' });
+        var draw = function (m) {
+          var d = PT.tree.distribute(s.tree, s.resolution, path, total, m);
+          PT.dom.clear(listHost);
+          Object.keys(d).forEach(function (c) {
+            listHost.appendChild(el('div', { class: 'row small' }, [
+              el('span', { class: 'tree-name', text: s.tree.nodes[c].name }),
+              el('span', { class: 'muted nums', text: s.resolution.nodes[c].subtreeCount + ' photos' }),
+              el('b', { class: 'nums', text: String(d[c]) })
+            ]));
+          });
+          return d;
+        };
+        var current = draw(mode);
+
+        body.appendChild(listHost);
+        body.appendChild(el('div', { class: 'row' }, [
+          el('button', { class: 'btn btn-sm', text: 'Weighted by photo count',
+            onclick: function () { current = draw('weighted'); } }),
+          el('button', { class: 'btn btn-sm', text: 'Even split',
+            onclick: function () { current = draw('even'); } }),
+          el('span', { class: 'spacer' }),
+          el('button', { class: 'btn btn-quiet', text: 'Cancel',
+            onclick: function () { PT.dom.$('#modal').close(); } }),
+          el('button', { class: 'btn btn-primary', text: 'Apply', onclick: function () {
+            PT.store.dispatch('tree:distribute', function (ss) {
+              Object.keys(current).forEach(function (c) {
+                ss.session.allocs[c] = { mode: 'fixed', value: current[c] };
+              });
+            });
+            PT.dom.$('#modal').close();
+            render();
+          } })
+        ]));
+        body.appendChild(el('p', { class: 'small dim', style: 'margin-top:10px',
+          text: 'These are suggestions. Every one is editable afterwards.' }));
+        PT.dom.$('#modal').showModal();
+      }
+
+      function renderIssues(res) {
+        PT.dom.clear(issuesHost);
+        var rank = { error: 0, warn: 1, note: 2 };
+        res.issues.slice().sort(function (a, b) { return rank[a.level] - rank[b.level]; })
+          .forEach(function (i) {
+            var s = PT.store.get();
+            var where = i.path === '' ? s.session.rootName : (s.tree.nodes[i.path] || {}).name || i.path;
+            issuesHost.appendChild(el('div', { class: 'notice notice-' + i.level }, [
+              el('b', { text: where + ': ' }),
+              el('span', { text: i.message })
+            ]));
+          });
+      }
+
+      function renderFooter(res) {
+        PT.dom.clear(footer);
+        var s = PT.store.get();
+
+        footer.appendChild(el('div', { class: 'totals' }, [
+          el('span', { class: 'muted small', text: 'Finalists' }),
+          el('b', { text: res.projectedTotal === null ? '—' : String(res.projectedTotal) }),
+          el('span', { class: 'muted small', text:
+            res.projectedTotal === null
+              ? 'no target: uncapped folders finish when you say so'
+              : 'from ' + res.units.length + ' tournament' + (res.units.length === 1 ? '' : 's') })
+        ]));
+
+        footer.appendChild(el('span', { class: 'spacer' }));
+
+        footer.appendChild(el('label', { class: 'check small' }, [
+          (function () {
+            var cb = el('input', { type: 'checkbox' });
+            cb.checked = s.session.settings.stageD;
+            cb.addEventListener('change', function () {
+              PT.store.dispatch('settings:stageD', function (ss) { ss.session.settings.stageD = cb.checked; });
+            });
+            return cb;
+          })(),
+          el('span', { text: 'Also run a best-of-the-best round across all winners' })
+        ]));
+
+        var go = el('button', {
+          class: 'btn btn-primary',
+          text: 'Start culling →',
+          onclick: function () { startUnits(res); }
+        });
+        if (res.hasErrors || !res.units.length) {
+          go.disabled = true;
+          go.title = res.hasErrors
+            ? 'Resolve the problems above first'
+            : 'Give at least one folder a finalist count';
+        }
+        footer.appendChild(go);
+      }
+
+      function startUnits(res) {
+        PT.store.dispatch('units:create', function (s) {
+          res.units.forEach(function (u) {
+            if (!s.session.units[u.id]) s.session.units[u.id] = PT.session.newUnit(u);
+          });
+          s.session.stage = 'unit';
+          var pending = PT.session.pendingUnits(s.session);
+          s.session.activeUnitId = pending.length ? pending[0].id : null;
+        });
+        var id = PT.store.get().session.activeUnitId;
+        if (id) PT.router.go('grid', { unitId: id });
+      }
+    },
+
+    unmount: function () {
+      PT.dom.$('#topbar-counters').textContent = '';
+    }
+  });
+})();
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Per-node allocation input with both the
+ *   typed * and the toggle entry paths, live re-resolution on every keystroke,
+ *   ranked issue list, weighted and even distribution with an editable preview,
+ *   projected total, Stage D opt-in, and unit creation.
+ */
+
+</script>
+<script>
+/* ===== 60_screen_grid.js ===== */
+/**
+ * @file 60_screen_grid.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description Stage A grid pass screen (PRD 7.1), the low cull rate offer (PRD 7.2), and the cut pile rescue screen (PRD 7.5). Registers the 'grid' and 'rescue' screens.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * This is the forcing function of PRD section 2 made concrete. Three properties
+ * are load-bearing and everything else here is in service of them:
+ *
+ *   1. The quota locks at pass start. PT.session.startPass COPIES the settings
+ *      into the pass, and every quota decision on this screen reads the pass copy,
+ *      never session.settings. Changing a setting mid-pass therefore cannot loosen
+ *      the commitment even if some other screen writes to settings. The config
+ *      controls are still rendered during a pass, disabled, next to a lock badge —
+ *      PRD 7.1 asks for the constraint to be visible rather than silent.
+ *
+ *   2. All stage state lives in the store, never in a closure here. unit.currentPass
+ *      holds order/index/kept/sel and is written on every toggle and every advance,
+ *      so PRD 7.10's mid-pass resume is a consequence of the data model rather than
+ *      a feature bolted on. A reload mid-pass re-enters on the same screen with the
+ *      same selection.
+ *
+ *   3. Only the photos on screen hold object URLs. Every screen advance releases
+ *      the previous cells, and the rescue pile — which can be hundreds of photos in
+ *      one scroller — attaches and releases through an IntersectionObserver. At 500
+ *      photos, holding every thumbnail URL defeats the bounded-memory strategy PRD
+ *      section 8 depends on.
+ *
+ * Two fields are added to the unit record beyond PT.session.newUnit:
+ *   unit.lastSummary        the finished pass summary being reported (PRD 7.2)
+ *   unit.lastPassSnapshot   pool + cut as they were BEFORE that pass, so the
+ *                           re-run offer can actually undo it. Persisted rather
+ *                           than held in memory because the user may reload while
+ *                           the offer is on screen.
+ *   unit.rescueLimit        the pre-committed rescue cap (PRD 7.5), locked once set
+ *   unit.rescueSel          in-progress rescue selection, so review survives reload
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+  var dom = PT.dom;
+  var el = dom.el;
+  var S = PT.session;
+
+  var STYLE_ID = 'pt-grid-style';
+
+  /* ------------------------------------------------------------------ style */
+
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    var css = [
+      '.pt-wrap{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;}',
+      '.pt-config{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 12px;}',
+      '.pt-config .f{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);}',
+      '.pt-config select,.pt-config input[type="number"]{padding:3px 6px;font-size:13px;}',
+      '.pt-config input[type="number"]{width:72px;}',
+      '.pt-config.locked{opacity:.8;}',
+      '.pt-lock{font-size:12px;border:1px solid var(--warn);color:var(--warn);border-radius:4px;padding:2px 8px;white-space:nowrap;}',
+      // The viewport cap is not cosmetic. #app is min-height:100%, so a tall grid
+      // grows the document instead of scrolling inside its own box — which would
+      // put every cut-pile thumbnail permanently "in view" and defeat the
+      // IntersectionObserver that keeps object URLs bounded. Measured: without the
+      // cap, all 40 pile thumbnails held URLs at once.
+      '.pt-grid{flex:1 1 auto;min-height:0;max-height:calc(100vh - 210px);overflow-y:auto;align-content:start;}',
+      '.pt-pile{flex:1 1 auto;min-height:0;max-height:calc(100vh - 250px);overflow-y:auto;align-content:start;}',
+      '.pt-cell-name{position:absolute;left:0;right:0;bottom:0;font-size:11px;padding:3px 6px;' +
+        'background:linear-gradient(transparent,rgba(0,0,0,.85));color:var(--text-dim);' +
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}',
+      '.pt-missing{display:flex;align-items:center;justify-content:center;height:100%;' +
+        'color:var(--text-mute);font-size:11px;text-align:center;padding:8px;}',
+      '.pt-actions{position:sticky;bottom:0;background:var(--bg);padding-top:8px;}',
+      '.pt-hint{color:var(--warn);font-size:13px;}',
+      '.pt-sum b{color:var(--text);}',
+      '.pt-title{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}'
+    ].join('\n');
+    document.head.appendChild(el('style', { id: STYLE_ID, text: css }));
+  }
+
+  /* ---------------------------------------------------------------- helpers */
+
+  function st() { return PT.store.get(); }
+
+  function unitId(params) {
+    var s = st();
+    if (params && params.unitId) return params.unitId;
+    return s && s.session ? s.session.activeUnitId : null;
+  }
+
+  function getUnit(id) {
+    var s = st();
+    if (!s || !s.session || !s.session.units) return null;
+    return s.session.units[id] || null;
+  }
+
+  /** Mutate the unit through the store so the change persists and resume works. */
+  function editUnit(id, name, fn) {
+    PT.store.dispatch(name, function (state) {
+      var u = state.session.units[id];
+      if (u) fn(u, state);
+    });
+  }
+
+  function photoName(id) {
+    var s = st();
+    var p = s && s.photos ? s.photos[id] : null;
+    return (p && (p.name || p.path)) || id;
+  }
+
+  function thumbOf(id) {
+    var s = st();
+    var d = s && s.derivatives ? s.derivatives[id] : null;
+    return d ? (d.thumb || d.preview || null) : null;
+  }
+
+  function toast(msg) {
+    var host = document.getElementById('toasts');
+    if (!host) return;
+    var t = el('div', { class: 'toast', text: msg });
+    host.appendChild(t);
+    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2600);
+  }
+
+  /**
+   * Navigate without exploding when a downstream screen is not in this build.
+   * A half-built artifact should say so, not throw out of a click handler.
+   */
+  function goSafe(name, params) {
+    try {
+      PT.router.go(name, params);
+      return true;
+    } catch (e) {
+      PT.warn('grid', 'navigation to "' + name + '" failed', e);
+      toast('The ' + name + ' screen is not available in this build yet.');
+      return false;
+    }
+  }
+
+  function setTopbar(contextText, counterNodes) {
+    var bar = document.getElementById('topbar');
+    if (bar) bar.hidden = false;
+    var ctx = document.getElementById('topbar-context');
+    if (ctx) ctx.textContent = contextText || '';
+    var cnt = document.getElementById('topbar-counters');
+    if (cnt) {
+      dom.clear(cnt);
+      (counterNodes || []).forEach(function (n) { cnt.appendChild(n); });
+    }
+  }
+
+  function clearTopbar() {
+    var ctx = document.getElementById('topbar-context');
+    if (ctx) ctx.textContent = '';
+    var cnt = document.getElementById('topbar-counters');
+    if (cnt) dom.clear(cnt);
+  }
+
+  function counter(label, value) {
+    return el('span', {}, [label + ' ', el('b', { text: String(value) })]);
+  }
+
+  /* ------------------------------------------------------------ pure logic */
+
+  /** The locked configuration of a live pass, shaped like a settings object. */
+  function passSettings(pass) {
+    return { quotaMode: pass.quotaMode, quotaCustom: pass.quotaCustom };
+  }
+
+  function quotaFor(pass, screenCount) {
+    return S.resolveQuota(passSettings(pass), screenCount);
+  }
+
+  /**
+   * PRD 7.1 counters. Pure so it can be unit tested and so the topbar and the
+   * action row cannot disagree about what the numbers are.
+   */
+  function passCounters(unit, pass) {
+    var total = pass.order.length;
+    var screens = S.screensTotal(pass);
+    var screen = S.screenAt(pass, pass.index);
+    var sel = pass.sel || [];
+    var shown = pass.index * pass.gridSize + screen.length;
+    var keptLive = pass.kept.length + sel.length;
+    var unseen = Math.max(0, total - shown);
+    return {
+      remaining: total - pass.index * pass.gridSize, // this screen included
+      screensLeft: screens - pass.index,
+      screensTotal: screens,
+      screenNo: pass.index + 1,
+      field: keptLive + unseen,                      // projected survivors
+      target: unit.target,
+      cutPct: shown ? (shown - keptLive) / shown : 0
+    };
+  }
+
+  /**
+   * PRD 7.2: the offer is to re-run "with a tighter quota", so the tool has to
+   * propose one. One notch tighter each time, bottoming out at Keep 1 — which is
+   * the tightest quota that still lets a pass make progress.
+   */
+  function tightenQuota(cfg, gridSize) {
+    var size = gridSize || cfg.gridSize || 9;
+    switch (cfg.quotaMode) {
+      case 'unlimited':
+        return { quotaMode: 'half', quotaCustom: cfg.quotaCustom };
+      case 'half':
+        return { quotaMode: 'custom', quotaCustom: Math.max(1, Math.floor(size / 2) - 1) };
+      case 'custom':
+        return cfg.quotaCustom > 1
+          ? { quotaMode: 'custom', quotaCustom: cfg.quotaCustom - 1 }
+          : { quotaMode: 'one', quotaCustom: 1 };
+      default:
+        return { quotaMode: 'one', quotaCustom: 1 };
+    }
+  }
+
+  /** PRD 7.5: fixed number, percentage of the cut pile, or unlimited. */
+  function rescueMax(limit, cutCount) {
+    if (!limit) return 0;
+    if (limit.mode === 'unlimited') return Infinity;
+    if (limit.mode === 'pct') {
+      var pct = Math.max(0, Math.min(100, Number(limit.value) || 0));
+      if (!pct) return 0;
+      return Math.min(cutCount, Math.max(1, Math.round((cutCount * pct) / 100)));
+    }
+    return Math.min(cutCount, Math.max(0, Math.floor(Number(limit.value) || 0)));
+  }
+
+  function rescueLimitLabel(limit, cutCount) {
+    if (!limit) return 'not set';
+    if (limit.mode === 'unlimited') return 'unlimited';
+    if (limit.mode === 'pct') return limit.value + '% of ' + cutCount + ' = ' + rescueMax(limit, cutCount);
+    return String(rescueMax(limit, cutCount));
+  }
+
+  function capLabel(quota) {
+    return quota === Infinity ? 'no limit' : 'keep at most ' + quota;
+  }
+
+  /* ================================================================== GRID */
+
+  var G = null; // live mount state; nulled by unmount
+
+  function releaseCells() {
+    if (!G) return;
+    G.imgs.forEach(function (img) { dom.releaseImg(img); });
+    G.imgs = [];
+  }
+
+  /**
+   * A photo cell. `pos` is 1-based and drives the number-key mapping; the tenth
+   * cell is labelled 0 because that is the key that selects it.
+   */
+  function photoCell(id, pos, onClick) {
+    var img = el('img', { class: 'thumb', alt: '' });
+    var blob = thumbOf(id);
+    var body;
+    if (blob) {
+      dom.setImg(img, blob);
+      body = img;
+    } else {
+      body = el('div', { class: 'pt-missing', text: 'no thumbnail' });
+    }
+    var cell = el('div', {
+      class: 'photo-cell',
+      dataset: { id: id, pos: String(pos), t: 'cell' },
+      title: photoName(id),
+      onclick: function () { onClick(id); }
+    }, [
+      body,
+      el('span', { class: 'idx', text: pos <= 9 ? String(pos) : (pos === 10 ? '0' : String(pos)) }),
+      el('span', { class: 'pt-cell-name', text: photoName(id) })
+    ]);
+    return { cell: cell, img: blob ? img : null };
+  }
+
+  /* --------------------------------------------------------- config card */
+
+  /**
+   * PRD 7.1's configuration table. Rendered in both views: live before a pass,
+   * disabled with a lock badge during one. Disabling rather than hiding is
+   * deliberate — the user needs to see what they committed to.
+   */
+  function configCard(unit, locked) {
+    var s = st().session;
+    var cfg = locked ? unit.currentPass : s.settings;
+    var wrap = el('div', { class: 'card card-tight pt-config' + (locked ? ' locked' : ''), dataset: { t: 'config' } });
+
+    function field(label, control) {
+      return el('label', { class: 'f' }, [label, control]);
+    }
+
+    var gridSel = el('select', {
+      dataset: { t: 'cfg-grid' },
+      disabled: locked,
+      onchange: function () {
+        var v = parseInt(gridSel.value, 10);
+        PT.store.dispatch('settings:gridSize', function (state) { state.session.settings.gridSize = v; });
+        render();
+      }
+    }, [6, 9, 12, 16].map(function (n) {
+      return el('option', { value: String(n), text: String(n) + ' per screen', selected: cfg.gridSize === n });
+    }));
+
+    var quotaSel = el('select', {
+      dataset: { t: 'cfg-quota' },
+      disabled: locked,
+      onchange: function () {
+        var v = quotaSel.value;
+        PT.store.dispatch('settings:quotaMode', function (state) { state.session.settings.quotaMode = v; });
+        render();
+      }
+    }, [
+      ['one', 'Keep 1'],
+      ['half', 'Keep up to half'],
+      ['custom', 'Custom number'],
+      ['unlimited', 'Unlimited']
+    ].map(function (o) {
+      return el('option', { value: o[0], text: o[1], selected: cfg.quotaMode === o[0] });
+    }));
+
+    var customIn = el('input', {
+      type: 'number', min: '1', max: '64',
+      value: String(cfg.quotaCustom || 1),
+      dataset: { t: 'cfg-custom' },
+      disabled: locked,
+      onchange: function () {
+        var v = Math.max(1, parseInt(customIn.value, 10) || 1);
+        customIn.value = String(v);
+        PT.store.dispatch('settings:quotaCustom', function (state) { state.session.settings.quotaCustom = v; });
+        render();
+      }
+    });
+
+    var shuffleIn = el('input', {
+      type: 'checkbox',
+      dataset: { t: 'cfg-shuffle' },
+      disabled: locked,
+      onchange: function () {
+        var v = shuffleIn.checked;
+        PT.store.dispatch('settings:shuffle', function (state) { state.session.settings.shuffle = v; });
+      }
+    });
+    shuffleIn.checked = locked ? !!cfg.shuffled : !!s.settings.shuffle;
+
+    var floorIn = el('input', {
+      type: 'number', min: '0', max: '100',
+      value: String(Math.round((s.settings.cullFloor || 0) * 100)),
+      dataset: { t: 'cfg-floor' },
+      disabled: locked,
+      title: 'Low cull rate warning floor (PRD 7.2). 0 disables it.',
+      onchange: function () {
+        var v = Math.max(0, Math.min(100, parseInt(floorIn.value, 10) || 0));
+        floorIn.value = String(v);
+        PT.store.dispatch('settings:cullFloor', function (state) { state.session.settings.cullFloor = v / 100; });
+      }
+    });
+
+    wrap.appendChild(field('Grid', gridSel));
+    wrap.appendChild(field('Quota', quotaSel));
+    if ((locked ? cfg.quotaMode : s.settings.quotaMode) === 'custom') wrap.appendChild(field('Keep up to', customIn));
+    wrap.appendChild(field('Shuffle', shuffleIn));
+    wrap.appendChild(field('Low cull floor %', floorIn));
+
+    if (locked) {
+      wrap.appendChild(el('span', { class: 'pt-lock', dataset: { t: 'lock-badge' },
+        text: 'Locked for pass ' + cfg.n + ': ' + S.quotaLabel(passSettings(cfg)) }));
+      wrap.appendChild(el('span', { class: 'small dim', dataset: { t: 'lock-note' },
+        text: 'The quota is locked until this pass ends. Changes take effect on the next pass.' }));
+    }
+    return wrap;
+  }
+
+  /* -------------------------------------------------------- setup / between */
+
+  function renderSetup(unit) {
+    var s = st().session;
+    var root = G.root;
+    dom.clear(root);
+    releaseCells();
+
+    var wrap = el('div', { class: 'pt-wrap screen-narrow' });
+    root.appendChild(wrap);
+
+    setTopbar(unit.label + ' · Stage A', [
+      counter('pool', unit.pool.length),
+      counter('cut', unit.cut.length),
+      counter('target', unit.target == null ? '—' : unit.target),
+      counter('passes', unit.passes.length)
+    ]);
+
+    wrap.appendChild(el('div', { class: 'pt-title' }, [
+      el('h1', { text: unit.label }),
+      el('span', { class: 'muted small', dataset: { t: 'unit-line' },
+        text: unit.pool.length + ' in the pool · ' + unit.cut.length + ' cut · ' +
+              (unit.target == null ? 'uncapped' : 'target ' + unit.target) })
+    ]));
+
+    /* ---- PRD 7.2: report the last pass, and offer the re-run if it was thin */
+    if (unit.lastSummary) {
+      var sum = unit.lastSummary;
+      var card = el('div', { class: 'card pt-sum', dataset: { t: 'summary' } }, [
+        el('h2', { text: 'Pass ' + sum.n + ' complete' }),
+        el('p', { class: 'muted small', dataset: { t: 'summary-line' } }, [
+          'Cut ', el('b', { text: String(sum.cut) }), ' of ', el('b', { text: String(sum.before) }),
+          ' (', el('b', { text: PT.fmt.pct(sum.cutPct) }), ' cut) across ',
+          el('b', { text: String(sum.screens) }), ' screens. ',
+          el('b', { text: String(sum.after) }), ' survive.'
+        ])
+      ]);
+      wrap.appendChild(card);
+
+      if (unit.lastPassSnapshot && S.lowCullRate(sum, s.settings)) {
+        var tighter = tightenQuota(sum, sum.gridSize);
+        var note = el('div', { class: 'notice notice-warn', dataset: { t: 'lowcull' } }, [
+          el('p', {}, [
+            'That pass cut only ', el('b', { text: PT.fmt.pct(sum.cutPct) }), ', below your ',
+            el('b', { text: PT.fmt.pct(s.settings.cullFloor) }), ' floor. It cost ' + sum.screens +
+            ' screens and left the pile largely intact.'
+          ]),
+          el('p', { class: 'small', text:
+            'You can re-run pass ' + sum.n + ' with a tighter quota (' +
+            S.quotaLabel(tighter) + '), which puts the ' + sum.cut +
+            ' cut photos back first. Or keep the result as it stands.' }),
+          el('div', { class: 'row' }, [
+            el('button', { class: 'btn btn-primary', dataset: { t: 'rerun' },
+              text: 'Re-run pass ' + sum.n + ' — ' + S.quotaLabel(tighter),
+              onclick: function () { rerunPass(tighter); } }),
+            el('button', { class: 'btn', dataset: { t: 'decline' }, text: 'Keep these results',
+              onclick: function () {
+                editUnit(G.unitId, 'grid:declineRerun', function (u) { u.lastPassSnapshot = null; });
+                render();
+              } })
+          ])
+        ]);
+        card.appendChild(note);
+      }
+    }
+
+    /* ---- PRD 7.1 handoff suggestion; uncapped units get none */
+    if (unit.passes.length) {
+      var sug = S.bracketSuggestion(unit);
+      wrap.appendChild(el('div', {
+        class: 'notice ' + (sug && sug.ready ? 'notice-note' : 'notice-note'),
+        dataset: { t: 'suggestion' },
+        text: sug ? sug.message
+                  : unit.pool.length + ' left. This folder is uncapped, so there is no target — ' +
+                    'run passes until you are happy with what is left.'
+      }));
+    }
+
+    /* ---- configuration for the NEXT pass */
+    if (unit.rerunOf) {
+      wrap.appendChild(el('div', { class: 'notice notice-note', dataset: { t: 'rerun-note' },
+        text: 'Re-running pass ' + unit.rerunOf + '. The quota below is one notch tighter — ' +
+              'adjust it if you like, then start. It locks again when the pass begins.' }));
+    }
+    wrap.appendChild(configCard(unit, false));
+
+    var canPass = unit.pool.length > 0;
+    var startLabel = 'Start pass ' + (unit.passes.length + 1) +
+      ' · ' + S.quotaLabel(s.settings) + ' · ' + s.settings.gridSize + ' per screen';
+
+    var actions = el('div', { class: 'row' }, [
+      el('button', {
+        class: 'btn btn-primary', dataset: { t: 'start-pass' }, text: startLabel,
+        disabled: !canPass, onclick: beginPass
+      }),
+      el('button', {
+        class: 'btn', dataset: { t: 'cutpile' },
+        text: 'Review cut pile (' + unit.cut.length + ')',
+        disabled: unit.cut.length === 0,
+        onclick: function () { goSafe('rescue', { unitId: G.unitId }); }
+      }),
+      el('button', {
+        class: 'btn', dataset: { t: 'tobracket' }, text: 'Move on to the bracket',
+        onclick: function () {
+          editUnit(G.unitId, 'unit:toBracket', function (u) { u.phase = 'bracket'; });
+          if (!goSafe('bracket', { unitId: G.unitId })) {
+            editUnit(G.unitId, 'unit:toBracket:revert', function (u) { u.phase = 'gridA'; });
+            render();
+          }
+        }
+      })
+    ]);
+    wrap.appendChild(actions);
+
+    if (!canPass) {
+      wrap.appendChild(el('div', { class: 'notice notice-warn', dataset: { t: 'empty' },
+        text: 'The pool is empty. Rescue something from the cut pile, or move on.' }));
+    }
+  }
+
+  /* -------------------------------------------------------------- the pass */
+
+  function beginPass() {
+    var s = st().session;
+    editUnit(G.unitId, 'grid:startPass', function (u) {
+      u.currentPass = S.startPass(u, s.settings);
+      u.currentPass.sel = [];
+      // Starting a new pass forecloses re-running the previous one.
+      u.lastPassSnapshot = null;
+      u.lastSummary = null;
+      u.rerunOf = null;
+      u.phase = 'gridA';
+    });
+    render();
+  }
+
+  function renderPass(unit) {
+    var root = G.root;
+    dom.clear(root);
+    releaseCells();
+
+    var wrap = el('div', { class: 'pt-wrap' });
+    root.appendChild(wrap);
+
+    G.els = {};
+    wrap.appendChild(configCard(unit, true));
+
+    G.els.grid = el('div', { class: 'grid pt-grid', dataset: { t: 'grid' } });
+    wrap.appendChild(G.els.grid);
+
+    G.els.back = el('button', { class: 'btn', dataset: { t: 'back' }, text: 'Back', onclick: goBack });
+    G.els.undo = el('button', { class: 'btn', dataset: { t: 'undo' }, text: 'Undo', onclick: undo });
+    G.els.hint = el('span', { class: 'pt-hint', dataset: { t: 'hint' } });
+    G.els.progress = el('span', { class: 'muted small nums', dataset: { t: 'progress' } });
+    G.els.advance = el('button', {
+      class: 'btn btn-primary', dataset: { t: 'advance' }, text: 'Continue', onclick: advance
+    });
+
+    wrap.appendChild(el('div', { class: 'row pt-actions' }, [
+      G.els.back,
+      G.els.undo,
+      G.els.progress,
+      G.els.hint,
+      el('span', { class: 'spacer' }),
+      el('span', { class: 'muted small' }, [
+        el('kbd', { text: '1' }), '–', el('kbd', { text: '9' }), ' select · ',
+        el('kbd', { text: '0' }), ' tenth · ',
+        el('kbd', { text: 'Enter' }), ' advance · ',
+        el('kbd', { text: 'U' }), ' undo · ',
+        el('kbd', { text: '←' }), ' back'
+      ]),
+      G.els.advance
+    ]));
+
+    paintScreen();
+  }
+
+  /** Rebuild the cells for the current screen. Every previous URL is released. */
+  function paintScreen() {
+    var unit = getUnit(G.unitId);
+    var pass = unit.currentPass;
+    releaseCells();
+    var host = G.els.grid;
+    dom.clear(host);
+    host.className = 'grid pt-grid grid-' + pass.gridSize;
+
+    var ids = S.screenAt(pass, pass.index);
+    G.screenIds = ids;
+    G.cells = [];
+    G.undoStack = [];
+    ids.forEach(function (id, i) {
+      var made = photoCell(id, i + 1, toggle);
+      if (made.img) G.imgs.push(made.img);
+      G.cells.push(made.cell);
+      host.appendChild(made.cell);
+    });
+    paintState();
+  }
+
+  /** Cheap repaint: classes, counters, button state. No image churn. */
+  function paintState() {
+    var unit = getUnit(G.unitId);
+    var pass = unit.currentPass;
+    var sel = pass.sel || [];
+    var quota = quotaFor(pass, G.screenIds.length);
+    var over = sel.length - (quota === Infinity ? sel.length : quota);
+
+    G.cells.forEach(function (c) {
+      var on = sel.indexOf(c.dataset.id) >= 0;
+      c.classList.toggle('kept', on);
+    });
+
+    var c = passCounters(unit, pass);
+    var last = pass.index + 1 >= c.screensTotal;
+
+    G.els.progress.textContent = 'screen ' + c.screenNo + ' of ' + c.screensTotal +
+      ' · ' + sel.length + ' selected · ' + capLabel(quota);
+    G.els.back.disabled = pass.index === 0;
+    G.els.undo.disabled = G.undoStack.length === 0 && pass.index === 0;
+
+    if (over > 0) {
+      G.els.advance.disabled = true;
+      G.els.advance.textContent = 'keep at most ' + quota;
+      G.els.hint.textContent = 'keep at most ' + quota + ' — deselect ' + over;
+    } else {
+      G.els.advance.disabled = false;
+      G.els.advance.textContent = last
+        ? 'Finish pass ' + pass.n + ' and continue'
+        : 'Keep ' + sel.length + ' · continue';
+      G.els.hint.textContent = '';
+    }
+
+    setTopbar(unit.label + ' · pass ' + pass.n + ' · ' + S.quotaLabel(passSettings(pass)), [
+      counter('remaining', c.remaining),
+      counter('screens left', c.screensLeft),
+      counter('field', c.field + (c.target == null ? ' (uncapped)' : ' / ' + c.target)),
+      counter('cut this pass', PT.fmt.pct(c.cutPct))
+    ]);
+  }
+
+  /**
+   * PRD 7.1 is explicit that going over the quota must not silently reject the
+   * click: the selection is allowed to exceed, and the advance button is what
+   * refuses, with the reason on it.
+   */
+  function toggle(id) {
+    editUnit(G.unitId, 'grid:toggle', function (u) {
+      var p = u.currentPass;
+      if (!p) return;
+      p.sel = p.sel || [];
+      var i = p.sel.indexOf(id);
+      if (i >= 0) p.sel.splice(i, 1); else p.sel.push(id);
+    });
+    G.undoStack.push(id);
+    paintState();
+  }
+
+  function undo() {
+    if (G.undoStack.length) {
+      var id = G.undoStack.pop();
+      editUnit(G.unitId, 'grid:undo', function (u) {
+        var p = u.currentPass;
+        var i = p.sel.indexOf(id);
+        if (i >= 0) p.sel.splice(i, 1); else p.sel.push(id);
+      });
+      paintState();
+      return;
+    }
+    goBack();
+  }
+
+  /**
+   * Back-navigation within the pass. The kept list is authoritative, so stepping
+   * back means pulling this screen's ids out of it and back into the selection —
+   * the user sees exactly what they had kept there.
+   */
+  function goBack() {
+    var unit = getUnit(G.unitId);
+    if (!unit.currentPass || unit.currentPass.index === 0) return;
+    editUnit(G.unitId, 'grid:back', function (u) {
+      var p = u.currentPass;
+      p.index--;
+      var ids = S.screenAt(p, p.index);
+      var back = [];
+      p.kept = p.kept.filter(function (id) {
+        if (ids.indexOf(id) >= 0) { back.push(id); return false; }
+        return true;
+      });
+      p.sel = back;
+    });
+    paintScreen();
+  }
+
+  function advance() {
+    var unit = getUnit(G.unitId);
+    var pass = unit.currentPass;
+    var quota = quotaFor(pass, G.screenIds.length);
+    if ((pass.sel || []).length > quota) return; // the button already says why
+    var last = pass.index + 1 >= S.screensTotal(pass);
+
+    if (!last) {
+      editUnit(G.unitId, 'grid:advance', function (u) {
+        var p = u.currentPass;
+        p.kept = p.kept.concat(p.sel || []);
+        p.sel = [];
+        p.index++;
+      });
+      paintScreen();   // releases the previous screen's object URLs
+      return;
+    }
+
+    editUnit(G.unitId, 'grid:finishPass', function (u) {
+      var p = u.currentPass;
+      p.kept = p.kept.concat(p.sel || []);
+      p.sel = [];
+      // Snapshot BEFORE folding the pass in, so the PRD 7.2 re-run can restore
+      // the pool and the cut pile exactly as they were.
+      u.lastPassSnapshot = { pool: u.pool.slice(), cut: u.cut.slice() };
+      var summary = S.finishPass(u, p);
+      u.lastSummary = summary;
+      if (!S.lowCullRate(summary, st().session.settings)) u.lastPassSnapshot = null;
+    });
+    releaseCells();
+    render();
+  }
+
+  /** PRD 7.2 re-run: restore the pre-pass state, then offer a tighter quota. */
+  function rerunPass(tighter) {
+    var unit = getUnit(G.unitId);
+    if (!unit.lastPassSnapshot) return;
+    var n = unit.lastSummary ? unit.lastSummary.n : unit.passes.length;
+    PT.store.dispatch('grid:rerunPass', function (state) {
+      var u = state.session.units[G.unitId];
+      var snap = u.lastPassSnapshot;
+      u.pool = snap.pool.slice();
+      u.cut = snap.cut.slice();
+      u.passes.pop();
+      u.lastPassSnapshot = null;
+      u.lastSummary = null;
+      u.rerunOf = n;
+      state.session.settings.quotaMode = tighter.quotaMode;
+      if (tighter.quotaCustom != null) state.session.settings.quotaCustom = tighter.quotaCustom;
+    });
+    toast('Pass ' + n + ' rolled back. ' + getUnit(G.unitId).pool.length + ' photos back in the pool.');
+    render();
+  }
+
+  /* ------------------------------------------------------------- keyboard */
+
+  function onKey(e) {
+    if (!G || !G.mode) return;
+    var tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    var unit = getUnit(G.unitId);
+    if (!unit || !unit.currentPass) return;
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!G.els.advance.disabled) advance();
+      return;
+    }
+    if (e.key === 'Backspace' || e.key === 'ArrowLeft') { e.preventDefault(); goBack(); return; }
+    if (e.key === 'u' || e.key === 'U' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z')) {
+      e.preventDefault(); undo(); return;
+    }
+    if (/^[0-9]$/.test(e.key)) {
+      // 1..9 are positions 1..9; 0 is the tenth cell.
+      var pos = e.key === '0' ? 10 : parseInt(e.key, 10);
+      var id = G.screenIds[pos - 1];
+      if (id) { e.preventDefault(); toggle(id); }
+    }
+  }
+
+  /* ------------------------------------------------------------- lifecycle */
+
+  function render() {
+    var unit = getUnit(G.unitId);
+    if (!unit) {
+      dom.clear(G.root);
+      G.root.appendChild(el('div', { class: 'error-box', text: 'No tournament unit to work on.' }));
+      return;
+    }
+    G.mode = unit.currentPass ? 'pass' : 'setup';
+    if (unit.currentPass) {
+      // PRD 7.10: a pass restored from storage may predate the `sel` field.
+      if (!unit.currentPass.sel) {
+        editUnit(G.unitId, 'grid:resumeInit', function (u) { u.currentPass.sel = []; });
+      }
+      renderPass(getUnit(G.unitId));
+    } else {
+      renderSetup(unit);
+    }
+  }
+
+  PT.router.register('grid', {
+    mount: function (root, params) {
+      injectStyle();
+      var s = st();
+      if (!s || !s.session) {
+        root.appendChild(el('div', { class: 'error-box', text: 'No session loaded.' }));
+        return;
+      }
+      G = { root: root, unitId: unitId(params), imgs: [], cells: [], screenIds: [], undoStack: [], els: {}, mode: null };
+      var u = getUnit(G.unitId);
+      if (u && s.session.activeUnitId !== G.unitId) {
+        PT.store.dispatch('session:activeUnit', function (state) { state.session.activeUnitId = G.unitId; });
+      }
+      G.keyHandler = onKey;
+      document.addEventListener('keydown', G.keyHandler);
+      render();
+      if (u && u.currentPass) PT.log('grid', 'resumed mid-pass', { pass: u.currentPass.n, screen: u.currentPass.index + 1 });
+    },
+    unmount: function () {
+      if (!G) return;
+      document.removeEventListener('keydown', G.keyHandler);
+      releaseCells();
+      clearTopbar();
+      G = null;
+    }
+  });
+
+  /* ================================================================ RESCUE */
+
+  var R = null;
+
+  function rescueRelease() {
+    if (!R) return;
+    R.imgs.forEach(function (img) { dom.releaseImg(img); });
+    R.imgs = [];
+  }
+
+  function renderRescue() {
+    var unit = getUnit(R.unitId);
+    var root = R.root;
+    dom.clear(root);
+    rescueRelease();
+    if (R.observer) { R.observer.disconnect(); R.observer = null; }
+
+    if (!unit) {
+      root.appendChild(el('div', { class: 'error-box', text: 'No tournament unit to review.' }));
+      return;
+    }
+
+    var wrap = el('div', { class: 'pt-wrap' });
+    root.appendChild(wrap);
+
+    if (!unit.cut.length) {
+      wrap.appendChild(el('h1', { text: 'Cut pile — ' + unit.label }));
+      wrap.appendChild(el('div', { class: 'notice notice-note', dataset: { t: 'empty' },
+        text: 'Nothing has been cut yet, so there is nothing to rescue.' }));
+      wrap.appendChild(el('div', { class: 'row' }, [
+        el('button', { class: 'btn', dataset: { t: 'rescue-back' }, text: 'Back to Stage A',
+          onclick: function () { goSafe('grid', { unitId: R.unitId }); } })
+      ]));
+      return;
+    }
+
+    if (!unit.rescueLimit) renderRescueLimit(wrap, unit);
+    else renderRescueReview(wrap, unit);
+  }
+
+  /**
+   * PRD 7.5: the limit is pre-committed, before the user has seen a single photo
+   * they might want back. Once locked it is never raised — that is the whole
+   * mechanism, since an adjustable rescue cap voids every quota upstream.
+   */
+  function renderRescueLimit(wrap, unit) {
+    var n = unit.cut.length;
+    setTopbar(unit.label + ' · cut pile', [counter('cut', n)]);
+
+    wrap.appendChild(el('h1', { text: 'Cut pile — ' + n + ' photos' }));
+    wrap.appendChild(el('p', { class: 'muted', text:
+      'Set your rescue limit before you look. It locks for the whole review: a nine-way ' +
+      'screen can drop a strong photo that landed among stronger ones, but an adjustable ' +
+      'rescue cap would void every quota you have held yourself to so far.' }));
+
+    var mode = el('select', { dataset: { t: 'rescue-mode' } }, [
+      el('option', { value: 'fixed', text: 'A fixed number' }),
+      el('option', { value: 'pct', text: 'A percentage of the cut pile' }),
+      el('option', { value: 'unlimited', text: 'Unlimited' })
+    ]);
+    var value = el('input', { type: 'number', min: '0', max: '999', value: '5', dataset: { t: 'rescue-value' } });
+    var preview = el('span', { class: 'muted small', dataset: { t: 'rescue-preview' } });
+
+    function refresh() {
+      value.disabled = mode.value === 'unlimited';
+      var lim = { mode: mode.value, value: Number(value.value) };
+      var max = rescueMax(lim, n);
+      preview.textContent = max === Infinity
+        ? 'no limit — every cut photo may come back'
+        : 'allows ' + max + ' of ' + n + ' back into the pool';
+    }
+    mode.addEventListener('change', refresh);
+    value.addEventListener('input', refresh);
+
+    var card = el('div', { class: 'card' }, [
+      el('div', { class: 'row' }, [
+        el('label', { class: 'f' }, ['Rescue limit ', mode]),
+        value,
+        preview
+      ]),
+      el('div', { class: 'row', style: 'margin-top:12px' }, [
+        el('button', {
+          class: 'btn btn-primary', dataset: { t: 'rescue-lock' }, text: 'Lock the limit and review',
+          onclick: function () {
+            var lim = { mode: mode.value, value: Number(value.value), committedAt: Date.now() };
+            editUnit(R.unitId, 'rescue:lockLimit', function (u) {
+              u.rescueLimit = lim;
+              u.rescueSel = u.rescueSel || [];
+              // The phase moves too, so a reload during the review comes back
+              // into the review rather than to the pass setup (PRD 7.10).
+              u.phase = 'rescue';
+            });
+            renderRescue();
+          }
+        }),
+        el('button', { class: 'btn btn-quiet', dataset: { t: 'rescue-skip' }, text: 'Skip the cut pile',
+          onclick: function () { goSafe('grid', { unitId: R.unitId }); } })
+      ])
+    ]);
+    refresh();
+    wrap.appendChild(card);
+  }
+
+  function renderRescueReview(wrap, unit) {
+    var n = unit.cut.length;
+    var max = rescueMax(unit.rescueLimit, n);
+
+    wrap.appendChild(el('div', { class: 'pt-title' }, [
+      el('h1', { text: 'Cut pile — ' + n + ' photos' }),
+      el('span', { class: 'pt-lock', dataset: { t: 'rescue-locked' },
+        text: 'Rescue limit locked: ' + rescueLimitLabel(unit.rescueLimit, n) })
+    ]));
+    wrap.appendChild(el('p', { class: 'muted small', text:
+      'Click anything worth another look. Rescued photos go back into the pool and ' +
+      'into the bracket. The limit was set before you looked and cannot be raised now.' }));
+
+    var pile = el('div', { class: 'grid pt-pile grid-' + (st().session.settings.gridSize || 9), dataset: { t: 'pile' } });
+    wrap.appendChild(pile);
+    R.els = {};
+    R.cells = [];
+
+    // Only what is near the viewport holds an object URL. The cut pile can be
+    // several hundred photos in one scroller; attaching them all would undo the
+    // bounded-memory guarantee the grid pass works so hard to keep.
+    R.observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        var img = en.target;
+        if (en.isIntersecting) {
+          if (!img._ptUrl) {
+            var b = thumbOf(img.dataset.id);
+            if (b) { dom.setImg(img, b); if (R.imgs.indexOf(img) < 0) R.imgs.push(img); }
+          }
+        } else if (img._ptUrl) {
+          dom.releaseImg(img);
+          img.removeAttribute('src');
+        }
+      });
+    }, { root: pile, rootMargin: '300px 0px' });
+
+    unit.cut.forEach(function (id, i) {
+      var img = el('img', { class: 'thumb', alt: '', dataset: { id: id } });
+      var cell = el('div', {
+        class: 'photo-cell', dataset: { id: id, t: 'pile-cell' }, title: photoName(id),
+        onclick: function () { toggleRescue(id); }
+      }, [
+        img,
+        el('span', { class: 'idx', text: String(i + 1) }),
+        el('span', { class: 'pt-cell-name', text: photoName(id) })
+      ]);
+      R.cells.push(cell);
+      pile.appendChild(cell);
+      R.observer.observe(img);
+    });
+
+    R.els.hint = el('span', { class: 'pt-hint', dataset: { t: 'rescue-hint' } });
+    R.els.count = el('span', { class: 'muted small nums', dataset: { t: 'rescue-count' } });
+    R.els.done = el('button', { class: 'btn btn-primary', dataset: { t: 'rescue-done' },
+      text: 'Done', onclick: commitRescue });
+
+    wrap.appendChild(el('div', { class: 'row pt-actions' }, [
+      el('button', { class: 'btn', dataset: { t: 'rescue-clear' }, text: 'Clear selection',
+        onclick: function () {
+          editUnit(R.unitId, 'rescue:clear', function (u) { u.rescueSel = []; });
+          paintRescue();
+        } }),
+      R.els.count,
+      R.els.hint,
+      el('span', { class: 'spacer' }),
+      R.els.done
+    ]));
+
+    R.max = max;
+    paintRescue();
+  }
+
+  function toggleRescue(id) {
+    editUnit(R.unitId, 'rescue:toggle', function (u) {
+      u.rescueSel = u.rescueSel || [];
+      var i = u.rescueSel.indexOf(id);
+      if (i >= 0) u.rescueSel.splice(i, 1); else u.rescueSel.push(id);
+    });
+    paintRescue();
+  }
+
+  function paintRescue() {
+    var unit = getUnit(R.unitId);
+    var sel = unit.rescueSel || [];
+    var max = R.max;
+    R.cells.forEach(function (c) { c.classList.toggle('kept', sel.indexOf(c.dataset.id) >= 0); });
+
+    var over = max === Infinity ? 0 : sel.length - max;
+    R.els.count.textContent = 'rescuing ' + sel.length + ' of ' +
+      (max === Infinity ? unit.cut.length + ' (no limit)' : max + ' allowed');
+    if (over > 0) {
+      R.els.done.disabled = true;
+      R.els.done.textContent = 'rescue at most ' + max;
+      R.els.hint.textContent = 'rescue at most ' + max + ' — deselect ' + over;
+    } else {
+      R.els.done.disabled = false;
+      R.els.done.textContent = sel.length
+        ? 'Return ' + sel.length + ' to the pool'
+        : 'Rescue nothing and continue';
+      R.els.hint.textContent = '';
+    }
+
+    setTopbar(unit.label + ' · cut pile', [
+      counter('cut', unit.cut.length),
+      counter('rescuing', sel.length),
+      counter('limit', max === Infinity ? '∞' : max)
+    ]);
+  }
+
+  function commitRescue() {
+    var unit = getUnit(R.unitId);
+    var sel = (unit.rescueSel || []).slice();
+    var max = R.max;
+    if (max !== Infinity && sel.length > max) return;
+    editUnit(R.unitId, 'rescue:commit', function (u) {
+      var keep = {};
+      sel.forEach(function (id) { keep[id] = 1; });
+      u.cut = u.cut.filter(function (id) { return !keep[id]; });
+      u.pool = u.pool.concat(sel);
+      u.rescued = (u.rescued || []).concat(sel);
+      u.rescueSel = [];
+      u.rescueDone = true;
+      u.phase = 'gridA';
+    });
+    if (sel.length) toast(sel.length + ' photo' + (sel.length === 1 ? '' : 's') + ' back in the pool.');
+    goSafe('grid', { unitId: R.unitId });
+  }
+
+  PT.router.register('rescue', {
+    mount: function (root, params) {
+      injectStyle();
+      var s = st();
+      if (!s || !s.session) {
+        root.appendChild(el('div', { class: 'error-box', text: 'No session loaded.' }));
+        return;
+      }
+      R = { root: root, unitId: unitId(params), imgs: [], cells: [], els: {}, observer: null, max: 0 };
+      renderRescue();
+    },
+    unmount: function () {
+      if (!R) return;
+      if (R.observer) { R.observer.disconnect(); R.observer = null; }
+      rescueRelease();
+      clearTopbar();
+      R = null;
+    }
+  });
+
+  /* ------------------------------------------------------------------- api */
+
+  // Exposed for tests and for any screen that needs the same arithmetic.
+  PT.gridScreen = {
+    passCounters: passCounters,
+    tightenQuota: tightenQuota,
+    rescueMax: rescueMax,
+    rescueLimitLabel: rescueLimitLabel,
+    quotaFor: quotaFor,
+    capLabel: capLabel
+  };
+
+  if (typeof PT.log === 'function') PT.log('grid', 'screens registered: grid, rescue');
+})();
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Stage A grid pass with locked per-pass
+ *   configuration, click and number-key selection, quota-disabled advance carrying
+ *   its own reason, undo, in-pass back-navigation that restores the previous
+ *   screen's keeps, PRD 7.1 counters in the topbar, mid-pass resume from the
+ *   persisted currentPass, the PRD 7.2 low cull rate offer with a true pool and
+ *   cut-pile rollback, and the PRD 7.5 cut pile rescue screen with a pre-committed
+ *   locked limit and viewport-bounded thumbnail attachment.
+ */
+
+</script>
+<script>
+/* ===== 70_screen_bracket.js ===== */
+/**
+ * @file 70_screen_bracket.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description Stage B bracket with the second-chance (repechage) round and Stage C burst runoff. Registers the 'bracket' and 'runoff' screens plus the pure PT.bracket ranking engine.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * ============================================================================
+ * PRD 7.3 — Stage B: bracket with a second-chance round
+ * ============================================================================
+ *
+ * THE STATE IS AN OPS LOG, NOT A TREE
+ * -----------------------------------
+ * Nothing about the bracket's shape is persisted. What persists is
+ *
+ *     unit.bracket = { pool, target, seed, ops: [ {t:'pick',m,w} | {t:'defer',m} ] }
+ *
+ * and the entire bracket — every pairing, every elimination edge, every
+ * placement — is REBUILT by replaying that log through a pure function. This is
+ * the single decision that makes three of the required behaviours fall out for
+ * free instead of each needing its own machinery:
+ *
+ *   - Unlimited undo is `ops.pop()` plus a rebuild. There are no inverse
+ *     operations to write and therefore no inverse operations to get wrong.
+ *   - Resume (PRD 7.10) is a rebuild from the persisted log. A reload mid-bracket
+ *     lands on exactly the pairing the user was looking at.
+ *   - The persisted record stays tiny: at 500 photos the log is a few hundred
+ *     two-field objects, not a serialised bracket tree.
+ *
+ * Rebuild cost is O(field + ops), measured at well under a millisecond for a
+ * 500-photo field, so doing it on every single click is not a compromise.
+ *
+ * SEEDING IS DETERMINISTIC (required for resume)
+ * ----------------------------------------------
+ * `seed` is stored once. The draw is `PT.session.seededShuffle(pool, seed)`, so
+ * a resumed bracket is the SAME bracket. A Math.random() draw would reshuffle on
+ * reload and silently invalidate every comparison already made.
+ *
+ * Entrants are then placed by the standard seeding pattern (1v16, 8v9, 4v13 …)
+ * rather than pairing the shuffled list off in order. With a random draw the
+ * pattern does not change who plays whom in any meaningful sense, but it is what
+ * distributes BYES correctly for fields that are not a power of two: the byes go
+ * to slots that are spread across the bracket instead of clumping in one corner.
+ *
+ * THE REPECHAGE (the point of the whole stage)
+ * --------------------------------------------
+ * A single-elimination bracket is only trustworthy about ONE thing: the winner.
+ * Everything below first place is an artefact of the draw. The finalist who lost
+ * the last match is not the second-best photo, it is the best photo in the other
+ * half of the bracket. If the two strongest photos are drawn against each other
+ * in round one, the second-strongest finishes in the bottom half of the results.
+ * That is exactly the failure PRD success criterion 4 forbids.
+ *
+ * The fix is the classic tournament-selection argument. Under any consistent
+ * judgement, the true second-best photo can only ever have lost to ONE photo:
+ * the champion. So:
+ *
+ *   place 1  the champion of the main bracket.
+ *   pool     every photo the champion personally eliminated.
+ *   place 2  run a fresh mini single-elimination over that pool. Its winner is
+ *            second. This is the second-chance round: a photo knocked out in
+ *            round one by the eventual champion is right back in contention for
+ *            second place, which is precisely "not lost to an unlucky draw".
+ *   place p  when a photo is placed, remove it from the pool and add every photo
+ *            IT personally eliminated (in the main bracket; anyone it beat during
+ *            a repechage round is already in the pool). Run the next mini
+ *            bracket. Repeat until `target` places are filled.
+ *
+ * Only photos beaten by a deep finisher ever enter the pool, which is the PRD's
+ * "photos eliminated by deep finishers". The ORDER they play in is not random:
+ * the mini bracket is seeded by how deep each candidate got in the main bracket,
+ * so the two candidates with the strongest résumés are placed on opposite sides
+ * and meet in the mini final rather than in its first round.
+ *
+ * Cost: (N-1) for the main bracket, then roughly ceil(log2 N) - 1 comparisons per
+ * additional place, because a champion's victim list is exactly one photo per
+ * round it played. Measured on a 32-photo field asking for a top 8: 31 + 32 = 63
+ * comparisons, against an information-theoretic floor of 39 and 496 for the
+ * all-pairs alternative.
+ *
+ * DEFERRAL, UNDO, EARLY-STOP
+ * --------------------------
+ * "Too close to call" rotates the pairing to the BACK of the current round's
+ * queue. It is never resolved by a coin flip and never dropped; it comes back
+ * once the rest of the round has been judged, by which time the user has usually
+ * recalibrated. Deferral is itself an op, so it survives reload and is undoable.
+ *
+ * Early-stop must yield a usable ranked result (PRD success criterion 9), so
+ * `unit.winners` is rewritten after EVERY comparison, not at the end. Decided
+ * places come first in true order; anything not yet placed is appended ranked by
+ * how deep it got and how many comparisons it won. Stopping is also reversible —
+ * it sets a flag rather than tearing the bracket down.
+ *
+ * ============================================================================
+ * PRD 7.4 — Stage C: burst runoff
+ * ============================================================================
+ * A finalist that belongs to a near-duplicate group can be expanded into a
+ * Keep-1 pass over that group. The group includes members cut back in Stage A,
+ * which is the point: the burst cost one decision at ranking time (PRD success
+ * criterion 3) and this is where the user gets to pick the best frame of it.
+ * Optional, per-photo, and reversible. A unit with no near-duplicate groups
+ * among its winners says so and offers to move on.
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+  var el = PT.dom.el;
+
+  /* ======================================================================
+   * 1. The engine — pure, no DOM, no store. Exported as PT.bracket.
+   * ==================================================================== */
+
+  function nextPow2(n) { var s = 1; while (s < n) s *= 2; return s; }
+
+  /**
+   * Slot order for a standard seeded bracket of `size` entrants, 1-based.
+   * size 8 -> [1,8,4,5,2,7,3,6], i.e. pairs (1v8)(4v5)(2v7)(3v6).
+   *
+   * Two properties matter here. Every pair sums to size+1, so the lower seed is
+   * always in the `a` slot and a bye (a seed number above the entrant count) is
+   * therefore always in `b`. And top seeds land in different halves, which is
+   * what spreads byes evenly across a non-power-of-two field.
+   */
+  function seedSlots(size) {
+    var s = [1], i, n, t;
+    while (s.length < size) {
+      n = s.length * 2 + 1;
+      t = [];
+      for (i = 0; i < s.length; i++) { t.push(s[i]); t.push(n - s[i]); }
+      s = t;
+    }
+    return s;
+  }
+
+  /**
+   * First-round pairs for a field of any size. `entrants` is in seed order:
+   * index 0 is seed 1. Entrants beyond the field size become nulls, which
+   * resolveRound() turns into byes.
+   */
+  function firstRoundPairs(entrants) {
+    var count = entrants.length;
+    var size = nextPow2(count);
+    var so = seedSlots(size);
+    var pairs = [], i, sa, sb;
+    for (i = 0; i < size / 2; i++) {
+      sa = so[2 * i];
+      sb = so[2 * i + 1];
+      pairs.push({
+        a: sa <= count ? entrants[sa - 1] : null,
+        b: sb <= count ? entrants[sb - 1] : null,
+        winner: null,
+        mid: null,
+        bye: false
+      });
+    }
+    return pairs;
+  }
+
+  function createEngine(pool, target, seed) {
+    var E = {
+      seed: seed >>> 0,
+      pool: pool.slice(),
+      target: Math.max(0, Math.min(target, pool.length)),
+      order: PT.session.seededShuffle(pool, seed >>> 0),
+
+      matches: {},      // mid -> {mid, tag, round, pair, a, b, place}
+      victims: {},      // winner id -> ids it personally eliminated
+      elimBy: {},       // loser id -> the id that knocked it out of the MAIN bracket
+      depth: {},        // id -> deepest MAIN round reached (0-based)
+      wins: {},         // id -> comparisons won, all stages
+      won: {},          // 'winner|loser' -> 1, so a pairing is never asked twice
+      derived: 0,       // pairings resolved from a result the user already gave
+      deferCount: {},   // mid -> times deferred
+
+      placements: [],   // ordered, best first, fully decided
+      candidates: [],   // live repechage pool for the next place
+      history: [],      // [{mid,w,l,tag,round,place}] newest last
+
+      comparisons: 0,
+      defers: 0,
+      place: 1,
+      sub: null,        // the sub-bracket currently being played
+      done: false,
+      broke: null       // set if an ops log did not match the rebuilt bracket
+    };
+    if (!E.order.length || E.target === 0) { E.done = true; return E; }
+    startSub(E, E.order, 'main', 1);
+    return E;
+  }
+
+  /** Begin a sub-bracket: the main draw, or one repechage mini bracket. */
+  function startSub(E, entrants, tag, place) {
+    if (!entrants.length) { closeSub(E, null); return; }
+    if (entrants.length === 1) { closeSub(E, entrants[0]); return; }
+    E.sub = {
+      tag: tag,
+      place: place,
+      entrants: entrants.length,
+      decided: 0,
+      derived: 0,
+      rounds: [firstRoundPairs(entrants)],
+      ri: 0,
+      queue: []
+    };
+    markDepth(E);
+    resolveRound(E);
+  }
+
+  /**
+   * Depth is recorded only for the main draw. It is the repechage seeding key
+   * and the tiebreak for early-stop ranking, and both want "how far did this
+   * photo get in the real bracket", not "how far in a consolation round".
+   */
+  function markDepth(E) {
+    var sub = E.sub, i, p;
+    if (sub.tag !== 'main') return;
+    for (i = 0; i < sub.rounds[sub.ri].length; i++) {
+      p = sub.rounds[sub.ri][i];
+      if (p.a) E.depth[p.a] = Math.max(E.depth[p.a] || 0, sub.ri);
+      if (p.b) E.depth[p.b] = Math.max(E.depth[p.b] || 0, sub.ri);
+    }
+  }
+
+  /**
+   * Auto-advance byes, mint match ids for the real pairings, and build the
+   * queue the user works through. An empty queue means the round needs no
+   * human input at all, so advance immediately.
+   */
+  /**
+   * A pairing this exact user already judged. The repechage re-pools photos
+   * across successive places, so without this the same two photos come back up
+   * repeatedly — which reads as the tool not listening, and inflates the
+   * comparison count for no information. Only DIRECT results are reused, never
+   * a transitive chain: the tool must not invent an answer the user never gave.
+   */
+  function knownWinner(E, a, b) {
+    if (E.won[a + '|' + b]) return a;
+    if (E.won[b + '|' + a]) return b;
+    return null;
+  }
+
+  function recordEdge(E, sub, w, l) {
+    E.won[w + '|' + l] = 1;
+    var v = E.victims[w] || (E.victims[w] = []);
+    if (v.indexOf(l) < 0) v.push(l);
+    // Only main-bracket edges answer "who eliminated whom" for the repechage;
+    // a repechage loss does not remove a photo from the candidate pool.
+    if (sub.tag === 'main' && !E.elimBy[l]) E.elimBy[l] = w;
+  }
+
+  function resolveRound(E) {
+    var sub = E.sub, round = sub.rounds[sub.ri], q = [], i, p, k;
+    for (i = 0; i < round.length; i++) {
+      p = round[i];
+      if (p.winner) continue;
+      if (p.a && !p.b) { p.winner = p.a; p.bye = true; continue; }
+      if (!p.a && p.b) { p.winner = p.b; p.bye = true; continue; }
+      if (!p.a && !p.b) continue;
+      k = knownWinner(E, p.a, p.b);
+      if (k) {
+        p.winner = k;
+        p.derived = true;
+        E.derived++;
+        sub.derived++;
+        recordEdge(E, sub, k, k === p.a ? p.b : p.a);
+        continue;
+      }
+      if (!p.mid) {
+        p.mid = sub.tag + ':r' + sub.ri + ':p' + i;
+        E.matches[p.mid] = {
+          mid: p.mid, tag: sub.tag, round: sub.ri, pair: i,
+          a: p.a, b: p.b, place: sub.place
+        };
+      }
+      q.push(i);
+    }
+    sub.queue = q;
+    if (!q.length) advanceRound(E);
+  }
+
+  function advanceRound(E) {
+    var sub = E.sub, round = sub.rounds[sub.ri], winners = [], next = [], i;
+    for (i = 0; i < round.length; i++) if (round[i].winner) winners.push(round[i].winner);
+    if (winners.length <= 1) { closeSub(E, winners[0] || null); return; }
+    for (i = 0; i < winners.length; i += 2) {
+      next.push({ a: winners[i], b: winners[i + 1] || null, winner: null, mid: null, bye: false });
+    }
+    sub.rounds.push(next);
+    sub.ri++;
+    markDepth(E);
+    resolveRound(E);
+  }
+
+  /**
+   * A sub-bracket produced its winner. Award the place, roll the candidate
+   * pool forward, and start the next repechage — see the header comment for
+   * why the pool is "everyone this photo personally beat".
+   */
+  function closeSub(E, winnerId) {
+    E.sub = null;
+    if (winnerId) {
+      E.placements.push(winnerId);
+      var pool = E.candidates.filter(function (id) { return id !== winnerId; });
+      (E.victims[winnerId] || []).forEach(function (id) {
+        if (pool.indexOf(id) < 0 && E.placements.indexOf(id) < 0) pool.push(id);
+      });
+      E.candidates = pool;
+    }
+    E.place = E.placements.length + 1;
+    if (E.placements.length >= E.target || !E.candidates.length) { E.done = true; return; }
+    startSub(E, seedRepechage(E), 'rep' + E.place, E.place);
+  }
+
+  /**
+   * Seed the next mini bracket by main-bracket depth, descending, so the two
+   * candidates with the strongest résumés meet in its FINAL rather than its
+   * first round. Sorting the ids before the shuffle, and using the shuffle
+   * position as the last tiebreak, keeps this independent of ingest order and
+   * identical on every rebuild.
+   */
+  function seedRepechage(E) {
+    var ids = E.candidates.slice().sort();
+    var shuffled = PT.session.seededShuffle(ids, (E.seed ^ (E.place * 2654435761)) >>> 0);
+    var rank = {};
+    shuffled.forEach(function (id, i) { rank[id] = i; });
+    return shuffled.slice().sort(function (x, y) {
+      var d = (E.depth[y] || 0) - (E.depth[x] || 0);
+      if (d) return d;
+      var w = (E.wins[y] || 0) - (E.wins[x] || 0);
+      if (w) return w;
+      return rank[x] - rank[y];
+    });
+  }
+
+  /** The pairing the user is being asked about right now, or null. */
+  function currentMatch(E) {
+    if (!E.sub || !E.sub.queue.length) return null;
+    return E.matches[E.sub.rounds[E.sub.ri][E.sub.queue[0]].mid];
+  }
+
+  function applyPick(E, winnerId) {
+    var m = currentMatch(E);
+    if (!m) return false;
+    var loser = winnerId === m.a ? m.b : (winnerId === m.b ? m.a : null);
+    if (!loser) return false;
+    var sub = E.sub, p = sub.rounds[sub.ri][sub.queue[0]];
+    p.winner = winnerId;
+    sub.queue.shift();
+    sub.decided++;
+    E.comparisons++;
+    E.wins[winnerId] = (E.wins[winnerId] || 0) + 1;
+    recordEdge(E, sub, winnerId, loser);
+    E.history.push({ mid: m.mid, w: winnerId, l: loser, tag: sub.tag, round: sub.ri, place: sub.place });
+    if (!sub.queue.length) advanceRound(E);
+    return true;
+  }
+
+  /** Rotate to the back of this round's queue. Never resolved, never dropped. */
+  function applyDefer(E) {
+    var sub = E.sub;
+    if (!sub || !sub.queue.length) return false;
+    var mid = sub.rounds[sub.ri][sub.queue[0]].mid;
+    E.deferCount[mid] = (E.deferCount[mid] || 0) + 1;
+    E.defers++;
+    sub.queue.push(sub.queue.shift());
+    return true;
+  }
+
+  /**
+   * Rebuild the whole bracket from the persisted log. This is the only way a
+   * bracket is ever constructed — mount, undo and resume all go through here,
+   * so there is exactly one code path and it is the one the tests exercise.
+   */
+  function build(pool, target, seed, ops) {
+    var E = createEngine(pool, target, seed);
+    var list = ops || [], i, op, m;
+    for (i = 0; i < list.length; i++) {
+      op = list[i];
+      if (E.done || !E.sub) { E.broke = E.broke || 'op ' + i + ' past completion'; break; }
+      m = currentMatch(E);
+      if (!m) { E.broke = 'op ' + i + ' with no pending match'; break; }
+      if (op.m && op.m !== m.mid) { E.broke = 'op ' + i + ' expected ' + op.m + ', bracket is at ' + m.mid; break; }
+      if (op.t === 'defer') applyDefer(E);
+      else if (!applyPick(E, op.w)) { E.broke = 'op ' + i + ' picked ' + op.w + ', not in ' + m.mid; break; }
+    }
+    return E;
+  }
+
+  /**
+   * PRD success criterion 9. Decided places first, in true order. Anything not
+   * yet placed is appended by main-bracket depth, then wins, then draw order —
+   * so a bracket stopped after two comparisons still hands back a defensible
+   * ranked list rather than an empty one.
+   */
+  function results(E) {
+    var placed = {}, out = E.placements.slice(), idx = {};
+    out.forEach(function (id) { placed[id] = 1; });
+    if (out.length < E.target) {
+      E.order.forEach(function (id, i) { idx[id] = i; });
+      var rest = E.order.filter(function (id) { return !placed[id]; });
+      rest.sort(function (a, b) {
+        var d = (E.depth[b] || 0) - (E.depth[a] || 0);
+        if (d) return d;
+        var w = (E.wins[b] || 0) - (E.wins[a] || 0);
+        if (w) return w;
+        return idx[a] - idx[b];
+      });
+      out = out.concat(rest);
+    }
+    return out.slice(0, E.target);
+  }
+
+  /**
+   * Comparisons still to come. Near-exact for the sub-bracket in progress — a
+   * k-entrant single elimination is k-1 matches, byes included, less the ones
+   * already answered by an earlier identical pairing — and modelled for the
+   * places after it, where a finisher's victim list runs to about one photo per
+   * round it played.
+   */
+  function estimate(E) {
+    if (E.done) return 0;
+    var rem = 0;
+    if (E.sub) rem += (E.sub.entrants - 1) - E.sub.derived - E.sub.decided;
+    var placesLeft = E.target - E.placements.length - (E.sub ? 1 : 0);
+    if (placesLeft > 0) {
+      rem += placesLeft * Math.max(1, Math.ceil(Math.log2(Math.max(2, E.order.length))) - 1);
+    }
+    return Math.max(0, rem);
+  }
+
+  /**
+   * Unlimited undo. Drops the most recent comparison and any deferrals made
+   * after it, because a user who undoes after deferring twice means "give me
+   * back the choice I actually made", not "give me back a deferral".
+   */
+  function undoOps(ops) {
+    for (var i = ops.length - 1; i >= 0; i--) {
+      if (ops[i].t !== 'defer') return ops.slice(0, i);
+    }
+    return ops.slice(0, Math.max(0, ops.length - 1));
+  }
+
+  PT.bracket = {
+    build: build,
+    results: results,
+    estimate: estimate,
+    undoOps: undoOps,
+    currentMatch: currentMatch,
+    seedSlots: seedSlots,
+    firstRoundPairs: firstRoundPairs,
+    nextPow2: nextPow2
+  };
+
+  /* ======================================================================
+   * 2. Styles — injected once, since src/css is owned elsewhere.
+   * ==================================================================== */
+
+  var STYLE_ID = 'pt-bracket-style';
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    var s = document.createElement('style');
+    s.id = STYLE_ID;
+    s.textContent = [
+      '.bk{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}',
+      '.bk-sub{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text-dim);flex-wrap:wrap}',
+      '.bk-tag{border:1px solid var(--line-2);border-radius:4px;padding:1px 7px;font-size:12px}',
+      '.bk-tag-rep{border-color:var(--accent-dim);color:var(--accent)}',
+      '.bk-tag-warn{border-color:#5c4f22;color:#f0e0b0}',
+      '.bk-stage{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}',
+      '.bk-pane{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;',
+      'background:#000;border:2px solid var(--line);border-radius:var(--r);overflow:hidden}',
+      '.bk-pane:hover{border-color:var(--line-2)}',
+      '.bk-pane.chosen{border-color:var(--accent)}',
+      '.bk-vp{position:relative;flex:1;min-height:0;overflow:hidden;cursor:pointer;touch-action:none}',
+      '.bk-vp img{position:absolute;top:0;left:0;transform-origin:0 0;-webkit-user-drag:none;user-select:none;pointer-events:none}',
+      '.bk-vp.grab{cursor:grabbing}',
+      '.bk-cap{display:flex;align-items:center;gap:8px;padding:5px 9px;font-size:12px;',
+      'background:var(--surface);color:var(--text-dim);border-top:1px solid var(--line);',
+      'white-space:nowrap;overflow:hidden}',
+      '.bk-cap .nm{overflow:hidden;text-overflow:ellipsis}',
+      '.bk-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}',
+      '.bk-zoom{font-variant-numeric:tabular-nums;min-width:56px;text-align:center;font-size:13px;color:var(--text-dim)}',
+      '.bk-miss{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-mute);font-size:13px}',
+      '.bk-results{overflow:auto;min-height:0;flex:1}',
+      '.bk-row{display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--line)}',
+      '.bk-row img{width:104px;height:70px;object-fit:contain;background:#000;border-radius:4px;flex:none}',
+      '.bk-rank{width:36px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text-dim);flex:none}',
+      '.bk-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}',
+      '.ro-group{border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:10px;background:var(--surface)}',
+      '.ro-head{display:flex;align-items:center;gap:10px}',
+      '.ro-head img{width:104px;height:70px;object-fit:contain;background:#000;border-radius:4px;flex:none}',
+      '.ro-body{margin-top:10px}',
+      '.ro-cell .tag{position:absolute;bottom:4px;left:4px;right:4px;font-size:11px;text-align:center;',
+      'background:rgba(0,0,0,0.7);border-radius:3px;padding:1px 3px;color:var(--text-dim)}',
+      '.ro-cell.dead{cursor:not-allowed;opacity:0.45}',
+      '@media(max-width:720px){.bk-stage{grid-template-columns:1fr}}'
+    ].join('\n');
+    document.head.appendChild(s);
+  }
+
+  /* ======================================================================
+   * 3. Shared helpers
+   * ==================================================================== */
+
+  function photoOf(id) {
+    var st = PT.store.get();
+    return (st && st.photos && st.photos[id]) || { id: id, name: id };
+  }
+
+  function nameOf(id) { return photoOf(id).name || id; }
+
+  /**
+   * PRD 7.9 caches a ~1600px preview and a ~320px thumb. The cache is
+   * evictable (see 00_core.js), so falling back to the thumb is normal
+   * operation, not an error path.
+   */
+  function blobFor(id, wantPreview) {
+    var st = PT.store.get();
+    var d = (st && st.derivatives && st.derivatives[id]) || null;
+    if (!d) return null;
+    return (wantPreview ? (d.preview || d.thumb) : (d.thumb || d.preview)) || null;
+  }
+
+  /** Async second chance: the record may still be in IndexedDB but not in memory. */
+  function hydrate(id) {
+    var st = PT.store.get();
+    if (!st) return Promise.resolve(null);
+    if (st.derivatives && st.derivatives[id]) return Promise.resolve(st.derivatives[id]);
+    return PT.db.get('derivatives', id).then(function (rec) {
+      if (!rec) return null;
+      var s2 = PT.store.get();
+      if (s2) { s2.derivatives = s2.derivatives || {}; s2.derivatives[id] = rec; }
+      return rec;
+    }).catch(function () { return null; });
+  }
+
+  function setTopbar(context, counters, stopHandler, stopLabel) {
+    var bar = document.getElementById('topbar');
+    if (bar) bar.hidden = false;
+    var c = document.getElementById('topbar-context');
+    if (c) c.textContent = context || '';
+    var n = document.getElementById('topbar-counters');
+    if (n) {
+      PT.dom.clear(n);
+      (counters || []).forEach(function (pair) {
+        n.appendChild(el('span', {}, [pair[0] + ' ', el('b', { text: String(pair[1]) })]));
+      });
+    }
+    var stop = document.getElementById('topbar-stop');
+    if (stop) {
+      if (stop._ptHandler) stop.removeEventListener('click', stop._ptHandler);
+      stop._ptHandler = null;
+      if (stopHandler) {
+        stop.hidden = false;
+        stop.textContent = stopLabel || 'Stop early';
+        stop._ptHandler = stopHandler;
+        stop.addEventListener('click', stopHandler);
+      } else {
+        stop.hidden = true;
+      }
+    }
+  }
+
+  function clearTopbar() { setTopbar('', [], null); }
+
+  /** Router.go throws on an unregistered screen; the next screen may not exist yet. */
+  function tryGo(name, params) {
+    try { PT.router.go(name, params); return true; }
+    catch (e) { PT.warn('bracket', 'cannot navigate to "' + name + '": ' + e.message); return false; }
+  }
+
+  /* ======================================================================
+   * 4. Screen: 'bracket'  (PRD 7.3)
+   * ==================================================================== */
+
+  var S = null;   // live screen state; null when unmounted
+
+  function unitOf(unitId) {
+    var st = PT.store.get();
+    if (!st || !st.session || !st.session.units) return null;
+    return st.session.units[unitId] || null;
+  }
+
+  function ensureBracket(unitId) {
+    var u = unitOf(unitId);
+    if (!u) return null;
+    if (!u.bracket || !u.bracket.ops) {
+      PT.store.dispatch('bracket:init', function (s) {
+        var unit = s.session.units[unitId];
+        var target = unit.target == null ? unit.pool.length : Math.min(unit.target, unit.pool.length);
+        var seed = (Date.now() ^ 0x9e3779b9) >>> 0;
+        unit.bracket = {
+          seed: seed,
+          pool: unit.pool.slice(),
+          target: target,
+          uncapped: unit.target == null,
+          order: PT.session.seededShuffle(unit.pool, seed),
+          ops: [],
+          stopped: false,
+          complete: false,
+          startedAt: Date.now()
+        };
+        if (unit.phase !== 'runoff' && unit.phase !== 'done') unit.phase = 'bracket';
+      });
+    }
+    return unitOf(unitId);
+  }
+
+  /**
+   * One dispatch per user action: mutate the log, rebuild, and rewrite the
+   * unit's ranked output. Keeping winners current after every comparison is
+   * what makes early-stop free (PRD success criterion 9).
+   */
+  function commit(name, mutate) {
+    if (!S) return;
+    var unitId = S.unitId;
+    PT.store.dispatch(name, function (s) {
+      var u = s.session.units[unitId];
+      if (!u || !u.bracket) return;
+      if (mutate) mutate(u.bracket, u);
+      var E = build(u.bracket.pool, u.bracket.target, u.bracket.seed, u.bracket.ops);
+      u.bracket.complete = E.done;
+      u.winners = results(E);
+      u.winnersDecided = E.placements.length;
+      u.comparisons = E.comparisons;
+      if (S) S.engine = E;
+    });
+    paint();
+  }
+
+  function mountBracket(root, params) {
+    injectStyle();
+    var unitId = params && params.unitId;
+    var u = ensureBracket(unitId);
+
+    if (!u) {
+      root.appendChild(el('div', { class: 'error-box', text: 'No tournament unit "' + unitId + '" in this session.' }));
+      return;
+    }
+
+    S = {
+      unitId: unitId,
+      root: root,
+      engine: null,
+      lastMid: null,
+      // Shared view state. cx/cy are normalised image coordinates, so the two
+      // panes show the SAME REGION even when the photos differ in aspect.
+      view: { z: 1, cx: 0.5, cy: 0.5 },
+      panes: [],
+      onKey: null,
+      onResize: null,
+      token: Date.now()
+    };
+
+    S.head = el('div', { class: 'bk-sub' });
+    S.stage = el('div', { class: 'bk-stage' });
+    S.bar = el('div', { class: 'bk-bar' });
+    S.body = el('div', { class: 'bk' }, [S.head, S.stage, S.bar]);
+    root.appendChild(S.body);
+
+    S.panes = [buildPane(0), buildPane(1)];
+
+    S.onKey = function (e) {
+      if (!S) return;
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      var m = S.engine && currentMatch(S.engine);
+      switch (e.key) {
+        case 'ArrowLeft':  if (m) { e.preventDefault(); choose(m.a); } break;
+        case 'ArrowRight': if (m) { e.preventDefault(); choose(m.b); } break;
+        case 'd': case 'D': if (m) { e.preventDefault(); defer(); } break;
+        case 'u': case 'U': e.preventDefault(); undo(); break;
+        case '0': e.preventDefault(); setZoom(1, null); break;
+        case '1': e.preventDefault(); zoomOneToOne(); break;
+        case '+': case '=': e.preventDefault(); setZoom(S.view.z * 1.35, null); break;
+        case '-': case '_': e.preventDefault(); setZoom(S.view.z / 1.35, null); break;
+      }
+    };
+    window.addEventListener('keydown', S.onKey);
+
+    S.onResize = function () { if (S) applyView(); };
+    window.addEventListener('resize', S.onResize);
+
+    // The shell's own Stop-early button emits this; honour it either way.
+    S.offStop = PT.bus.on('stage:stop-early', function () { setStopped(true); });
+
+    commit('bracket:open', null);
+  }
+
+  function buildPane(side) {
+    var img = el('img', { alt: '' });
+    var vp = el('div', { class: 'bk-vp' }, [img]);
+    var cap = el('div', { class: 'bk-cap' }, [
+      el('kbd', { text: side === 0 ? '←' : '→' }),
+      el('span', { class: 'nm' }),
+      el('span', { class: 'spacer' }),
+      el('span', { class: 'dim px' })
+    ]);
+    var pane = el('div', { class: 'bk-pane' }, [vp, cap]);
+    var P = { side: side, pane: pane, vp: vp, img: img, cap: cap, id: null, nat: { w: 0, h: 0 } };
+
+    img.addEventListener('load', function () {
+      P.nat.w = img.naturalWidth || 0;
+      P.nat.h = img.naturalHeight || 0;
+      applyView();
+    });
+
+    // Drag to pan. A drag longer than a few pixels suppresses the click, so
+    // panning never fires a choice by accident.
+    var drag = null;
+    vp.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      drag = { x: e.clientX, y: e.clientY, moved: 0, cx: S.view.cx, cy: S.view.cy };
+      vp.classList.add('grab');
+      try { vp.setPointerCapture(e.pointerId); } catch (err) { /* not fatal */ }
+    });
+    vp.addEventListener('pointermove', function (e) {
+      if (!drag || !S) return;
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
+      var g = geom(P);
+      if (!g) return;
+      S.view.cx = drag.cx - dx / (g.natW * g.S);
+      S.view.cy = drag.cy - dy / (g.natH * g.S);
+      applyView();
+    });
+    function endDrag() { if (drag) { vp.classList.remove('grab'); } }
+    vp.addEventListener('pointerup', function (e) {
+      var wasDrag = drag && drag.moved > 5;
+      endDrag();
+      drag = null;
+      if (wasDrag || !S) return;
+      var m = S.engine && currentMatch(S.engine);
+      if (m) choose(side === 0 ? m.a : m.b);
+    });
+    vp.addEventListener('pointercancel', function () { endDrag(); drag = null; });
+
+    // Wheel zoom about the cursor, applied to BOTH panes.
+    vp.addEventListener('wheel', function (e) {
+      if (!S) return;
+      e.preventDefault();
+      var r = vp.getBoundingClientRect();
+      // Proportional to the wheel delta so a trackpad glides and a mouse notch
+      // steps, capped per event so one violent flick cannot jump to 16x.
+      var f = Math.max(0.5, Math.min(2, Math.exp(-e.deltaY * 0.0015)));
+      setZoom(S.view.z * f, { P: P, x: e.clientX - r.left, y: e.clientY - r.top });
+    }, { passive: false });
+
+    return P;
+  }
+
+  /* ------------------------------------------------------------ zoom model */
+
+  /**
+   * Layout for one pane at the current shared view. `fit` is the scale at which
+   * the whole photo is visible; z multiplies it, so z is a shared, aspect-
+   * independent quantity and both panes always frame the same relative region.
+   */
+  function geom(P) {
+    if (!P.nat.w || !P.nat.h) return null;
+    var w = P.vp.clientWidth, h = P.vp.clientHeight;
+    if (!w || !h) return null;
+    var fit = Math.min(w / P.nat.w, h / P.nat.h);
+    var Sc = fit * S.view.z;
+    return { vpW: w, vpH: h, natW: P.nat.w, natH: P.nat.h, fit: fit, S: Sc };
+  }
+
+  /**
+   * Clamping is PER PANE and never written back to the shared centre. Two
+   * photos of different orientation overflow the viewport on different axes,
+   * so clamping the shared value against both would pin it to dead centre and
+   * kill panning entirely — measured, and it is why this is not a one-liner.
+   * An axis that does not overflow simply centres; every axis that can pan
+   * pans to the same normalised coordinate in both panes.
+   */
+  function clampCenter(g, cx, cy) {
+    var halfX = (g.vpW / 2) / (g.natW * g.S);
+    var halfY = (g.vpH / 2) / (g.natH * g.S);
+    return [
+      halfX >= 0.5 ? 0.5 : Math.min(1 - halfX, Math.max(halfX, cx)),
+      halfY >= 0.5 ? 0.5 : Math.min(1 - halfY, Math.max(halfY, cy))
+    ];
+  }
+
+  function applyView() {
+    if (!S) return;
+    S.view.cx = Math.min(1, Math.max(0, S.view.cx));
+    S.view.cy = Math.min(1, Math.max(0, S.view.cy));
+    S.panes.forEach(function (P) {
+      var g = geom(P);
+      if (!g) { P.img.style.transform = ''; return; }
+      var c = clampCenter(g, S.view.cx, S.view.cy);
+      var left = g.vpW / 2 - c[0] * g.natW * g.S;
+      var top = g.vpH / 2 - c[1] * g.natH * g.S;
+      P.img.style.width = g.natW + 'px';
+      P.img.style.height = g.natH + 'px';
+      P.img.style.transform = 'translate(' + left.toFixed(2) + 'px,' + top.toFixed(2) + 'px) scale(' + g.S.toFixed(5) + ')';
+      var px = P.cap.querySelector('.px');
+      if (px) px.textContent = g.natW ? g.natW + '×' + g.natH : '';
+    });
+    if (S.zoomLabel) S.zoomLabel.textContent = Math.round(S.view.z * 100) + '%';
+  }
+
+  /**
+   * z is relative to fit, so z=1 shows both photos whole. The floor drops below
+   * 1 only when a preview is smaller than its pane: there 1:1 means zooming
+   * OUT, and refusing to go there would make the 1:1 button a no-op.
+   */
+  function minZoom() {
+    var g = geom(S.panes[0]) || geom(S.panes[1]);
+    return g ? Math.min(1, 1 / g.fit) : 1;
+  }
+
+  /** anchor: {P, x, y} keeps the point under the cursor fixed while zooming. */
+  function setZoom(z, anchor) {
+    if (!S) return;
+    z = Math.max(minZoom(), Math.min(16, z));
+    if (anchor && anchor.P) {
+      var g = geom(anchor.P);
+      if (g) {
+        var left = g.vpW / 2 - S.view.cx * g.natW * g.S;
+        var top = g.vpH / 2 - S.view.cy * g.natH * g.S;
+        var u = (anchor.x - left) / (g.natW * g.S);
+        var v = (anchor.y - top) / (g.natH * g.S);
+        var S2 = g.fit * z;
+        S.view.cx = u - (anchor.x - g.vpW / 2) / (g.natW * S2);
+        S.view.cy = v - (anchor.y - g.vpH / 2) / (g.natH * S2);
+      }
+    }
+    S.view.z = z;
+    applyView();
+  }
+
+  /**
+   * 1:1 means one preview pixel per screen pixel. Two photos of different
+   * aspect cannot both be at 1:1 while framing the same region, so the LEFT
+   * pane is the reference and the right stays locked to the same region.
+   */
+  function zoomOneToOne() {
+    var g = geom(S.panes[0]) || geom(S.panes[1]);
+    if (!g) return;
+    setZoom(1 / g.fit, null);
+  }
+
+  /* ------------------------------------------------------------- actions */
+
+  function choose(winnerId) {
+    if (!S || !winnerId) return;
+    var m = S.engine && currentMatch(S.engine);
+    if (!m) return;
+    commit('bracket:pick', function (b) { b.ops.push({ t: 'pick', m: m.mid, w: winnerId }); });
+  }
+
+  function defer() {
+    if (!S) return;
+    var m = S.engine && currentMatch(S.engine);
+    if (!m) return;
+    commit('bracket:defer', function (b) { b.ops.push({ t: 'defer', m: m.mid }); });
+  }
+
+  function undo() {
+    if (!S) return;
+    commit('bracket:undo', function (b) { b.ops = undoOps(b.ops); b.stopped = false; });
+  }
+
+  /**
+   * Early-stop is a flag, not a teardown: `unit.winners` is already current
+   * after every comparison, so stopping costs nothing and resuming is one
+   * click. Guarded so the shell's own #topbar-stop handler and this screen's
+   * cannot double-dispatch.
+   */
+  function setStopped(v) {
+    if (!S) return;
+    var u = unitOf(S.unitId);
+    if (!u || !u.bracket || !!u.bracket.stopped === !!v) return;
+    commit(v ? 'bracket:stop' : 'bracket:resume', function (b) { b.stopped = !!v; });
+  }
+
+  function continueToRunoff() {
+    if (!S) return;
+    var unitId = S.unitId;
+    commit('bracket:handoff', function (b, u) { if (u.phase === 'bracket') u.phase = 'runoff'; });
+    PT.bus.emit('bracket:complete', { unitId: unitId });
+    if (PT.router.current() === 'bracket') tryGo('runoff', { unitId: unitId });
+  }
+
+  /* --------------------------------------------------------------- paint */
+
+  function paint() {
+    if (!S) return;
+    var u = unitOf(S.unitId);
+    if (!u) return;
+    var E = S.engine || build(u.bracket.pool, u.bracket.target, u.bracket.seed, u.bracket.ops);
+    S.engine = E;
+    var m = currentMatch(E);
+    var finished = E.done || u.bracket.stopped || !m;
+
+    setTopbar(
+      (u.label || 'unit') + ' · Stage B bracket',
+      [
+        ['target', u.bracket.uncapped ? 'uncapped' : E.target],
+        ['remaining', Math.max(0, E.target - E.placements.length)],
+        ['comparisons', E.comparisons],
+        ['est. left', finished && E.done ? 0 : '~' + estimate(E)]
+      ],
+      finished ? null : function () { setStopped(true); },
+      'Stop early'
+    );
+
+    if (finished) paintDone(u, E);
+    else paintMatch(u, E, m);
+  }
+
+  function paintMatch(u, E, m) {
+    S.stage.style.display = '';
+    PT.dom.clear(S.head);
+    PT.dom.clear(S.bar);
+
+    var isRep = m.tag !== 'main';
+    S.head.appendChild(el('span', {
+      class: 'bk-tag' + (isRep ? ' bk-tag-rep' : ''),
+      text: isRep ? 'Second chance · place ' + m.place : 'Main bracket · round ' + (m.round + 1)
+    }));
+    var roundTotal = E.sub.rounds[E.sub.ri].filter(function (p) { return p.mid; }).length;
+    S.head.appendChild(el('span', {
+      text: E.sub.queue.length + ' pairing' + (E.sub.queue.length === 1 ? '' : 's') +
+            ' still to judge of ' + roundTotal + ' this round'
+    }));
+    if (isRep) {
+      S.head.appendChild(el('span', {
+        class: 'small dim',
+        text: 'These lost to ' + nameOf(E.placements[E.placements.length - 1]) + ' or to a photo already placed.'
+      }));
+    }
+    if (E.deferCount[m.mid]) {
+      S.head.appendChild(el('span', {
+        class: 'bk-tag bk-tag-warn',
+        text: E.sub.queue.length === 1
+          ? 'Deferred · last pairing in this round'
+          : 'Deferred, back again'
+      }));
+    }
+    if (E.broke) S.head.appendChild(el('span', { class: 'bk-tag bk-tag-warn', text: 'log/bracket mismatch: ' + E.broke }));
+
+    // Attach before loading so the panes have a measurable size by the time an
+    // image fires its load event.
+    if (!S.stage.firstChild) {
+      S.stage.appendChild(S.panes[0].pane);
+      S.stage.appendChild(S.panes[1].pane);
+    }
+    // Only reload the photos when the pairing actually changes; repainting the
+    // header after a defer must not flash the images or reset the zoom.
+    if (S.lastMid !== m.mid) {
+      S.lastMid = m.mid;
+      S.view = { z: 1, cx: 0.5, cy: 0.5 };
+      loadPane(S.panes[0], m.a);
+      loadPane(S.panes[1], m.b);
+    }
+
+    S.zoomLabel = el('span', { class: 'bk-zoom', text: Math.round(S.view.z * 100) + '%' });
+    S.bar.appendChild(el('button', {
+      class: 'btn', id: 'bk-defer', onclick: defer,
+      title: 'Sends this pairing to the back of the round. It comes back.'
+    }, ['Too close to call ', el('kbd', { text: 'D' })]));
+    S.bar.appendChild(el('button', {
+      class: 'btn', id: 'bk-undo', onclick: undo,
+      disabled: !u.bracket.ops.length
+    }, ['Undo ', el('kbd', { text: 'U' })]));
+    S.bar.appendChild(el('span', { class: 'spacer' }));
+    S.bar.appendChild(el('button', { class: 'btn btn-sm', id: 'bk-zoomout', text: '−', onclick: function () { setZoom(S.view.z / 1.35, null); } }));
+    S.bar.appendChild(S.zoomLabel);
+    S.bar.appendChild(el('button', { class: 'btn btn-sm', id: 'bk-zoomin', text: '+', onclick: function () { setZoom(S.view.z * 1.35, null); } }));
+    S.bar.appendChild(el('button', { class: 'btn btn-sm', id: 'bk-fit', text: 'Fit', onclick: function () { setZoom(1, null); } }));
+    S.bar.appendChild(el('button', {
+      class: 'btn btn-sm', id: 'bk-1to1', text: '1:1', onclick: zoomOneToOne,
+      title: 'Both panes zoom together to the same region; the left pane sets the pixel scale.'
+    }));
+    S.bar.appendChild(el('span', { class: 'small dim', text: 'scroll to zoom · drag to pan · both photos move together' }));
+
+    applyView();
+  }
+
+  function loadPane(P, id) {
+    P.id = id;
+    P.nat.w = 0; P.nat.h = 0;
+    var nm = P.cap.querySelector('.nm');
+    if (nm) nm.textContent = nameOf(id);
+    var blob = blobFor(id, true);
+    if (blob) { PT.dom.setImg(P.img, blob); return; }
+    PT.dom.setImg(P.img, null);
+    var token = S.token;
+    hydrate(id).then(function (rec) {
+      if (!S || S.token !== token || P.id !== id) return;
+      var b2 = rec && (rec.preview || rec.thumb);
+      if (b2) PT.dom.setImg(P.img, b2);
+      else {
+        var miss = P.vp.querySelector('.bk-miss');
+        if (!miss) P.vp.appendChild(el('div', { class: 'bk-miss', text: nameOf(id) + ' — no cached preview' }));
+      }
+    });
+  }
+
+  /**
+   * Completion, whether the bracket ran out of comparisons or the user stopped
+   * early. Either way the ranked list is real and usable; the only difference
+   * is how many places were decided head-to-head versus inferred from depth.
+   */
+  function paintDone(u, E) {
+    PT.dom.clear(S.head);
+    PT.dom.clear(S.bar);
+    PT.dom.clear(S.stage);
+    S.stage.style.display = 'block';
+    S.lastMid = null;
+    PT.dom.releaseImg(S.panes[0].img);
+    PT.dom.releaseImg(S.panes[1].img);
+
+    var stopped = !!u.bracket.stopped && !E.done;
+    var decided = E.placements.length;
+    var list = u.winners || [];
+
+    S.head.appendChild(el('span', {
+      class: 'bk-tag' + (stopped ? ' bk-tag-warn' : ''),
+      text: stopped ? 'Stopped early' : 'Bracket complete'
+    }));
+    S.head.appendChild(el('span', {
+      text: decided + ' of ' + list.length + ' place' + (list.length === 1 ? '' : 's') +
+            ' decided head-to-head in ' + E.comparisons + ' comparison' + (E.comparisons === 1 ? '' : 's') + '.'
+    }));
+    if (decided < list.length) {
+      S.head.appendChild(el('span', {
+        class: 'small dim',
+        text: 'The rest are ranked by how far they got and how many comparisons they won.'
+      }));
+    }
+    if (E.derived) {
+      S.head.appendChild(el('span', {
+        class: 'small dim',
+        text: E.derived + ' further pairing' + (E.derived === 1 ? '' : 's') + ' answered by a choice you had already made.'
+      }));
+    }
+
+    var box = el('div', { class: 'bk-results', id: 'bk-results' });
+    list.forEach(function (id, i) {
+      var img = el('img', { alt: '' });
+      var b = blobFor(id, false);
+      if (b) PT.dom.setImg(img, b);
+      var row = el('div', { class: 'bk-row', dataset: { id: id, rank: String(i + 1) } }, [
+        el('span', { class: 'bk-rank', text: String(i + 1) }),
+        img,
+        el('span', { class: 'bk-name', text: nameOf(id) }),
+        el('span', {
+          class: 'small ' + (i < decided ? 'muted' : 'dim'),
+          text: i < decided ? 'decided' : 'inferred'
+        })
+      ]);
+      box.appendChild(row);
+      if (!b) hydrate(id).then(function (rec) {
+        if (S && rec && (rec.thumb || rec.preview)) PT.dom.setImg(img, rec.thumb || rec.preview);
+      });
+    });
+    if (!list.length) box.appendChild(el('div', { class: 'notice notice-note', text: 'This unit has no photos to rank.' }));
+    S.stage.appendChild(box);
+
+    if (stopped) {
+      S.bar.appendChild(el('button', { class: 'btn', id: 'bk-resume', text: 'Resume ranking', onclick: function () { setStopped(false); } }));
+    }
+    S.bar.appendChild(el('button', { class: 'btn', id: 'bk-undo', text: 'Undo last comparison', onclick: undo, disabled: !u.bracket.ops.length }));
+    S.bar.appendChild(el('span', { class: 'spacer' }));
+    S.bar.appendChild(el('button', { class: 'btn btn-primary', id: 'bk-continue', text: 'Continue to burst runoff', onclick: continueToRunoff }));
+  }
+
+  function unmountBracket(root) {
+    if (S) {
+      if (S.onKey) window.removeEventListener('keydown', S.onKey);
+      if (S.onResize) window.removeEventListener('resize', S.onResize);
+      if (S.offStop) S.offStop();
+      S.panes.forEach(function (P) { PT.dom.releaseImg(P.img); });
+    }
+    PT.dom.$$('img', root).forEach(function (img) { PT.dom.releaseImg(img); });
+    clearTopbar();
+    S = null;
+  }
+
+  PT.router.register('bracket', { mount: mountBracket, unmount: unmountBracket });
+
+  /* ======================================================================
+   * 5. Screen: 'runoff'  (PRD 7.4, Stage C)
+   * ==================================================================== */
+
+  var R = null;
+
+  /**
+   * Groups come from the reviewed grouping (PRD 7.7) when there is one, and
+   * otherwise from a fresh clustering. Either way it is computed over the
+   * unit's WHOLE field, not just the winners: the frames a burst lost to
+   * Stage A are exactly the ones the user now gets to reconsider.
+   */
+  function runoffGroups(unit) {
+    var st = PT.store.get();
+    var settings = (st.session && st.session.settings) || PT.session.DEFAULTS;
+    var raw = null;
+
+    if (unit.groups && unit.groups.length) {
+      raw = unit.groups.map(function (g) {
+        return Array.isArray(g) ? g.slice() : ((g && g.ids) || []).slice();
+      });
+    } else {
+      var items = [];
+      (unit.allIds || []).forEach(function (id) {
+        var p = st.photos && st.photos[id];
+        if (p && typeof p.phash === 'string' && p.phash.length === 16) {
+          items.push({ id: id, hash: p.phash, w: p.w, h: p.h, sharp: p.sharp });
+        }
+      });
+      if (items.length < 2) return [];
+      try {
+        raw = PT.phash.cluster(items, { threshold: settings.dupeThreshold, mode: settings.dupeMode });
+      } catch (e) {
+        PT.warn('runoff', 'cluster failed', e);
+        return [];
+      }
+    }
+    return raw.filter(function (g) { return g && g.length > 1; });
+  }
+
+  function membersMeta(ids) {
+    var st = PT.store.get();
+    return ids.map(function (id) {
+      var p = (st.photos && st.photos[id]) || {};
+      return { id: id, w: p.w, h: p.h, sharp: p.sharp };
+    });
+  }
+
+  function mountRunoff(root, params) {
+    injectStyle();
+    var unitId = params && params.unitId;
+    var u = unitOf(unitId);
+    if (!u) {
+      root.appendChild(el('div', { class: 'error-box', text: 'No tournament unit "' + unitId + '" in this session.' }));
+      return;
+    }
+
+    // The entry ranking is frozen once, so every swap stays reversible and a
+    // reload reproduces exactly the same list.
+    if (!u.runoff) {
+      PT.store.dispatch('runoff:init', function (s) {
+        var unit = s.session.units[unitId];
+        unit.runoff = { orig: (unit.winners || []).slice(), picks: {}, done: false };
+      });
+      u = unitOf(unitId);
+    }
+
+    R = { unitId: unitId, root: root, groups: runoffGroups(u), open: {} };
+    R.body = el('div', { class: 'bk' });
+    root.appendChild(R.body);
+    paintRunoff();
+  }
+
+  function runoffRows(u) {
+    var orig = (u.runoff && u.runoff.orig) || u.winners || [];
+    var byId = {};
+    R.groups.forEach(function (g) { g.forEach(function (id) { byId[id] = g; }); });
+    var rows = [];
+    orig.forEach(function (id, i) {
+      var g = byId[id];
+      if (g && g.length > 1) rows.push({ rank: i + 1, orig: id, group: g });
+    });
+    return rows;
+  }
+
+  function currentWinners(u) {
+    var ro = u.runoff || { orig: u.winners || [], picks: {} };
+    return (ro.orig || []).map(function (id) { return ro.picks[id] || id; });
+  }
+
+  function commitRunoff(name, mutate) {
+    if (!R) return;
+    var unitId = R.unitId;
+    PT.store.dispatch(name, function (s) {
+      var u = s.session.units[unitId];
+      if (!u) return;
+      mutate(u);
+      u.winners = currentWinners(u);
+    });
+    paintRunoff();
+  }
+
+  function paintRunoff() {
+    if (!R) return;
+    var u = unitOf(R.unitId);
+    if (!u) return;
+    var rows = runoffRows(u);
+    var winners = currentWinners(u);
+    var swapped = Object.keys(u.runoff.picks).filter(function (k) { return u.runoff.picks[k] !== k; }).length;
+
+    setTopbar(
+      (u.label || 'unit') + ' · Stage C burst runoff',
+      [
+        ['finalists', winners.length],
+        ['expandable', rows.length],
+        ['swapped', swapped]
+      ],
+      null
+    );
+
+    PT.dom.$$('img', R.body).forEach(function (img) { PT.dom.releaseImg(img); });
+    PT.dom.clear(R.body);
+
+    var head = el('div', { class: 'bk-sub' });
+    R.body.appendChild(head);
+
+    if (!rows.length) {
+      // PRD 7.4: say so and move on rather than presenting an empty UI.
+      R.body.appendChild(el('div', { class: 'notice notice-note', id: 'ro-none' }, [
+        'None of these ' + winners.length + ' finalist' + (winners.length === 1 ? '' : 's') +
+        ' belongs to a near-duplicate group, so there is no burst to run off. Nothing to do here.'
+      ]));
+      var bar0 = el('div', { class: 'bk-bar' }, [
+        el('span', { class: 'spacer' }),
+        el('button', { class: 'btn btn-primary', id: 'ro-continue', text: 'Continue', onclick: finishRunoff })
+      ]);
+      R.body.appendChild(bar0);
+      return;
+    }
+
+    head.appendChild(el('span', {
+      text: rows.length + ' finalist' + (rows.length === 1 ? '' : 's') + ' came out of a burst. ' +
+            'Expanding one runs a Keep 1 pass over the whole burst, including frames cut earlier.'
+    }));
+
+    var list = el('div', { class: 'bk-results', id: 'ro-list' });
+    rows.forEach(function (row) { list.appendChild(runoffGroupEl(u, row, winners)); });
+    R.body.appendChild(list);
+
+    R.body.appendChild(el('div', { class: 'bk-bar' }, [
+      el('span', { class: 'small dim', text: 'Every choice here is reversible until you continue.' }),
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn-primary', id: 'ro-continue', text: 'Continue', onclick: finishRunoff })
+    ]));
+  }
+
+  function runoffGroupEl(u, row, winners) {
+    var picked = u.runoff.picks[row.orig] || row.orig;
+    var open = !!R.open[row.orig];
+    var meta = membersMeta(row.group);
+    var nominee = PT.phash.nominate(meta);
+
+    var thumb = el('img', { alt: '' });
+    var b = blobFor(picked, false);
+    if (b) PT.dom.setImg(thumb, b);
+    else hydrate(picked).then(function (rec) {
+      if (R && rec && (rec.thumb || rec.preview)) PT.dom.setImg(thumb, rec.thumb || rec.preview);
+    });
+
+    var head = el('div', { class: 'ro-head' }, [
+      el('span', { class: 'bk-rank', text: '#' + row.rank }),
+      thumb,
+      el('span', { class: 'bk-name' }, [
+        el('div', { text: nameOf(picked) }),
+        el('div', {
+          class: 'small dim',
+          text: row.group.length + ' near-identical frames' +
+                (picked !== row.orig ? ' · swapped in for ' + nameOf(row.orig) : '')
+        })
+      ]),
+      el('button', {
+        class: 'btn btn-sm', dataset: { expand: row.orig },
+        text: open ? 'Close' : 'Expand burst',
+        onclick: function () { R.open[row.orig] = !open; paintRunoff(); }
+      }),
+      picked !== row.orig ? el('button', {
+        class: 'btn btn-sm btn-quiet', dataset: { revert: row.orig }, text: 'Revert',
+        onclick: function () {
+          commitRunoff('runoff:revert', function (uu) { delete uu.runoff.picks[row.orig]; });
+        }
+      }) : null
+    ]);
+
+    var wrap = el('div', { class: 'ro-group', dataset: { group: row.orig } }, [head]);
+    if (!open) return wrap;
+
+    var grid = el('div', { class: 'grid grid-' + (row.group.length <= 6 ? '6' : (row.group.length <= 12 ? '12' : '16')) });
+    row.group.forEach(function (id) {
+      var taken = picked !== id && winners.indexOf(id) >= 0;
+      var cell = el('div', {
+        class: 'photo-cell ro-cell' + (id === picked ? ' kept' : '') + (taken ? ' dead' : ''),
+        dataset: { member: id, group: row.orig },
+        title: taken ? 'Already a finalist in its own right' : nameOf(id),
+        onclick: taken ? null : function () {
+          commitRunoff('runoff:keep1', function (uu) {
+            if (id === row.orig) delete uu.runoff.picks[row.orig];
+            else uu.runoff.picks[row.orig] = id;
+          });
+        }
+      });
+      var img = el('img', { class: 'thumb', alt: '' });
+      cell.appendChild(img);
+      var tags = [];
+      if (id === picked) tags.push('keeping');
+      if (id === row.orig && id !== picked) tags.push('was #' + row.rank);
+      if (id === nominee) tags.push('sharpest');
+      if (taken) tags.push('already a finalist');
+      if (tags.length) cell.appendChild(el('span', { class: 'tag', text: tags.join(' · ') }));
+      grid.appendChild(cell);
+
+      var bb = blobFor(id, false);
+      if (bb) PT.dom.setImg(img, bb);
+      else hydrate(id).then(function (rec) {
+        if (R && rec && (rec.thumb || rec.preview)) PT.dom.setImg(img, rec.thumb || rec.preview);
+      });
+    });
+
+    wrap.appendChild(el('div', { class: 'ro-body' }, [
+      el('div', { class: 'small dim', text: 'Keep 1: click the frame that survives. The suggestion is the sharpest at the highest resolution.' }),
+      grid
+    ]));
+    return wrap;
+  }
+
+  function finishRunoff() {
+    if (!R) return;
+    var unitId = R.unitId;
+    commitRunoff('runoff:done', function (u) {
+      u.runoff.done = true;
+      u.phase = 'done';
+    });
+    PT.bus.emit('runoff:complete', { unitId: unitId });
+    PT.bus.emit('unit:complete', { unitId: unitId });
+    if (PT.router.current() !== 'runoff') return;
+    // PT.advance() owns the next-unit / Stage D / export decision (PRD 7.6).
+    if (typeof PT.advance === 'function') PT.advance();
+    else if (!tryGo('export', { unitId: unitId })) tryGo('tree', {});
+  }
+
+  function unmountRunoff(root) {
+    PT.dom.$$('img', root).forEach(function (img) { PT.dom.releaseImg(img); });
+    clearTopbar();
+    R = null;
+  }
+
+  PT.router.register('runoff', { mount: mountRunoff, unmount: unmountRunoff });
+
+  PT.log('bracket', 'screens registered: bracket, runoff');
+})();
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Pure PT.bracket engine: deterministic
+ *   seeded draw, standard seed slots so byes spread across non-power-of-two
+ *   fields, elimination edges recorded, and the repechage as iterative
+ *   candidate-pool mini brackets seeded by main-bracket depth. State is an ops
+ *   log replayed on every change, which is what gives unlimited undo, mid-
+ *   bracket resume and a tiny persisted record from one mechanism. Matchup
+ *   screen with viewport-filling previews, thumb fallback, click and arrow-key
+ *   choice, deferral by queue rotation, and shared normalised-coordinate zoom so
+ *   both photos frame the same region. Early-stop writes a ranked list from
+ *   decided places plus depth-inferred order. Stage C runoff expands any
+ *   finalist's burst into a reversible Keep-1 pass, and says so plainly when a
+ *   unit has no near-duplicate groups.
+ */
+
+</script>
+<script>
+/* ===== 80_screen_export.js ===== */
+/**
+ * @file 80_screen_export.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description PRD 7.8 export review and output: per-finalist intent labels, ordered prefixes, per-source folder naming, mirrored or flat structure, disk writing with collision handling, download bundles, and the decision JSON.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * Nothing is written until the user has seen exactly what will be written. The
+ * review screen lists every finalist with its rank, source folder and final
+ * destination filename, and the label field feeds directly into that filename so
+ * the reasoning survives the export (PRD success criterion 8).
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+  var el = PT.dom.el;
+  var STYLE_ID = 'pt-export-style';
+
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    document.head.appendChild(el('style', { id: STYLE_ID, text:
+      '.exp-row{display:grid;grid-template-columns:34px 76px 1fr 1.4fr;gap:10px;align-items:center;' +
+        'padding:6px;border-radius:6px}' +
+      '.exp-row:hover{background:var(--surface-2)}' +
+      '.exp-rank{font-variant-numeric:tabular-nums;color:var(--text-mute);text-align:right}' +
+      '.exp-thumb{width:76px;height:52px;object-fit:contain;background:#000;border-radius:4px}' +
+      '.exp-name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.exp-dest{font-family:var(--mono);font-size:11px;color:var(--text-dim);' +
+        'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.exp-set{margin-bottom:18px}'
+    }));
+  }
+
+  /** PRD 7.8: labels are optional, and become part of the filename. */
+  function slugLabel(s) {
+    return String(s || '').trim().toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 48);
+  }
+
+  /**
+   * Destination filename. The original name is always the final component so
+   * provenance survives renaming (PRD 7.8), and the ordered prefix keeps
+   * sequence through alphabetical sorting in slideshow tools.
+   */
+  function destName(photo, rank, total, settings, label) {
+    var parts = [];
+    if (settings.prefixes) parts.push(PT.fmt.ordinal(rank, total));
+    var lab = slugLabel(label);
+    if (lab) parts.push(lab);
+    parts.push(photo.name);
+    return parts.join('_');
+  }
+
+  /** Each result set writes to its own folder named for its source (PRD 7.8). */
+  function folderFor(unit) {
+    if (unit.id === 'stageD') return '_finalists_overall';
+    if (unit.kind === 'pooled') return '_finalists_pooled';
+    var leaf = String(unit.label || 'unit').split('/').pop();
+    return '_finalists_' + leaf.replace(/[^A-Za-z0-9._-]+/g, '_');
+  }
+
+  function resultSets(session) {
+    return Object.keys(session.units)
+      .map(function (k) { return session.units[k]; })
+      .filter(function (u) { return u.winners && u.winners.length; })
+      .map(function (u) { return { unit: u, folder: folderFor(u), ids: u.winners.slice() }; });
+  }
+
+  PT.router.register('export', {
+    mount: function (root) {
+      injectStyle();
+      var st = PT.store.get();
+      var session = st.session;
+      PT.dom.$('#topbar').hidden = false;
+      PT.dom.$('#topbar-context').textContent = session.rootName;
+      PT.dom.$('#topbar-counters').textContent = '';
+
+      var sets = resultSets(session);
+
+      root.appendChild(el('h1', { text: 'Export review' }));
+
+      if (!sets.length) {
+        root.appendChild(el('div', { class: 'card' }, [
+          el('p', { text: 'No finalists yet. Finish at least one tournament first.' }),
+          el('button', { class: 'btn', text: 'Back to the folder tree',
+            onclick: function () { PT.router.go('tree'); } })
+        ]));
+        return;
+      }
+
+      var opts = el('div', { class: 'card row' });
+      var listHost = el('div');
+      var actions = el('div', { class: 'card row' });
+      root.appendChild(opts);
+      root.appendChild(listHost);
+      root.appendChild(actions);
+
+      session.labels = session.labels || {};
+
+      /* --------------------------------------------------------- options -- */
+
+      function toggle(labelText, key, title) {
+        var cb = el('input', { type: 'checkbox' });
+        cb.checked = !!session.settings[key];
+        cb.addEventListener('change', function () {
+          PT.store.dispatch('export:opt', function (s) { s.session.settings[key] = cb.checked; });
+          renderList();
+        });
+        return el('label', { class: 'check small', title: title || '' }, [cb, el('span', { text: labelText })]);
+      }
+
+      opts.appendChild(toggle('Numbered prefixes', 'prefixes',
+        'Keeps rank order when a slideshow tool sorts alphabetically'));
+
+      var structSel = el('select', {});
+      [['mirror', 'Mirror the source folders'], ['flat', 'Flatten into one folder']].forEach(function (o) {
+        var op = el('option', { value: o[0], text: o[1] });
+        if (session.settings.outputStructure === o[0]) op.selected = true;
+        structSel.appendChild(op);
+      });
+      structSel.addEventListener('change', function () {
+        PT.store.dispatch('export:struct', function (s) { s.session.outputStructure = structSel.value; s.session.settings.outputStructure = structSel.value; });
+        renderList();
+      });
+      opts.appendChild(structSel);
+      opts.appendChild(el('span', { class: 'spacer' }));
+      opts.appendChild(el('span', { class: 'small dim', id: 'exp-total' }));
+
+      /* ------------------------------------------------------------ list -- */
+
+      function renderList() {
+        var s = PT.store.get();
+        PT.dom.clear(listHost);
+        var totalFiles = 0, totalBytes = 0;
+
+        sets.forEach(function (set) {
+          var card = el('div', { class: 'card exp-set' });
+          card.appendChild(el('div', { class: 'row' }, [
+            el('h2', { text: set.unit.label }),
+            el('span', { class: 'muted small mono', text:
+              (s.session.settings.outputStructure === 'flat' ? '_finalists' : set.folder) + '/' }),
+            el('span', { class: 'spacer' }),
+            el('span', { class: 'muted small', text: set.ids.length + ' finalists' })
+          ]));
+
+          set.ids.forEach(function (id, i) {
+            var photo = s.photos[id];
+            if (!photo) return;
+            totalFiles++;
+            totalBytes += photo.size || 0;
+
+            var img = el('img', { class: 'exp-thumb', alt: '' });
+            var d = s.derivatives[id];
+            if (d && d.thumb) PT.dom.setImg(img, d.thumb);
+
+            var dest = el('div', { class: 'exp-dest' });
+            var labelInput = el('input', {
+              type: 'text', placeholder: 'why this one won, or how it will be used',
+              value: s.session.labels[id] || ''
+            });
+            var refresh = function () {
+              dest.textContent = destName(photo, i + 1, set.ids.length, s.session.settings, labelInput.value);
+            };
+            labelInput.addEventListener('input', function () {
+              PT.store.dispatch('export:label', function (ss) { ss.session.labels[id] = labelInput.value; });
+              refresh();
+            });
+            refresh();
+
+            card.appendChild(el('div', { class: 'exp-row' }, [
+              el('span', { class: 'exp-rank', text: String(i + 1) }),
+              img,
+              el('div', {}, [
+                el('div', { class: 'exp-name', text: photo.name }),
+                el('div', { class: 'small dim', text: photo.dir || '/' })
+              ]),
+              el('div', {}, [labelInput, dest])
+            ]));
+          });
+
+          listHost.appendChild(card);
+        });
+
+        // PRD 8: duplication across sets is deliberate, so report the real total.
+        PT.dom.$('#exp-total').textContent =
+          totalFiles + ' files, about ' + PT.fmt.bytes(totalBytes) + ' to write';
+      }
+
+      renderList();
+
+      /* --------------------------------------------------------- actions -- */
+
+      var canWrite = session.sourceKind === 'handle' && PT.env.hasFSA;
+
+      var writeBtn = el('button', {
+        class: 'btn btn-primary',
+        text: canWrite ? 'Write finalists to disk' : 'Writing to disk needs a folder handle',
+        onclick: function () { doWrite(sets); }
+      });
+      writeBtn.disabled = !canWrite;
+      if (!canWrite) {
+        writeBtn.title = 'This session was started from dropped files, so there is no folder to write into. ' +
+          'Download the bundle instead.';
+      }
+
+      actions.appendChild(writeBtn);
+      actions.appendChild(el('button', { class: 'btn', text: 'Download as files',
+        onclick: function () { doDownload(sets); } }));
+      actions.appendChild(el('button', { class: 'btn', text: 'Copy filename list',
+        onclick: function () { copyList(sets); } }));
+      actions.appendChild(el('button', { class: 'btn btn-quiet', text: 'Decision JSON',
+        onclick: function () { downloadJson(sets); } }));
+      actions.appendChild(el('span', { class: 'spacer' }));
+      actions.appendChild(el('span', { class: 'small dim', id: 'exp-status' }));
+    },
+
+    unmount: function (root) {
+      PT.dom.$$('.exp-thumb', root).forEach(function (img) { PT.dom.releaseImg(img); });
+    }
+  });
+
+  function status(msg) {
+    var n = PT.dom.$('#exp-status');
+    if (n) n.textContent = msg;
+  }
+
+  /** Reads the original bytes back for export. */
+  function originalBlob(id) {
+    var src = PT.sources[id];
+    if (!src) return Promise.reject(new Error('the original file is no longer available in this session'));
+    if (typeof src.getFile === 'function') return src.getFile();
+    return Promise.resolve(src);
+  }
+
+  function plan(sets) {
+    var s = PT.store.get();
+    var flat = s.session.settings.outputStructure === 'flat';
+    var out = [];
+    sets.forEach(function (set) {
+      set.ids.forEach(function (id, i) {
+        var photo = s.photos[id];
+        if (!photo) return;
+        out.push({
+          id: id,
+          photo: photo,
+          folder: flat ? '_finalists' : set.folder,
+          name: destName(photo, i + 1, set.ids.length, s.session.settings, s.session.labels[id]),
+          rank: i + 1,
+          unit: set.unit.label
+        });
+      });
+    });
+    return out;
+  }
+
+  /**
+   * PRD 7.8: collision handling applies to disk writes only. When a target folder
+   * already exists with contents, ask — never silently overwrite.
+   */
+  function resolveCollision(dirHandle, folder) {
+    return dirHandle.getDirectoryHandle(folder, { create: false })
+      .then(function (existing) {
+        return (async function () {
+          for await (var _ of existing.values()) return true;
+          return false;
+        })();
+      })
+      .then(function (hasContents) {
+        if (!hasContents) return { mode: 'add', folder: folder };
+        return ask(folder);
+      })
+      .catch(function () { return { mode: 'add', folder: folder }; });
+  }
+
+  function ask(folder) {
+    return new Promise(function (resolve) {
+      var body = PT.dom.$('#modal-body');
+      PT.dom.clear(body);
+      body.appendChild(el('h2', { text: folder + ' already has files in it' }));
+      body.appendChild(el('p', { class: 'muted small', text:
+        'Nothing is overwritten unless you choose to replace.' }));
+      var pick = function (mode) {
+        return function () {
+          PT.dom.$('#modal').close();
+          resolve({
+            mode: mode,
+            folder: mode === 'sibling'
+              ? folder + '_' + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
+              : folder
+          });
+        };
+      };
+      body.appendChild(el('div', { class: 'row' }, [
+        el('button', { class: 'btn', text: 'Add alongside', onclick: pick('add') }),
+        el('button', { class: 'btn btn-danger', text: 'Replace contents', onclick: pick('replace') }),
+        el('button', { class: 'btn btn-primary', text: 'New timestamped folder', onclick: pick('sibling') })
+      ]));
+      PT.dom.$('#modal').showModal();
+    });
+  }
+
+  function doWrite(sets) {
+    var items = plan(sets);
+    status('Preparing…');
+
+    PT.db.get('handles', 'root').then(function (rec) {
+      if (!rec || !rec.handle) throw new Error('no folder handle stored for this session');
+      var dir = rec.handle;
+
+      return dir.queryPermission({ mode: 'readwrite' }).then(function (p) {
+        // A stored handle comes back as "prompt" after a browser restart, and
+        // re-granting requires a user gesture — which this click is.
+        if (p === 'granted') return 'granted';
+        return dir.requestPermission({ mode: 'readwrite' });
+      }).then(function (p) {
+        if (p !== 'granted') throw new Error('permission to write was not granted');
+
+        var folders = {};
+        items.forEach(function (it) { folders[it.folder] = 1; });
+
+        var chain = Promise.resolve();
+        var mapping = {};
+        Object.keys(folders).forEach(function (f) {
+          chain = chain.then(function () {
+            return resolveCollision(dir, f).then(function (choice) { mapping[f] = choice; });
+          });
+        });
+
+        return chain.then(function () {
+          var written = 0;
+          var seq = Promise.resolve();
+          items.forEach(function (it) {
+            seq = seq.then(function () {
+              var choice = mapping[it.folder];
+              return dir.getDirectoryHandle(choice.folder, { create: true })
+                .then(function (fh) {
+                  if (choice.mode === 'replace' && !choice._cleared) {
+                    choice._cleared = true;
+                    return (async function () {
+                      var names = [];
+                      for await (var e of fh.values()) names.push(e.name);
+                      for (var i = 0; i < names.length; i++) {
+                        await fh.removeEntry(names[i], { recursive: true });
+                      }
+                      return fh;
+                    })();
+                  }
+                  return fh;
+                })
+                .then(function (fh) {
+                  return originalBlob(it.id).then(function (blob) {
+                    return fh.getFileHandle(it.name, { create: true })
+                      .then(function (file) { return file.createWritable(); })
+                      .then(function (w) {
+                        return w.write(blob).then(function () { return w.close(); });
+                      });
+                  });
+                })
+                .then(function () {
+                  written++;
+                  if (written % 5 === 0) status('Writing… ' + written + ' / ' + items.length);
+                });
+            });
+          });
+          return seq.then(function () { return written; });
+        });
+      });
+    }).then(function (written) {
+      status(written + ' files written.');
+      PT.toast('Wrote ' + written + ' finalists into ' + PT.store.get().session.rootName + '.');
+      PT.store.dispatch('export:done', function (s) { s.session.finished = true; });
+    }).catch(function (e) {
+      PT.warn('export', e);
+      status('');
+      PT.toast('Could not write: ' + e.message);
+    });
+  }
+
+  function saveBlob(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: name });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  /**
+   * Downloads each finalist individually rather than zipping. A zip would need a
+   * compression library; Chromium prompts once for multiple downloads and the
+   * names already carry the folder in them.
+   */
+  function doDownload(sets) {
+    var items = plan(sets);
+    var i = 0;
+    status('Downloading…');
+    (function next() {
+      if (i >= items.length) { status(items.length + ' files downloaded.'); return; }
+      var it = items[i++];
+      originalBlob(it.id)
+        .then(function (blob) { saveBlob(blob, it.folder + '__' + it.name); })
+        .catch(function () { /* a missing original must not stall the rest */ })
+        .then(function () { setTimeout(next, 120); });
+    })();
+  }
+
+  function copyList(sets) {
+    var text = plan(sets).map(function (it) { return it.folder + '/' + it.name; }).join('\n');
+    navigator.clipboard.writeText(text)
+      .then(function () { PT.toast('Filename list copied.'); })
+      .catch(function () { PT.toast('Could not reach the clipboard.'); });
+  }
+
+  /** PRD 7.8: decision history including labels and the full filename mapping. */
+  function downloadJson(sets) {
+    var s = PT.store.get();
+    var items = plan(sets);
+    var doc = {
+      _metadata: {
+        file: 'photournament_decisions.json',
+        version: '1.0',
+        app: 'Photournament v' + PT.VERSION,
+        exported: new Date().toISOString(),
+        source: s.session.rootName
+      },
+      settings: s.session.settings,
+      allocations: s.session.allocs,
+      units: Object.keys(s.session.units).map(function (k) {
+        var u = s.session.units[k];
+        return {
+          id: u.id, label: u.label, kind: u.kind, target: u.target,
+          field: u.allIds.length, comparisons: u.comparisons,
+          passes: u.passes, rescued: u.rescued.length,
+          winners: u.winners
+        };
+      }),
+      mapping: items.map(function (it) {
+        return {
+          id: it.id, rank: it.rank, unit: it.unit,
+          original: it.photo.path,
+          label: s.session.labels[it.id] || '',
+          exported: it.folder + '/' + it.name
+        };
+      }),
+      actionLog: PT.store.actionLog()
+    };
+    saveBlob(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }),
+      'photournament_decisions_v1.0.json');
+    PT.toast('Decision JSON downloaded.');
+  }
+})();
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Review list with rank, source and
+ *   destination filename, per-finalist intent labels feeding the filename,
+ *   toggleable ordered prefixes, mirrored or flat output, per-source folder
+ *   naming, disk writing with permission re-grant and collision prompts,
+ *   individual downloads, clipboard list, and the decision JSON.
+ */
+
+</script>
+<script>
+/* ===== 99_app.js ===== */
+/**
+ * @file 99_app.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-07-28
+ * @lastUpdated 2026-07-28
+ * @description Application boot: environment checks, session resume, stage routing, toasts, and the global keyboard layer.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * Loads last. Every screen module has registered itself by the time this runs.
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+  var el = PT.dom.el;
+
+  /* ------------------------------------------------------------- toasts --- */
+
+  PT.bus.on('toast', function (msg) {
+    var host = PT.dom.$('#toasts');
+    if (!host) return;
+    var t = el('div', { class: 'toast', text: String(msg) });
+    host.appendChild(t);
+    setTimeout(function () {
+      t.style.opacity = '0';
+      t.style.transition = 'opacity 250ms';
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 260);
+    }, 3200);
+  });
+
+  PT.toast = function (msg) { PT.bus.emit('toast', msg); };
+
+  /* -------------------------------------------------------------- modal --- */
+
+  var modal = null;
+  PT.ready(function () {
+    modal = PT.dom.$('#modal');
+    if (modal) {
+      modal.addEventListener('click', function (e) {
+        // Click outside the panel closes; clicks inside must not.
+        if (e.target === modal) modal.close();
+      });
+    }
+  });
+
+  /* ------------------------------------------------------------ routing --- */
+
+  /**
+   * Where a restored session should land. Screens own their own internal
+   * position (a half-finished Stage A pass resumes from unit.currentPass), so
+   * this only has to pick the right screen.
+   */
+  function screenForSession(session) {
+    if (!session) return { name: 'welcome' };
+    switch (session.stage) {
+      case 'tree':   return { name: 'tree' };
+      case 'export': return { name: 'export' };
+      case 'unit': {
+        var u = session.units[session.activeUnitId];
+        if (!u) {
+          var pending = PT.session.pendingUnits(session);
+          if (!pending.length) return { name: 'export' };
+          return { name: 'grid', params: { unitId: pending[0].id } };
+        }
+        var byPhase = {
+          gridA: 'grid', rescue: 'rescue', dupes: 'grid',
+          bracket: 'bracket', runoff: 'runoff', done: 'grid'
+        };
+        return { name: byPhase[u.phase] || 'grid', params: { unitId: u.id } };
+      }
+      default: return { name: 'welcome' };
+    }
+  }
+
+  /**
+   * Called by stage screens when a unit finishes. Advances to the next pending
+   * unit, then Stage D if enabled (PRD 7.6), then export.
+   */
+  PT.advance = function () {
+    var s = PT.store.get();
+    var session = s.session;
+    var pending = PT.session.pendingUnits(session);
+
+    if (pending.length) {
+      PT.store.dispatch('unit:next', function (ss) { ss.session.activeUnitId = pending[0].id; });
+      PT.router.go('grid', { unitId: pending[0].id });
+      return;
+    }
+
+    if (session.settings.stageD && !session.stageDUnit) {
+      var field = PT.session.allWinners(session);
+      if (field.length > 1) {
+        PT.store.dispatch('stageD:create', function (ss) {
+          var u = PT.session.newUnit({
+            id: 'stageD',
+            kind: 'fixed',
+            label: 'best of the best',
+            target: Math.min(ss.session.settings.stageDTarget, field.length),
+            photoIds: field
+          });
+          ss.session.units.stageD = u;
+          ss.session.stageDUnit = 'stageD';
+          ss.session.activeUnitId = 'stageD';
+        });
+        PT.router.go('grid', { unitId: 'stageD' });
+        return;
+      }
+    }
+
+    PT.store.dispatch('stage:export', function (ss) {
+      ss.session.stage = 'export';
+      ss.session.activeUnitId = null;
+    });
+    PT.router.go('export');
+  };
+
+  /* ------------------------------------------------------------- resume --- */
+
+  /**
+   * PRD 7.10. Decisions live in the sessions store and survive independently of
+   * the derivative cache, which the browser may evict at any time (probe 01
+   * measured storage.persist() returning false even on localhost).
+   */
+  function tryResume() {
+    return PT.db.all('sessions').then(function (rows) {
+      if (!rows || !rows.length) return null;
+      rows.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      var session = rows[0];
+      if (!session || session.finished) return null;
+      if (session.stage === 'ingest') return null;
+      return session;
+    }).catch(function () { return null; });
+  }
+
+  function offerResume(session) {
+    var root = PT.dom.$('#screen');
+    PT.dom.clear(root);
+    var wrap = el('div', { class: 'screen screen-narrow' });
+    root.appendChild(wrap);
+
+    var when = new Date(session.createdAt).toLocaleString();
+    var units = Object.keys(session.units || {});
+    var done = units.filter(function (k) { return session.units[k].phase === 'done'; }).length;
+
+    wrap.appendChild(el('div', { class: 'card' }, [
+      el('h1', { text: 'Pick up where you left off?' }),
+      el('p', { class: 'muted', text:
+        session.rootName + ' — started ' + when + '. ' +
+        (units.length ? done + ' of ' + units.length + ' tournaments finished.' : '') }),
+      el('div', { class: 'row', style: 'margin-top:14px' }, [
+        el('button', { class: 'btn btn-primary', text: 'Resume', onclick: function () { doResume(session); } }),
+        el('button', { class: 'btn', text: 'Start fresh', onclick: function () {
+          PT.db.clear('sessions');
+          PT.router.go('welcome');
+        } })
+      ])
+    ]));
+  }
+
+  function doResume(session) {
+    Promise.all([PT.db.all('photos'), PT.db.all('derivatives')]).then(function (r) {
+      var photos = {}, derivatives = {};
+      (r[0] || []).forEach(function (p) { photos[p.id] = p; });
+      (r[1] || []).forEach(function (d) { derivatives[d.id] = d; });
+
+      var live = Object.keys(photos).map(function (k) { return photos[k]; })
+        .filter(function (p) { return !p.err; });
+
+      PT.store.init({
+        session: session,
+        photos: photos,
+        derivatives: derivatives,
+        tree: live.length ? PT.tree.build(live) : null,
+        resolution: null
+      });
+
+      if (!Object.keys(derivatives).length && live.length) {
+        PT.toast('The thumbnail cache was cleared by the browser. Your decisions are intact.');
+      }
+
+      var target = screenForSession(session);
+      PT.router.go(target.name, target.params);
+    }).catch(function (e) {
+      PT.warn('resume', e);
+      PT.router.go('welcome');
+    });
+  }
+
+  /* -------------------------------------------------------------- boot ---- */
+
+  PT.ready(function () {
+    // Chromium-only is a deliberate PRD 8 decision, but it must be stated rather
+    // than surfacing as a mysteriously broken button.
+    if (!PT.env.hasFSA) {
+      PT.log('app', 'File System Access API unavailable: resume and disk output are off');
+    }
+
+    var stop = PT.dom.$('#topbar-stop');
+    if (stop) {
+      stop.addEventListener('click', function () { PT.bus.emit('stage:stop-early'); });
+    }
+
+    tryResume().then(function (session) {
+      if (session) offerResume(session);
+      else PT.router.go('welcome');
+    });
+  });
+
+  /* --------------------------------------------------------- diagnostics -- */
+
+  /** Handy from the console; also what the smoke tests drive. */
+  PT.debug = {
+    state: function () { return PT.store.get(); },
+    resetAll: function () {
+      return Promise.all([
+        PT.db.clear('sessions'), PT.db.clear('photos'),
+        PT.db.clear('derivatives'), PT.db.clear('handles')
+      ]).then(function () { location.reload(); });
+    },
+    screens: function () { return Object.keys(PT.router._screens || {}); }
+  };
+})();
+
+/** CHANGELOG
+ * v1.0 (2026-07-28): Initial release. Toasts, modal dismissal, stage routing
+ *   with per-phase screen selection, unit advance including the optional Stage D,
+ *   session resume with an evicted-cache notice, and console diagnostics.
  */
 
 </script>

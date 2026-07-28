@@ -389,13 +389,35 @@
      * PRD section 8 depends on.
      */
     setImg: function (img, blob) {
-      if (img._ptUrl) URL.revokeObjectURL(img._ptUrl);
-      if (!blob) { img.removeAttribute('src'); img._ptUrl = null; return; }
-      img._ptUrl = URL.createObjectURL(blob);
-      img.src = img._ptUrl;
+      var old = img._ptUrl;
+      if (!blob) {
+        img.removeAttribute('src');
+        img._ptUrl = null;
+        if (old) URL.revokeObjectURL(old);
+        return;
+      }
+      var url = URL.createObjectURL(blob);
+      img._ptUrl = url;
+      img.src = url;
+      // Safe now: the element no longer references the old URL.
+      if (old) URL.revokeObjectURL(old);
     },
+
+    /**
+     * Detaches the source BEFORE revoking. Revoking a URL that an <img> is still
+     * decoding aborts that load, and on a file:// origin the aborted request
+     * surfaces as "Not allowed to load local resource: blob:null/..." in the
+     * console. Clearing src first cancels the load cleanly instead.
+     *
+     * This matters because screens re-render faster than large previews decode,
+     * so the race is the normal case rather than an edge one.
+     */
     releaseImg: function (img) {
-      if (img && img._ptUrl) { URL.revokeObjectURL(img._ptUrl); img._ptUrl = null; }
+      if (!img || !img._ptUrl) return;
+      var url = img._ptUrl;
+      img._ptUrl = null;
+      img.removeAttribute('src');
+      URL.revokeObjectURL(url);
     }
   };
 

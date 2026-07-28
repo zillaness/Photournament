@@ -1580,3 +1580,25 @@ kbd {
  *   docs/handoff_v1.0.md and this file's own header all name it, and a rename
  *   would leave three dangling references to fix a purely additive change.
  */
+
+/* ==========================================================================
+   14. BRAND MARK
+   ==========================================================================
+   The recursive identity mark, referenced from the sprite in the shell. Its
+   own palette is fixed by the identity spec (#474747 cells, #F3F3F3 selected)
+   rather than tokenised — it is a logo, not a UI surface, and it never sits
+   adjacent to a photograph where a cast would matter.
+   ========================================================================== */
+
+#app .pt-brandmark {
+  width: 44px;
+  height: 44px;
+  display: block;
+  flex: none;
+}
+
+#app .screen-welcome .pt-brandmark { width: 56px; height: 56px; margin-bottom: 4px; }
+
+@media (max-width: 720px) {
+  #app .pt-brandmark { width: 36px; height: 36px; }
+}

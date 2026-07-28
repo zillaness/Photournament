@@ -25,7 +25,12 @@
 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#171717">
+<!--
+  The design system's --bg, which resolves to #0d0d0d. The identity package
+  shipped #171717, but that is this stylesheet's --surface, not its page
+  background — the browser chrome would not have matched the page.
+-->
+<meta name="theme-color" content="#0d0d0d">
 <title>Photournament</title>
 <!--
   The favicon is embedded because the distributable must remain one file and
@@ -1619,7 +1624,98 @@ kbd {
  *   would leave three dangling references to fix a purely additive change.
  */
 
+/* ==========================================================================
+   14. BRAND MARK
+   ==========================================================================
+   The recursive identity mark, referenced from the sprite in the shell. Its
+   own palette is fixed by the identity spec (#474747 cells, #F3F3F3 selected)
+   rather than tokenised — it is a logo, not a UI surface, and it never sits
+   adjacent to a photograph where a cast would matter.
+   ========================================================================== */
+
+#app .pt-brandmark {
+  width: 44px;
+  height: 44px;
+  display: block;
+  flex: none;
+}
+
+#app .screen-welcome .pt-brandmark { width: 56px; height: 56px; margin-bottom: 4px; }
+
+@media (max-width: 720px) {
+  #app .pt-brandmark { width: 36px; height: 36px; }
+}
+
 </style>
+
+
+<!--
+  The recursive brand mark, defined once. It uses <symbol>/<use> recursion, so
+  inlining the whole file at each call site would collide on ids; screens
+  reference #ptm-mark instead. Inline rather than an <img src>, because a
+  sibling asset cannot load from a file:// origin.
+-->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <defs>
+      <symbol id="ptm-r0" viewBox="0 0 100 100">
+        <g fill="#474747">
+          <rect x="0" y="0" width="30" height="30" rx="3"/><rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+      <symbol id="ptm-r1" viewBox="0 0 100 100">
+        <use href="#ptm-r0" x="0" y="0" width="30" height="30"/>
+        <g fill="#474747">
+          <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+      <symbol id="ptm-r2" viewBox="0 0 100 100">
+        <use href="#ptm-r1" x="0" y="0" width="30" height="30"/>
+        <g fill="#474747">
+          <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+      <symbol id="ptm-r3" viewBox="0 0 100 100">
+        <use href="#ptm-r2" x="0" y="0" width="30" height="30"/>
+        <g fill="#474747">
+          <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+      <symbol id="ptm-r4" viewBox="0 0 100 100">
+        <use href="#ptm-r3" x="0" y="0" width="30" height="30"/>
+        <g fill="#474747">
+          <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+    </defs>
+  <symbol id="ptm-mark" viewBox="0 0 100 100">
+    <use href="#ptm-r4" x="0" y="0" width="32" height="32"/>
+      <g fill="#474747">
+        <rect x="34" y="0" width="32" height="32" rx="3"/>
+        <rect x="68" y="0" width="32" height="32" rx="3"/>
+        <rect x="0" y="34" width="32" height="32" rx="3"/>
+        <rect x="68" y="34" width="32" height="32" rx="3"/>
+        <rect x="0" y="68" width="32" height="32" rx="3"/>
+        <rect x="34" y="68" width="32" height="32" rx="3"/>
+        <rect x="68" y="68" width="32" height="32" rx="3"/>
+      </g>
+      <rect x="34" y="34" width="32" height="32" rx="3" fill="#F3F3F3"/>
+  </symbol>
+</svg>
 
 <div id="app">
   <header id="topbar" hidden>
@@ -5398,7 +5494,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 40_screen_ingest.js ===== */
 /**
  * @file 40_screen_ingest.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -5431,11 +5527,31 @@ v1.0 - 2026-07-28 - Samuel Cao
 
   var PREVIEW_PX = 1280;
 
-  /** Nine cells with one marked. Purely decorative; drawn entirely in CSS. */
-  function mark(live) {
+  /**
+   * Two different objects that happen to look alike, deliberately kept apart:
+   *
+   * - The BRAND MARK is the real recursive identity, referenced from the sprite
+   *   defined once in the shell. Identity, so it is the identity artwork.
+   * - The ACTIVITY INDICATOR is nine CSS cells that walk on a keyframe loop while
+   *   ingest runs. It has a job the static mark cannot do, and animating the
+   *   recursive artwork would turn a logo into a spinner.
+   */
+  function brandMark() {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'pt-brandmark');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Photournament');
+    var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#ptm-mark');
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function activityMark() {
     var cells = [];
     for (var i = 0; i < 9; i++) cells.push(el('i'));
-    return el('div', { class: 'pt-mark' + (live ? ' pt-mark-live' : '') }, cells);
+    return el('div', { class: 'pt-mark pt-mark-live' }, cells);
   }
 
   /* ------------------------------------------------------------- entry ---- */
@@ -5445,7 +5561,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       PT.dom.$('#topbar').hidden = true;
 
       root.appendChild(el('div', { class: 'card' }, [
-        mark(false),
+        brandMark(),
         el('h1', { text: 'Photournament' }),
         el('p', { class: 'muted', text:
           'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
@@ -5823,7 +5939,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       var actions = el('div', { class: 'row', id: 'ingest-actions' });
 
       root.appendChild(el('div', { class: 'card screen-narrow' }, [
-        el('div', { class: 'row' }, [mark(true), el('h1', { text: 'Reading photos' })]),
+        el('div', { class: 'row' }, [activityMark(), el('h1', { text: 'Reading photos' })]),
         status, count, bar, detail, summary, actions
       ]));
 
@@ -6048,6 +6164,10 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   31, zero odd distances.
  * v1.4 (2026-07-28): Added PT.scanForNew for PRD 7.10, comparing by fingerprint
  *   rather than by path so a renamed file reads as new.
+ * v1.5 (2026-07-28): The entry screen now shows the real recursive identity mark,
+ *   referenced from the sprite defined once in the shell. The nine animated CSS
+ *   cells stay as the ingest activity indicator — animating the identity artwork
+ *   would turn a logo into a spinner.
 */
 
 </script>

@@ -1,6 +1,6 @@
 /**
  * file: smoke_dist.mjs
- * version: 1.1
+ * version: 1.2
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -68,7 +68,15 @@ const r = await page.evaluate(async () => {
       var l = document.querySelector('link[rel="icon"]');
       return !!l && /^data:image\/svg\+xml/.test(l.getAttribute('href'));
     })(),
-    themeColor: (document.querySelector('meta[name="theme-color"]') || {}).content || null
+    themeColor: (document.querySelector('meta[name="theme-color"]') || {}).content || null,
+    // The mark is a <use> of a sprite symbol; an unresolved reference lays out
+    // as a zero-sized box, so measuring it proves the reference actually bound.
+    brandMark: (function () {
+      var m = document.querySelector('.pt-brandmark');
+      if (!m) return false;
+      var b = m.getBoundingClientRect();
+      return b.width > 8 && b.height > 8 && !!document.getElementById('ptm-mark');
+    })()
   };
 
   // The real end-to-end capability: spin a worker from the inlined source and
@@ -107,7 +115,10 @@ check('design tokens resolved', r.bgToken.length > 0, r.bgToken || '(none)');
 check('page background is painted', r.bodyBg && r.bodyBg !== 'rgba(0, 0, 0, 0)', r.bodyBg);
 check('no build tokens left in output', r.tokensLeft === 0, r.tokensLeft);
 check('favicon is embedded as a data URI', r.iconIsDataUri === true, r.iconIsDataUri);
-check('theme colour is set', r.themeColor === '#171717', r.themeColor);
+// Must match the stylesheet's --bg, not the identity package's own background —
+// otherwise the browser chrome is a different colour from the page under it.
+check('theme colour matches the page background', r.themeColor === '#0d0d0d', r.themeColor);
+check('the recursive brand mark renders', r.brandMark === true, r.brandMark);
 check('libheif payload embedded', r.heicPayloadBytes > 1000000, (r.heicPayloadBytes / 1048576).toFixed(2) + ' MB');
 check('libheif NOT executed at boot', r.heicNotExecuted === true, r.heicNotExecuted);
 check('worker spawns from inlined source', r.workerFromInlineSrc === 'alive', r.workerFromInlineSrc);
@@ -130,4 +141,7 @@ process.exit(failed === 0 ? 0 : 1);
   * v1.1 (2026-07-28): Colour-space agnostic background check, and guards for the
  *   embedded favicon and theme colour. data: URIs are excluded from the
  *   self-containment count because they are inline, not loaded.
+ * v1.2 (2026-07-28): Theme colour asserted against the stylesheet's own --bg
+ *   rather than a literal from the identity package, and the brand mark measured
+ *   so an unresolved sprite reference cannot pass as rendered.
 */

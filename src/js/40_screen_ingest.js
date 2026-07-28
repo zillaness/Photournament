@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -33,11 +33,31 @@
 
   var PREVIEW_PX = 1280;
 
-  /** Nine cells with one marked. Purely decorative; drawn entirely in CSS. */
-  function mark(live) {
+  /**
+   * Two different objects that happen to look alike, deliberately kept apart:
+   *
+   * - The BRAND MARK is the real recursive identity, referenced from the sprite
+   *   defined once in the shell. Identity, so it is the identity artwork.
+   * - The ACTIVITY INDICATOR is nine CSS cells that walk on a keyframe loop while
+   *   ingest runs. It has a job the static mark cannot do, and animating the
+   *   recursive artwork would turn a logo into a spinner.
+   */
+  function brandMark() {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'pt-brandmark');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Photournament');
+    var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#ptm-mark');
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function activityMark() {
     var cells = [];
     for (var i = 0; i < 9; i++) cells.push(el('i'));
-    return el('div', { class: 'pt-mark' + (live ? ' pt-mark-live' : '') }, cells);
+    return el('div', { class: 'pt-mark pt-mark-live' }, cells);
   }
 
   /* ------------------------------------------------------------- entry ---- */
@@ -47,7 +67,7 @@
       PT.dom.$('#topbar').hidden = true;
 
       root.appendChild(el('div', { class: 'card' }, [
-        mark(false),
+        brandMark(),
         el('h1', { text: 'Photournament' }),
         el('p', { class: 'muted', text:
           'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
@@ -425,7 +445,7 @@
       var actions = el('div', { class: 'row', id: 'ingest-actions' });
 
       root.appendChild(el('div', { class: 'card screen-narrow' }, [
-        el('div', { class: 'row' }, [mark(true), el('h1', { text: 'Reading photos' })]),
+        el('div', { class: 'row' }, [activityMark(), el('h1', { text: 'Reading photos' })]),
         status, count, bar, detail, summary, actions
       ]));
 
@@ -650,4 +670,8 @@
  *   31, zero odd distances.
  * v1.4 (2026-07-28): Added PT.scanForNew for PRD 7.10, comparing by fingerprint
  *   rather than by path so a renamed file reads as new.
+ * v1.5 (2026-07-28): The entry screen now shows the real recursive identity mark,
+ *   referenced from the sprite defined once in the shell. The nine animated CSS
+ *   cells stay as the ingest activity indicator — animating the identity artwork
+ *   would turn a logo into a spinner.
 */

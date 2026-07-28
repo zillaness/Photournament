@@ -18,7 +18,12 @@
 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#171717">
+<!--
+  The design system's --bg, which resolves to #0d0d0d. The identity package
+  shipped #171717, but that is this stylesheet's --surface, not its page
+  background — the browser chrome would not have matched the page.
+-->
+<meta name="theme-color" content="#0d0d0d">
 <title>Photournament</title>
 <!--
   The favicon is embedded because the distributable must remain one file and
@@ -30,6 +35,75 @@
 <!--BUILD:CSS-->
 <link rel="stylesheet" href="css/00_base.css">
 <!--/BUILD:CSS-->
+
+
+<!--
+  The recursive brand mark, defined once. It uses <symbol>/<use> recursion, so
+  inlining the whole file at each call site would collide on ids; screens
+  reference #ptm-mark instead. Inline rather than an <img src>, because a
+  sibling asset cannot load from a file:// origin.
+-->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <defs>
+      <symbol id="ptm-r0" viewBox="0 0 100 100">
+        <g fill="#474747">
+          <rect x="0" y="0" width="30" height="30" rx="3"/><rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+      <symbol id="ptm-r1" viewBox="0 0 100 100">
+        <use href="#ptm-r0" x="0" y="0" width="30" height="30"/>
+        <g fill="#474747">
+          <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+      <symbol id="ptm-r2" viewBox="0 0 100 100">
+        <use href="#ptm-r1" x="0" y="0" width="30" height="30"/>
+        <g fill="#474747">
+          <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+      <symbol id="ptm-r3" viewBox="0 0 100 100">
+        <use href="#ptm-r2" x="0" y="0" width="30" height="30"/>
+        <g fill="#474747">
+          <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+      <symbol id="ptm-r4" viewBox="0 0 100 100">
+        <use href="#ptm-r3" x="0" y="0" width="30" height="30"/>
+        <g fill="#474747">
+          <rect x="35" y="0" width="30" height="30" rx="3"/><rect x="70" y="0" width="30" height="30" rx="3"/>
+          <rect x="0" y="35" width="30" height="30" rx="3"/><rect x="70" y="35" width="30" height="30" rx="3"/>
+          <rect x="0" y="70" width="30" height="30" rx="3"/><rect x="35" y="70" width="30" height="30" rx="3"/><rect x="70" y="70" width="30" height="30" rx="3"/>
+        </g>
+        <rect x="35" y="35" width="30" height="30" rx="3" fill="#F3F3F3"/>
+      </symbol>
+    </defs>
+  <symbol id="ptm-mark" viewBox="0 0 100 100">
+    <use href="#ptm-r4" x="0" y="0" width="32" height="32"/>
+      <g fill="#474747">
+        <rect x="34" y="0" width="32" height="32" rx="3"/>
+        <rect x="68" y="0" width="32" height="32" rx="3"/>
+        <rect x="0" y="34" width="32" height="32" rx="3"/>
+        <rect x="68" y="34" width="32" height="32" rx="3"/>
+        <rect x="0" y="68" width="32" height="32" rx="3"/>
+        <rect x="34" y="68" width="32" height="32" rx="3"/>
+        <rect x="68" y="68" width="32" height="32" rx="3"/>
+      </g>
+      <rect x="34" y="34" width="32" height="32" rx="3" fill="#F3F3F3"/>
+  </symbol>
+</svg>
 
 <div id="app">
   <header id="topbar" hidden>

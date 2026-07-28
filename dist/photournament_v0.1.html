@@ -6354,6 +6354,12 @@ v1.0 - 2026-07-28 - Samuel Cao
         text: 'The rest are ranked by how far they got and how many comparisons they won.'
       }));
     }
+    if (E.derived) {
+      S.head.appendChild(el('span', {
+        class: 'small dim',
+        text: E.derived + ' further pairing' + (E.derived === 1 ? '' : 's') + ' answered by a choice you had already made.'
+      }));
+    }
 
     var box = el('div', { class: 'bk-results', id: 'bk-results' });
     list.forEach(function (id, i) {

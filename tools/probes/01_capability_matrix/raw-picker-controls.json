@@ -1,0 +1,113 @@
+{
+  "generatedAt": "2026-07-28T03:18:12.844Z",
+  "display": ":99",
+  "runs": [
+    {
+      "label": "HEADED_file",
+      "url": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+      "args": [],
+      "headless": false,
+      "display": ":99",
+      "at1500ms": {
+        "showDirectoryPicker": {
+          "phase": "pending",
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      },
+      "at5500ms": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "Error: TIMEOUT after 4000ms: showDirectoryPicker",
+          "errorName": "Error",
+          "ms": 4000,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    },
+    {
+      "label": "HEADED_http_localhost",
+      "url": "http://localhost:8102/probe.html",
+      "args": [],
+      "headless": false,
+      "display": ":99",
+      "at1500ms": {
+        "showDirectoryPicker": {
+          "phase": "pending",
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      },
+      "at5500ms": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "Error: TIMEOUT after 4000ms: showDirectoryPicker",
+          "errorName": "Error",
+          "ms": 4001,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    },
+    {
+      "label": "HEADLESS_file_for_comparison",
+      "url": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+      "args": [],
+      "headless": true,
+      "display": ":99",
+      "at1500ms": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 11,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      },
+      "at5500ms": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 11,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    }
+  ],
+  "blockedOriginControl": {
+    "parentAttempt": "TIMEOUT — cross-origin iframe cannot be scripted from parent (expected)",
+    "crossOriginIframeContext": {
+      "origin": "http://127.0.0.1:8102",
+      "secure": true,
+      "hasPicker": true
+    },
+    "crossOriginIframePicker": {
+      "showDirectoryPicker": {
+        "phase": "rejected",
+        "error": "SecurityError: Failed to execute 'showDirectoryPicker' on 'Window': Cross origin sub frames aren't allowed to show a file picker.",
+        "errorName": "SecurityError",
+        "ms": 1,
+        "userActivation": {
+          "isActive": true,
+          "hasBeenActive": true
+        }
+      }
+    }
+  }
+}

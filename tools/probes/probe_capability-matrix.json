@@ -1,0 +1,247 @@
+{
+  "probe": "capability-matrix",
+  "headline": "A plain double-clicked file:// HTML page gets everything Photournament needs — IndexedDB (Blobs, Files, ImageBitmaps) fully works and survives a browser restart, and showDirectoryPicker actually opens the native dialog on a file:// origin — but nothing may be loaded by URL: fetch, module scripts, and relative-URL Workers are all CORS-blocked, so the app must be one self-contained HTML file whose workers are spawned from blob URLs and pull libheif in via importScripts().",
+  "findings": [
+    {
+      "capability": "window.isSecureContext / window.origin",
+      "file_url": "works — isSecureContext=true, but window.origin is the opaque string \"null\" (location.origin=\"file://\")",
+      "http_url": "works — isSecureContext=true, origin=\"http://localhost:8099\"",
+      "detail": "file:// IS a secure context, so crypto.subtle, FSA, and OPFS are not gated out on that basis. The opaque \"null\" origin is what drives every failure below. --allow-file-access-from-files flips window.origin to \"file://\"."
+    },
+    {
+      "capability": "IndexedDB: open, write record, write Blob, read both back, delete (THE key question)",
+      "file_url": "works — every step passed, no degradation vs http",
+      "http_url": "works",
+      "detail": "Record with Date+Map round-tripped; Blob (53B) round-tripped with instanceof and .text() intact; delete confirmed (get returns undefined); indexedDB.databases() lists the DB. Chrome's file:// origin gets a real, full-featured IndexedDB. PRD 7.10 persistence is safe to build on."
+    },
+    {
+      "capability": "IndexedDB persistence across a FULL BROWSER RESTART (persistent profile)",
+      "file_url": "works — 40MB Blob written, browser killed, relaunched: read back as exactly 41,943,040 bytes; marker record intact",
+      "http_url": "works — identical",
+      "detail": "On-disk proof: <profile>/Default/IndexedDB/file__0.indexeddb.leveldb + file__0.indexeddb.blob (41,950,393 B) vs http_localhost_8101.indexeddb.*. Write throughput 228ms (file) vs 206ms (http) for 40MB. CAVEAT: the bucket is file__0 — ONE origin shared by every file:// page in the profile. No per-file isolation, shared quota. Namespace the DB name."
+    },
+    {
+      "capability": "structuredClone round-trip through IndexedDB of Blob, File, ImageBitmap, ArrayBuffer",
+      "file_url": "works — all four",
+      "http_url": "works — all four",
+      "detail": "File preserved name=IMG_1234.HEIC and lastModified=1234567890 (directly supports the PRD 7.9 fingerprint). ImageBitmap came back 8x6 as an ImageBitmap. Direct structuredClone() of the same four also passed; structuredClone(function(){}) threw DataCloneError as the control."
+    },
+    {
+      "capability": "navigator.storage.estimate()",
+      "file_url": "works — quota 0.96GB on one mount, 162GB on another; usageDetails.indexedDB populated",
+      "http_url": "works — same ranges",
+      "detail": "Quota tracks free disk, not origin type; file:// is not penalised. usageDetails.indexedDB makes the PRD §8 'show cache size' mitigation buildable."
+    },
+    {
+      "capability": "navigator.storage.persist()",
+      "file_url": "works (call succeeds) but RETURNS false; persisted() false before and after",
+      "http_url": "works (call succeeds) but RETURNS false — identical",
+      "detail": "NOT a file:// limitation. A fresh headless profile has no site engagement so the grant is denied on localhost too. Treat the cache as evictable: every cached derivative must be re-derivable, and resume must survive an evicted cache."
+    },
+    {
+      "capability": "OPFS — navigator.storage.getDirectory()",
+      "file_url": "blocked: SecurityError: It was determined that certain files are unsafe for access within a Web application, or that too many calls are being made on file resources.",
+      "http_url": "works — getFileHandle/createWritable/read round-trip OK",
+      "detail": "The ONLY storage API file:// actually loses. --allow-file-access-from-files fixes it. Do not design OPFS as the file:// fallback — IndexedDB is the one that works."
+    },
+    {
+      "capability": "File System Access API surface presence",
+      "file_url": "works — showDirectoryPicker, showOpenFilePicker, showSaveFilePicker all in window; FileSystemHandle/DirectoryHandle/FileHandle/WritableFileStream all 'function'; queryPermission/requestPermission/isSameEntry/entries/values/getFileHandle/getDirectoryHandle/removeEntry/createWritable all present",
+      "http_url": "works — byte-identical surface",
+      "detail": "window.showDirectoryPicker.length === 0 on BOTH origins (native fn, one optional options bag) — arity is not a discriminator. input.webkitdirectory also true on both."
+    },
+    {
+      "capability": "showDirectoryPicker() called inside a REAL trusted user gesture — HEADLESS",
+      "file_url": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+      "http_url": "identical AbortError",
+      "detail": "navigator.userActivation was {isActive:true, hasBeenActive:true} at call time in both. Same error on both origins means file:// is NOT being singled out. Headless has no dialog to show."
+    },
+    {
+      "capability": "showDirectoryPicker() in a trusted gesture — HEADED under Xvfb (the decisive test)",
+      "file_url": "works — promise STAYS PENDING at 1.5s; the native folder dialog actually opened",
+      "http_url": "works — pending, identical behaviour",
+      "detail": "THIS DECIDES THE DELIVERY MODEL. On a real headed browser the file:// call does not reject at all. PRD §8 (local HTML file, folder handle, disk write, resume) stands as written, with no flags."
+    },
+    {
+      "capability": "Disambiguation control: what a genuinely BLOCKED origin returns",
+      "file_url": "n/a — control run on http",
+      "http_url": "SecurityError: Failed to execute 'showDirectoryPicker' on 'Window': Cross origin sub frames aren't allowed to show a file picker.",
+      "detail": "Reproduced deliberately via a cross-origin iframe with no permissions-policy grant. Proves the three failure modes are distinguishable: TypeError = API absent; SecurityError = blocked on this origin; AbortError = present-and-permitted, user cancelled / no dialog. file:// gives AbortError, i.e. NOT blocked. Limitation: headless returns AbortError even with NO gesture, so headless alone cannot separate 'no gesture' from 'no dialog' — hence the headed run."
+    },
+    {
+      "capability": "new Worker('./w.js') — relative URL, classic",
+      "file_url": "blocked: SecurityError: Failed to construct 'Worker': Script at 'file:///.../w.js' cannot be accessed from origin 'null'.",
+      "http_url": "works — postMessage round-trip",
+      "detail": "Same SecurityError for './wm.js' with {type:'module'}. Fixed by --allow-file-access-from-files (unusable in practice)."
+    },
+    {
+      "capability": "new Worker(blobURL) — classic",
+      "file_url": "works — postMessage round-trip; worker location blob:null/<uuid>",
+      "http_url": "works",
+      "detail": "THE ESCAPE HATCH. Every Photournament worker must be constructed this way."
+    },
+    {
+      "capability": "new Worker(blobURL, {type:'module'})",
+      "file_url": "blocked: onerror fires with an EMPTY message (opaque) — module resolution against an opaque origin fails",
+      "http_url": "works",
+      "detail": "Fixed by the flag. Module workers from blob URLs are out on file://."
+    },
+    {
+      "capability": "new Worker(dataURL) — classic AND {type:'module'}",
+      "file_url": "works — both round-trip",
+      "http_url": "works — both",
+      "detail": "data-URL module worker is the ONLY module worker that works unflagged on file://."
+    },
+    {
+      "capability": "createImageBitmap(Blob) + OffscreenCanvas 2d + getImageData + convertToBlob INSIDE a blob-URL worker",
+      "file_url": "works — full chain: 8x6 bitmap, 2d ctx, pixel 48,96,192,255, image/jpeg 785B; plus WASM add()=42, crypto.subtle digest 32B, indexedDB present, isSecureContext true",
+      "http_url": "works — identical",
+      "detail": "The entire PRD §7.9 ingest pipeline runs off the main thread on file://. Same chain in a RELATIVE-url worker fails (worker cannot be constructed)."
+    },
+    {
+      "capability": "Canvas taint after drawing a Blob-decoded image (perceptual hashing viability)",
+      "file_url": "works — getImageData returned real pixels 48,96,192,255 and toDataURL produced a 1055-char JPEG data URL",
+      "http_url": "works",
+      "detail": "Canvas is NOT tainted by Blob-sourced images on file://, so PRD §7.7 perceptual hashing is viable."
+    },
+    {
+      "capability": "fetch('./local.txt') — relative URL",
+      "file_url": "blocked: TypeError: Failed to fetch. Console: \"Access to fetch ... from origin 'null' has been blocked by CORS policy: Cross origin requests are only supported for protocol schemes: chrome, chrome-extension, chrome-untrusted, data, http, https, isolated-app.\"",
+      "http_url": "works — 200, body matched",
+      "detail": "Flag behaviour is BUILD-DEPENDENT: full Chromium + --allow-file-access-from-files succeeds, headless_shell + same flag still fails with 'URL scheme \"file\" is not supported'. Do not rely on it."
+    },
+    {
+      "capability": "XMLHttpRequest on a relative path",
+      "file_url": "blocked: onerror, status=0. Console: CORS policy block from origin 'null'",
+      "http_url": "works — 200, 33 bytes",
+      "detail": "--allow-file-access-from-files fixes XHR in BOTH builds — XHR is more permissive than fetch here. Still unusable in practice (flag)."
+    },
+    {
+      "capability": "fetch of a data: URL, and fetch of a blob: URL",
+      "file_url": "works — both 200 with correct bodies",
+      "http_url": "works — both",
+      "detail": "Only same-directory file:// URLs are blocked; data: and blob: are unaffected."
+    },
+    {
+      "capability": "<script type=\"module\" src=\"./m.js\"> external module loading",
+      "file_url": "blocked silently: \"Access to script at 'file:///.../m.js' from origin 'null' has been blocked by CORS policy\" — module never executed",
+      "http_url": "works — executed",
+      "detail": "Dynamic import('./m.js') also fails: TypeError: Failed to fetch dynamically imported module. Both fixed by the flag."
+    },
+    {
+      "capability": "INLINE <script type=\"module\"> (no src)",
+      "file_url": "works — executed",
+      "http_url": "works",
+      "detail": "Module SYNTAX is fine on file://; only module FETCHING is blocked. Bundling to one file sidesteps this entirely."
+    },
+    {
+      "capability": "classic <script src=\"./x.js\"> external script loading",
+      "file_url": "works — loaded the real 2.1MB libheif.js, onload fired",
+      "http_url": "works",
+      "detail": "NOT subject to the CORS rule that kills fetch/module/worker. This is the only URL-based code loading that survives file://, so an 'asset folder' (PRD §8) is viable ONLY for classic scripts."
+    },
+    {
+      "capability": "WebAssembly.instantiate / .compile of inline bytes",
+      "file_url": "works — add(20,22)=42, compile returns a WebAssembly.Module",
+      "http_url": "works",
+      "detail": "Works on the main thread AND inside a blob worker on file://."
+    },
+    {
+      "capability": "WebAssembly.instantiateStreaming(fetch('./tiny.wasm'))",
+      "file_url": "blocked: TypeError: Failed to fetch (consequence of the fetch block, not of WASM)",
+      "http_url": "works — add=3",
+      "detail": "Any WASM shipped as a separate .wasm file is dead on file://. WASM must be inlined."
+    },
+    {
+      "capability": "libheif-js build loadability (PRD §8 HEIC decode)",
+      "file_url": "asm.js build (libheif/libheif.js, 2.1MB): works, HeifDecoder constructed, init 53ms. wasm-bundle (base64-inlined, 1.46MB): works, HeifDecoder constructed, init 21ms. split build (libheif.js + separate libheif.wasm): FAILS — 'sync fetching of the wasm failed'; the .wasm fetch is CORS-blocked from origin 'null'",
+      "http_url": "asm.js works; bundle works; split build still needs {wasmBinary} preloaded but the .wasm itself fetches fine (200, 1,034,305 B)",
+      "detail": "USE libheif-wasm/libheif-bundle.js: smaller than asm.js, 2.5x faster init, and the only wasm option that needs no fetch. Decode codepath verified live by feeding deliberate garbage (returns 0 images cleanly)."
+    },
+    {
+      "capability": "Getting libheif INTO a worker on file:// — importScripts()",
+      "file_url": "works — new Worker(blobURL) then importScripts('file:///.../libheif.js') SUCCEEDS: libheif is a function, HeifDecoder constructed inside the worker in 53ms, decode codepath live. By contrast new Worker('./importer.js') fails (SecurityError), and eval-ing library source fetched by the page fails (page cannot fetch on file://)",
+      "http_url": "all three approaches work",
+      "detail": "Critical asymmetry: importScripts() from a blob worker CAN reach file:// URLs even though fetch() cannot. This single fact is what makes a worker-threaded, file://-hosted HEIC pipeline possible."
+    },
+    {
+      "capability": "crypto.subtle.digest('SHA-256') for file fingerprinting",
+      "file_url": "works — sha256('photournament')=86f43de22a3f5a0ad4789af07a0f9d9d1a3675fdc9b138afcda5c239ffcee5b2; digest of a Blob's arrayBuffer() returned 32 B; crypto.randomUUID() works",
+      "http_url": "works — byte-identical digest",
+      "detail": "Also confirmed available inside a blob-URL worker. PRD §7.9 fingerprinting is unblocked."
+    },
+    {
+      "capability": "DataTransferItem.getAsFileSystemHandle presence + drag-drop surface",
+      "file_url": "works (present) — typeof 'function', arity 0; webkitGetAsEntry and getAsFile also present; input.webkitdirectory true",
+      "http_url": "works (present) — identical surface",
+      "detail": "Calling it on a SYNTHETIC DataTransfer returns null on BOTH origins — expected, no real OS drag exists. A genuine folder drag (the PRD's primary entry point) could NOT be tested; see unverified."
+    },
+    {
+      "capability": "a[download] with a blob: URL (PRD 7.8 download bundle)",
+      "file_url": "works — download fired, 31 bytes saved, suggested filename honoured",
+      "http_url": "works — identical",
+      "detail": "Verified by capturing the actual Playwright download event, not just checking 'download' in anchor."
+    },
+    {
+      "capability": "localStorage / sessionStorage / document.cookie / caches",
+      "file_url": "localStorage works, sessionStorage works, document.cookie SILENTLY IGNORED (false), caches present",
+      "http_url": "all four work",
+      "detail": "Cookies are never fixed by any flag on file://. Irrelevant to this app, but do not use cookies for any state."
+    },
+    {
+      "capability": "Effect of --allow-file-access-from-files (and --disable-web-security)",
+      "file_url": "Changes: window.origin null->file://; relative-URL classic AND module Workers start working; blob module workers start working; <script type=module src> and import() start working; XHR on relative paths starts working (both builds); fetch on relative paths works in FULL Chromium only; OPFS starts working. Unchanged: IndexedDB (already fine, same file__0 bucket), FSA pickers (already fine), document.cookie (still broken).",
+      "http_url": "n/a — flag is irrelevant to http origins",
+      "detail": "--allow-running-insecure-content and --disable-web-security tested alongside changed nothing further. END USERS WILL NOT HAVE FLAGS SET: it requires quitting the browser, editing a shortcut, and accepting a browser-wide downgrade letting any local page read any readable file. Every flag-dependent capability above must be treated as FAIL in practice."
+    }
+  ],
+  "artifacts": [
+    "tools/probes/01_capability_matrix/probe.html",
+    "tools/probes/01_capability_matrix/persist.html",
+    "tools/probes/01_capability_matrix/heic.html",
+    "tools/probes/01_capability_matrix/extra.html",
+    "tools/probes/01_capability_matrix/w.js",
+    "tools/probes/01_capability_matrix/wm.js",
+    "tools/probes/01_capability_matrix/heavy.js",
+    "tools/probes/01_capability_matrix/importer.js",
+    "tools/probes/01_capability_matrix/m.js",
+    "tools/probes/01_capability_matrix/local.txt",
+    "tools/probes/01_capability_matrix/tiny.wasm",
+    "tools/probes/01_capability_matrix/server.mjs",
+    "tools/probes/01_capability_matrix/run.mjs",
+    "tools/probes/01_capability_matrix/run-persistence.mjs",
+    "tools/probes/01_capability_matrix/run-picker-controls.mjs",
+    "tools/probes/01_capability_matrix/run-libheif.mjs",
+    "tools/probes/01_capability_matrix/run-extra.mjs",
+    "tools/probes/01_capability_matrix/run-picker-screenshot.mjs",
+    "tools/probes/01_capability_matrix/raw-results.json",
+    "tools/probes/01_capability_matrix/raw-persistence.json",
+    "tools/probes/01_capability_matrix/raw-picker-controls.json",
+    "tools/probes/01_capability_matrix/raw-libheif.json",
+    "tools/probes/01_capability_matrix/raw-extra.json"
+  ],
+  "architectural_implications": [
+    "Ship as ONE self-contained HTML file. No <script type=\"module\" src>, no relative-URL Worker, no fetch of any sibling asset — all three are CORS-blocked from origin 'null'. Classic <script src=\"./x.js\"> is the only URL-based loading that survives, so the PRD §8 'asset folder if needed' is viable ONLY for classic scripts.",
+    "Every Web Worker must be constructed from a blob URL (or a data URL). Build worker source as a string in the main bundle, URL.createObjectURL(new Blob([src])), then spawn. Module workers are out unless created from a data URL.",
+    "Load libheif inside the worker via importScripts() of an ABSOLUTE file:// URL resolved from location.href, using the base64-inlined libheif-wasm/libheif-bundle.js. Do not fetch it from the page (blocked) and do not module-import it (blocked). The split build with a separate .wasm is unusable on file://.",
+    "IndexedDB is safe to carry the entire PRD 7.10 persistence story — decisions, tree allocation, labels, thumbnail/preview/sidecar Blob caches. It survives full browser restarts on file:// and stored a 40MB Blob without complaint at ~175 MB/s.",
+    "Namespace the IndexedDB database explicitly (e.g. 'photournament/v1'). Every file:// page in the profile shares ONE origin bucket named file__0 — there is no per-file isolation, the quota is shared with every other local HTML tool, and indexedDB.databases() will list unrelated tools' databases.",
+    "Treat the cache as evictable. storage.persist() returned false even on http://localhost in a fresh profile, so every cached derivative (thumbnail, 1600px preview, HEIC sidecar, phash) must be re-derivable from originals, and resume must restore decisions even when the cache is gone.",
+    "Handle showDirectoryPicker's AbortError as an ordinary no-op, not an error state — user cancellation is the common path. Only SecurityError means 'this origin cannot do this'. Require a real user gesture on the call.",
+    "Do not use OPFS as the file:// storage fallback. It is the single storage API file:// actually loses (SecurityError), while IndexedDB is unaffected.",
+    "Perceptual hashing (§7.7) is viable on file://: canvas is not tainted by Blob-sourced images, getImageData returns real pixels, and the whole decode-to-pixels path runs inside a blob worker.",
+    "Report cache size from navigator.storage.estimate().usageDetails.indexedDB rather than assumptions — quota tracks free disk (0.93GB to 162GB observed across mounts) and file:// is not penalised.",
+    "Do not require, document, or silently depend on --allow-file-access-from-files. Users will not set it, and it is a browser-wide security downgrade. Design so the unflagged file:// column is the only one that matters."
+  ],
+  "unverified": [
+    "A REAL OS drag-and-drop of a folder — the PRD §8 primary entry point. DataTransferItem.getAsFileSystemHandle is present with arity 0 on both origins, but Playwright cannot synthesise a native OS drag; a synthetic DataTransfer returns null from it on file:// AND on localhost, so that null says nothing about the real path. Needs a manual human test.",
+    "A PICKER-DERIVED FileSystemDirectoryHandle persisted across a browser restart. The restart test used an OPFS root handle as a stand-in (it survived with queryPermission -> 'granted' and readable entries()). A real picker handle is expected to return 'prompt' and need requestPermission() inside a gesture on resume; that re-grant flow was not exercised because no picker handle is obtainable headlessly.",
+    "Actual HEIC decoding. Only that HeifDecoder constructs and its decode codepath runs cleanly (fed deliberate garbage, returned 0 images). No real .heic file was available, so decode correctness, per-image speed, and memory behaviour at the PRD's ~500-photo volume are untested. That is Probe/Phase 1's job.",
+    "Writing to disk via FileSystemWritableFileStream. createWritable is present on FileSystemFileHandle, and OPFS writes worked, but no write through a picker-derived handle into the user's source tree (sidecars, _finalists_* folders, collision handling) was performed.",
+    "Screenshot of the open native folder dialog. The bundled ffmpeg (/opt/pw-browsers/ffmpeg-1011) is compiled WITHOUT x11grab, so run-picker-screenshot.mjs produces no PNG. The pending-promise state is the evidence instead, which is stronger anyway (API state, not pixels).",
+    "Real Chrome / Edge / Brave release channels, and non-Linux platforms. All runs used Playwright's bundled Chromium 141.0.7390.37 on Linux x86_64 (both headless_shell and the full chromium channel). macOS and Windows file:// behaviour was not tested, and one flag result already proved build-dependent (fetch under --allow-file-access-from-files works in full Chromium but not headless_shell), so cross-build assumptions are demonstrably risky.",
+    "storage.persist() under genuine user engagement. It returned false everywhere here, but a fresh headless profile has no engagement score. Whether a file:// origin can ever be granted persistence in real use is unknown.",
+    "Quota behaviour at the real ceiling. 40MB was written; the full 500-photo cache the PRD implies (thumbnails + 1600px previews + HEIC sidecars) was not, so eviction behaviour under storage pressure — and how it interacts with the shared file__0 bucket — is untested.",
+    "IndexedDB behaviour when two file:// tools collide in the shared file__0 bucket (name clashes, version conflicts, quota starvation) was observed structurally but not stress-tested."
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "probe": "heic-decode",
+  "headline": "HEIC decode works fully offline from file:// in a blob-URL worker — a genuine 11.94 MP HEVC HEIC decodes in ~950 ms with zero network requests — but the decode pattern in the libheif-js README leaks 6.35 MB of wasm heap per image (~3.2 GB projected at the PRD's 500 photos), and the two-line fix is undocumented.",
+  "findings": [
+    {
+      "capability": "libheif-wasm/libheif-bundle.js loads as a CLASSIC <script> and initialises with zero network requests",
+      "file_url": "works — cold init 45.0 ms median over 5 fresh browser processes (script parse 22.7 ms + libheif() factory 22.3 ms); exactly 2 requests total (the HTML + the bundle .js), 0 for *.wasm, 0 remote, 0 fetch/XHR/WebSocket/EventSource tripwire hits",
+      "http_url": "works — identical: 2 requests, 0 wasm, 0 remote, 0 tripwire hits; cold init 53.4 ms",
+      "detail": "The global exposed by the script tag is an Emscripten MODULARIZE FACTORY, not the module — you must call libheif() before new .HeifDecoder(). The README's `new libheif.HeifDecoder()` fails in the browser with 'not a constructor'. Static corroboration that no wasm fetch is possible: the bundle embeds a 1,379,076-char base64 literal decoding to 1,034,307 bytes vs the standalone libheif.wasm on disk at 1,034,305 bytes, and contains no instantiateStreaming call."
+    },
+    {
+      "capability": "Decode a genuine 12 MP HEVC-coded HEIC to RGBA and write it out as a PNG",
+      "file_url": "works — 3992x2992 (11.94 MP), 994 ms median steady-state, 1180 ms first-decode (JIT warm-up); 47,776,256-byte RGBA; PNG written (22.6 MB) and visually verified as a correct aerial coastline photo",
+      "http_url": "works — byte-identical pixels (sampled channel sum 1282876 matches file:// exactly), 1378 ms",
+      "detail": "Fixture is a real HEVC-in-HEIF: ftyp heic/mif1 with a `grid` derived image over 48 hvc1 tiles and 50 infe entries — the tiled layout an iPhone writes. NOT an AVIF stand-in; no AVIF fallback was needed and none was used. No npm packages were installed (sharp was never required). Decode cost is linear in megapixels across a 13x size range: 83.2 ms/MP."
+    },
+    {
+      "capability": "Pure asm.js build (libheif/libheif.js) as the alternative",
+      "file_url": "works — cold init 115.2 ms; 12 MP decode 1,997 ms median (167.2 ms/MP); zero network; identical pixels",
+      "http_url": "works — cold init 118.2 ms; 12 MP decode 2,499 ms",
+      "detail": "Uniformly 2.01x slower than the wasm bundle at every image size tested (1.94x-2.52x), from a file that is 42% LARGER (2.08 MB vs 1.46 MB). It has no advantage on this target. Recommendation: ship the wasm bundle."
+    },
+    {
+      "capability": "Blob-URL Web Worker + importScripts(ABSOLUTE url of the bundle) — PRD 7.9 worker-threaded decode",
+      "file_url": "works — this is the key result. Worker init 93.5 ms, 12 MP decode 1,594 ms (first, incl. warm-up). importScripts of an absolute file:// URL from inside a blob worker succeeds even though the page origin is 'null'",
+      "http_url": "works — init 55 ms, decode 1,524 ms",
+      "detail": "Build the URL with new URL(rel, location.href).href. Playwright routing does NOT surface blob-worker subresource loads, so the no-network claim for the worker rests on the in-worker fetch tripwire (0 hits), the base64-embedding evidence, and the inlined-source variant below."
+    },
+    {
+      "capability": "Blob-URL worker + importScripts(RELATIVE path)",
+      "file_url": "blocked: \"Failed to execute 'importScripts' on 'WorkerGlobalScope': The URL '../../../../node_modules/libheif-js/libheif-wasm/libheif-bundle.js' is invalid.\"",
+      "http_url": "blocked: same error",
+      "detail": "A relative path resolves against the blob: URL base and is rejected outright. The absolute URL is mandatory, not a stylistic choice."
+    },
+    {
+      "capability": "Classic (non-blob) Web Worker from a sibling .js file — the obvious way to ship a worker",
+      "file_url": "blocked: \"Failed to construct 'Worker': Script at 'file:///.../worker_classic.js' cannot be accessed from origin 'null'.\" Throws at the constructor.",
+      "http_url": "works — loads and initialises normally",
+      "detail": "This is the trap for PRD section 8's local-HTML delivery. Any design that ships worker.js next to index.html works in dev over localhost and breaks the instant the user double-clicks the HTML file. The blob-URL worker is the only portable option."
+    },
+    {
+      "capability": "Blob-URL worker with the whole bundle SOURCE inlined in the HTML (<script type=\"text/plain\"> -> .textContent -> Blob), no importScripts at all",
+      "file_url": "works — 1 network request in the entire session (the HTML itself). Fastest init measured: factory 23.5 ms, decode 1,318 ms",
+      "http_url": "works",
+      "detail": "The true zero-external-request fallback if a single-file deliverable is ever wanted. Cost: a 1.47 MB HTML file. Proves conclusively that no fetch is involved anywhere in decode."
+    },
+    {
+      "capability": "Transfer the decoded RGBA buffer out of the worker (zero-copy)",
+      "file_url": "works — 47,776,256-byte ArrayBuffer transferred via postMessage(..., [buf]); received with byteLength preserved and instanceof ArrayBuffer true",
+      "http_url": "works — identical",
+      "detail": "The buffer IS transferable. Transfer it; structured-cloning 48 MB per image would be a significant unnecessary cost at 500 photos."
+    },
+    {
+      "capability": "OffscreenCanvas derivative generation inside the worker (PRD 7.9 previews/thumbs, PRD 8 sidecars)",
+      "file_url": "works — full ingest step per image (1 worker, median): decode 1,033 ms + 1600px preview JPEG 41 ms + 320px thumb JPEG 2.8 ms + full-size JPEG sidecar 199 ms = 1,430 ms total",
+      "http_url": "n/a (not re-run; no reason to differ — the page-level canvas path was verified identical under both)",
+      "detail": "convertToBlob works in a blob worker under file://. HEIC decode is 81% of the whole per-image pipeline, so optimisation effort belongs nowhere else. Derivative sizes: sidecar 3,323,667 B (11% LARGER than the 2,994,394 B HEIC it came from — 1.66 GB per 500 photos), 1600px preview 548,364 B, 320px thumb 25,425 B."
+    },
+    {
+      "capability": "Worker-pool parallel scaling on 4 vCPUs",
+      "file_url": "measured — 1w: 1,266 ms/img (0.79 img/s); 2w: 728 ms/img (1.37 img/s); 4w: 446 ms/img (2.24 img/s, 2.84x); 8w: 457 ms/img (2.19 img/s, 2.83x)",
+      "http_url": "n/a (run under file:// only)",
+      "detail": "Scaling stops dead at the core count — 8 workers is measurably no better than 4 and doubles memory. Size the pool at navigator.hardwareConcurrency, capped; do not oversubscribe."
+    },
+    {
+      "capability": "Wasm heap stability across a 500-photo-scale run — THE BLOCKER",
+      "file_url": "BROKEN with the documented pattern, FIXED with the correct one. new HeifDecoder() per image: heap grows 72 MB -> 446 MB over 60 decodes, 6.35 MB/decode, still climbing (74 MB over the last 20) -> ~3,245 MB projected at 500. ONE shared HeifDecoder + image.free() on every returned handle: heap dead flat at 72 MB across 200 sequential 12 MP decodes, zero growth, identical pixel checksums (5,105,342) at decode 1 and 200, median 953 ms",
+      "http_url": "n/a (memory behaviour is transport-independent; measured under file:// only)",
+      "detail": "Root cause read out of the shipped wrapper: HeifDecoder.prototype.decode frees its heif_context only on the NEXT decode() call on the SAME instance, and there is no destructor. A fresh decoder per image strands one full context (file bytes + decoded planes) forever; Emscripten heaps only grow. Four variants tested at 60 decodes: new-decoder-alone, new-decoder+free(), and shared-decoder-alone ALL leak 6.35 MB/decode identically. Only shared-decoder AND free() together is flat. Both halves required; neither alone helps at all. Invisible at the 2-3 image scale anyone tests by hand."
+    },
+    {
+      "capability": "Signalling unsupported / corrupt files (PRD 7.9 'flag unsupported files at load')",
+      "file_url": "partially works — decode() NEVER throws. JPEG input -> [] (len 0); 4 KB of 0x41 -> []; empty buffer -> []. But a truncated HEIC (first 50 KB of a 2.9 MB file) -> returns 1 image reporting a full, valid-looking 3992x2992",
+      "http_url": "n/a (input handling is transport-independent)",
+      "detail": "Treat decode() returning length 0 as 'unsupported'. The truncation case is the trap: metadata parses, a handle is returned, dimensions look right, and the failure only surfaces when image.display() invokes its callback with null. Ingest error detection must hang off the display() callback, not off decode()."
+    }
+  ],
+  "artifacts": [
+    "tools/probes/02_heic/FINDINGS.md",
+    "tools/probes/02_heic/fixtures/photo_12mp.heic",
+    "tools/probes/02_heic/fixtures/example_strukturag.heic",
+    "tools/probes/02_heic/fixtures/nokia_C003.heic",
+    "tools/probes/02_heic/fixtures/PROVENANCE.md",
+    "tools/probes/02_heic/harness.html",
+    "tools/probes/02_heic/gen_harness.js",
+    "tools/probes/02_heic/run_page.js",
+    "tools/probes/02_heic/worker_probe.html",
+    "tools/probes/02_heic/run_worker.js",
+    "tools/probes/02_heic/bench.js",
+    "tools/probes/02_heic/mem_soak.js",
+    "tools/probes/02_heic/mem_fix.js",
+    "tools/probes/02_heic/confirm_fix.js",
+    "tools/probes/02_heic/out/bench.json",
+    "tools/probes/02_heic/out/mem_soak.json",
+    "tools/probes/02_heic/out/mem_fix.json",
+    "tools/probes/02_heic/out/confirm_fix.json",
+    "tools/probes/02_heic/out/derivative_sizes.json",
+    "tools/probes/02_heic/out/report_file_wasm.json",
+    "tools/probes/02_heic/out/report_http_wasm.json",
+    "tools/probes/02_heic/out/report_file_asm.json",
+    "tools/probes/02_heic/out/report_http_asm.json",
+    "tools/probes/02_heic/out/report_worker_file.json",
+    "tools/probes/02_heic/out/report_worker_http.json",
+    "tools/probes/02_heic/out/report_worker_file_inline.json",
+    "tools/probes/02_heic/out/decoded_file_wasm_photo_12mp_heic.png",
+    "tools/probes/02_heic/out/preview_640.png",
+    "tools/probes/02_heic/out/sidecar_file_wasm_photo_12mp_heic.jpg"
+  ],
+  "architectural_implications": [
+    "The ingest worker MUST create exactly ONE HeifDecoder and reuse it for every image, AND call .free() on every handle in the array returned by decode() — not just images[0], since multi-image HEICs (thumbnail pairs, Live Photos) return several. Both are required; either alone leaks 6.35 MB/image and reaches ~3.2 GB at 500 photos, killing the tab. Add this as a row in PRD section 8's constraint table or the mitigation will be lost.",
+    "The app MUST ship libheif-js/libheif-wasm/libheif-bundle.js (1.46 MB, wasm inlined as base64) and MUST NOT ship libheif-wasm/libheif.js (81 KB + separate 1.03 MB .wasm), because the latter fetches its .wasm at runtime — impossible from a file:// page. The asm.js build is 2.01x slower from a larger file and has no advantage on a Chromium-only target.",
+    "Decode workers MUST be blob-URL workers, not classic worker files. new Worker('./worker.js') throws at construction under file:// ('cannot be accessed from origin null'), so the obvious approach works over localhost in dev and breaks the moment a user double-clicks the HTML — exactly PRD section 8's delivery model.",
+    "Inside the worker, importScripts MUST be given an ABSOLUTE URL built with new URL(rel, location.href).href. A relative path resolves against the blob: base and throws 'The URL is invalid' under both file:// and http://.",
+    "The worker pool size MUST be capped at navigator.hardwareConcurrency. Measured scaling stops dead at the core count: 8 workers gave 2.19 img/s vs 4 workers' 2.24 img/s while doubling memory (each worker holds its own ~72 MB wasm arena).",
+    "The decoded RGBA ArrayBuffer MUST be transferred, not cloned, when leaving the worker — 47.8 MB per 12 MP image, verified transferable and received intact.",
+    "Ingest failure detection MUST hang off the image.display() callback receiving null, NOT off decode(). decode() never throws; a truncated HEIC returns a handle reporting full valid dimensions. Only a decode() return of length 0 reliably means 'unsupported format'.",
+    "PRD section 8's HEIC sidecar decision needs a size warning in the UI: a full-size q0.90 JPEG sidecar is 3,323,667 bytes against the 2,994,394-byte HEIC it came from — 11% LARGER, or +1.66 GB for a 500-photo set, roughly doubling the source folder. Consider generating the 1600px preview (548 KB) for display and deferring the full sidecar to export time.",
+    "PRD section 11 phase 1 can proceed. Budget ~4 minutes (241 s) of one-time ingest for 500 x 12 MP HEICs on 4 cores including previews, thumbnails and sidecars, on a modest 2.1 GHz Xeon VM — a modern laptop will be faster. This validates the 'one-time, cached, worker-threaded, resumable' mitigation as written.",
+    "Budget one throwaway warm-up decode per worker: the first decode in a fresh context is ~20% slower (1,180 ms vs 994 ms) from JIT warm-up.",
+    "The libheif global from a <script> tag is a factory function, not the module. Call libheif() first — the README's browser example is wrong and fails with 'HeifDecoder is not a constructor'."
+  ],
+  "unverified": [
+    "Real iPhone provenance of the 12 MP fixture. It is structurally an iPhone-style HEIC (grid derived image over 48 hvc1 tiles at 3992x2992, 2 Exif boxes) but carries no Apple maker-note, so I cannot claim it came off an iPhone. It IS unambiguously genuine HEVC-in-HEIF, not AVIF.",
+    "10-bit / HDR HEIC, Live Photos, depth maps and burst containers. All three fixtures were 8-bit stills.",
+    "EXIF orientation handling (irot/imir boxes). Untested and a plausible source of sideways thumbnails in the grid — worth a follow-up probe since PRD 7.9 generates thumbnails at ingest.",
+    "Headed Chromium on real hardware. Everything was headless Chromium on a 4 vCPU Xeon @ 2.10 GHz cloud VM. Absolute times will differ; the 2.01x wasm/asm ratio and the memory behaviour should not.",
+    "The File System Access API path. Bytes were handed to the page via page.evaluate — equivalent to a File.arrayBuffer() result — but the actual directory-handle -> getFile() -> decode chain was not exercised. That belongs to the ingest probe.",
+    "Sidecar disk writes and IndexedDB persistence/quota behaviour. Out of scope here; only artefact sizes were measured.",
+    "Playwright routing did not surface the blob worker's importScripts of a file:// URL, so the worker's zero-network claim rests on the in-worker fetch/XHR tripwire (0 hits), the base64-embedding evidence, and the inlined-source variant that makes exactly 1 request in the whole session. Page-level file:// requests WERE observed by routing, so routing does see file:// traffic in general.",
+    "Sustained behaviour past 200 sequential decodes in one worker. Flat at 200; not run to the full 500.",
+    "Whether http:// parity holds for the OffscreenCanvas derivative pipeline and parallel worker scaling — both were run under file:// only. The page-level canvas path was verified identical under both transports, so divergence is unlikely.",
+    "Memory behaviour under http:// was not separately measured; it is transport-independent by construction."
+  ]
+}

@@ -1,0 +1,275 @@
+{
+  "generatedAt": "2026-07-28T03:17:00.990Z",
+  "payloadMB": 40,
+  "scenarios": [
+    {
+      "label": "file_default",
+      "url": "file:///home/user/Photournament/tools/probes/01_capability_matrix/persist.html",
+      "args": [],
+      "profile": "/tmp/pt-profile-Jj9NIq",
+      "write": {
+        "origin": "null",
+        "bigWrittenBytes": 41943040,
+        "bigWriteMs": 228,
+        "handleStored": "could not obtain/store handle: SecurityError: It was determined that certain files are unsafe for access within a Web application, or that too many calls are being made on file resources.",
+        "ok": true,
+        "estimate": {
+          "quota": 162331904409,
+          "usage": 41950074,
+          "usageDetails": {
+            "indexedDB": 41950074
+          }
+        }
+      },
+      "writeLogs": [],
+      "readAfterRestart": {
+        "origin": "null",
+        "href": "file:///home/user/Photournament/tools/probes/01_capability_matrix/persist.html",
+        "marker": {
+          "written": 1785208621415,
+          "tag": "PHOTOURNAMENT"
+        },
+        "blobFound": true,
+        "blobSize": 4117,
+        "blobText": "SIDECAR_JPEG_STANDIN_xxx",
+        "bigFound": true,
+        "bigSize": 41943040,
+        "handleFound": false,
+        "estimate": {
+          "quota": 162331904409,
+          "usage": 41950393,
+          "usageDetails": {
+            "indexedDB": 41950393
+          }
+        }
+      },
+      "readAfterReload": {
+        "origin": "null",
+        "href": "file:///home/user/Photournament/tools/probes/01_capability_matrix/persist.html",
+        "marker": {
+          "written": 1785208621415,
+          "tag": "PHOTOURNAMENT"
+        },
+        "blobFound": true,
+        "blobSize": 4117,
+        "blobText": "SIDECAR_JPEG_STANDIN_xxx",
+        "bigFound": true,
+        "bigSize": 41943040,
+        "handleFound": false,
+        "estimate": {
+          "quota": 162331904409,
+          "usage": 41950393,
+          "usageDetails": {
+            "indexedDB": 41950393
+          }
+        }
+      },
+      "readLogs": [],
+      "idbOnDisk": [
+        {
+          "path": "<profile>/Default/IndexedDB",
+          "entries": [
+            "file__0.indexeddb.blob",
+            "file__0.indexeddb.leveldb"
+          ],
+          "bytes": 41950393
+        }
+      ],
+      "profileBytes": 46228777,
+      "pickerControls": {
+        "noGesture": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+        "iframe": "no contentDocument (iframe fully opaque to parent)"
+      }
+    },
+    {
+      "label": "http_localhost",
+      "url": "http://localhost:8101/persist.html",
+      "args": [],
+      "profile": "/tmp/pt-profile-EUdmeL",
+      "write": {
+        "origin": "http://localhost:8101",
+        "bigWrittenBytes": 41943040,
+        "bigWriteMs": 206,
+        "handleStored": "stored OPFS root handle (kind=directory)",
+        "ok": true,
+        "estimate": {
+          "quota": 162331904409,
+          "usage": 41950926,
+          "usageDetails": {
+            "fileSystem": 162,
+            "indexedDB": 41950764
+          }
+        }
+      },
+      "writeLogs": [
+        "[error] Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "readAfterRestart": {
+        "origin": "http://localhost:8101",
+        "href": "http://localhost:8101/persist.html",
+        "marker": {
+          "written": 1785208622835,
+          "tag": "PHOTOURNAMENT"
+        },
+        "blobFound": true,
+        "blobSize": 4117,
+        "blobText": "SIDECAR_JPEG_STANDIN_xxx",
+        "bigFound": true,
+        "bigSize": 41943040,
+        "handleFound": true,
+        "handleKind": "directory",
+        "handleName": "",
+        "handleIsDirHandle": true,
+        "handlePermission": "granted",
+        "handleReadBack": "entries(): [\"keep.txt\"]",
+        "estimate": {
+          "quota": 162331904409,
+          "usage": 41951269,
+          "usageDetails": {
+            "fileSystem": 162,
+            "indexedDB": 41951107
+          }
+        }
+      },
+      "readAfterReload": {
+        "origin": "http://localhost:8101",
+        "href": "http://localhost:8101/persist.html",
+        "marker": {
+          "written": 1785208622835,
+          "tag": "PHOTOURNAMENT"
+        },
+        "blobFound": true,
+        "blobSize": 4117,
+        "blobText": "SIDECAR_JPEG_STANDIN_xxx",
+        "bigFound": true,
+        "bigSize": 41943040,
+        "handleFound": true,
+        "handleKind": "directory",
+        "handleName": "",
+        "handleIsDirHandle": true,
+        "handlePermission": "granted",
+        "handleReadBack": "entries(): [\"keep.txt\"]",
+        "estimate": {
+          "quota": 162331904409,
+          "usage": 41951269,
+          "usageDetails": {
+            "fileSystem": 162,
+            "indexedDB": 41951107
+          }
+        }
+      },
+      "readLogs": [
+        "[error] Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "idbOnDisk": [
+        {
+          "path": "<profile>/Default/IndexedDB",
+          "entries": [
+            "http_localhost_8101.indexeddb.blob",
+            "http_localhost_8101.indexeddb.leveldb"
+          ],
+          "bytes": 41951107
+        }
+      ],
+      "profileBytes": 46230374,
+      "pickerControls": {
+        "noGesture": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+        "iframe": "no contentDocument (iframe fully opaque to parent)"
+      }
+    },
+    {
+      "label": "file_allowFileAccess",
+      "url": "file:///home/user/Photournament/tools/probes/01_capability_matrix/persist.html",
+      "args": [
+        "--allow-file-access-from-files"
+      ],
+      "profile": "/tmp/pt-profile-8LEpzp",
+      "write": {
+        "origin": "file://",
+        "bigWrittenBytes": 41943040,
+        "bigWriteMs": 169,
+        "handleStored": "stored OPFS root handle (kind=directory)",
+        "ok": true,
+        "estimate": {
+          "quota": 162331904409,
+          "usage": 41950878,
+          "usageDetails": {
+            "fileSystem": 162,
+            "indexedDB": 41950716
+          }
+        }
+      },
+      "writeLogs": [],
+      "readAfterRestart": {
+        "origin": "file://",
+        "href": "file:///home/user/Photournament/tools/probes/01_capability_matrix/persist.html",
+        "marker": {
+          "written": 1785208624322,
+          "tag": "PHOTOURNAMENT"
+        },
+        "blobFound": true,
+        "blobSize": 4117,
+        "blobText": "SIDECAR_JPEG_STANDIN_xxx",
+        "bigFound": true,
+        "bigSize": 41943040,
+        "handleFound": true,
+        "handleKind": "directory",
+        "handleName": "",
+        "handleIsDirHandle": true,
+        "handlePermission": "granted",
+        "handleReadBack": "entries(): [\"keep.txt\"]",
+        "estimate": {
+          "quota": 162331904409,
+          "usage": 41951197,
+          "usageDetails": {
+            "fileSystem": 162,
+            "indexedDB": 41951035
+          }
+        }
+      },
+      "readAfterReload": {
+        "origin": "file://",
+        "href": "file:///home/user/Photournament/tools/probes/01_capability_matrix/persist.html",
+        "marker": {
+          "written": 1785208624322,
+          "tag": "PHOTOURNAMENT"
+        },
+        "blobFound": true,
+        "blobSize": 4117,
+        "blobText": "SIDECAR_JPEG_STANDIN_xxx",
+        "bigFound": true,
+        "bigSize": 41943040,
+        "handleFound": true,
+        "handleKind": "directory",
+        "handleName": "",
+        "handleIsDirHandle": true,
+        "handlePermission": "granted",
+        "handleReadBack": "entries(): [\"keep.txt\"]",
+        "estimate": {
+          "quota": 162331904409,
+          "usage": 41951197,
+          "usageDetails": {
+            "fileSystem": 162,
+            "indexedDB": 41951035
+          }
+        }
+      },
+      "readLogs": [],
+      "idbOnDisk": [
+        {
+          "path": "<profile>/Default/IndexedDB",
+          "entries": [
+            "file__0.indexeddb.blob",
+            "file__0.indexeddb.leveldb"
+          ],
+          "bytes": 41951035
+        }
+      ],
+      "profileBytes": 46230933,
+      "pickerControls": {
+        "noGesture": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+        "iframe": "no contentDocument (iframe fully opaque to parent)"
+      }
+    }
+  ]
+}

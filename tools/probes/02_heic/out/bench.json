@@ -1,0 +1,445 @@
+{
+  "probe": "02_heic/bench",
+  "host": {
+    "cpus": 4,
+    "model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "totalMemGB": 16.9
+  },
+  "iters": 7,
+  "coldTrials": 5,
+  "fixtures": {
+    "photo_12mp.heic": {
+      "bytes": 2994394
+    },
+    "example_strukturag.heic": {
+      "bytes": 718114
+    },
+    "nokia_C003.heic": {
+      "bytes": 224452
+    }
+  },
+  "wasm": {
+    "coldInit": {
+      "scriptParseMs": {
+        "n": 5,
+        "min": 20.6,
+        "median": 22.7,
+        "max": 26.9,
+        "mean": 23.7
+      },
+      "factoryMs": {
+        "n": 5,
+        "min": 20.4,
+        "median": 22.3,
+        "max": 24.5,
+        "mean": 22.5
+      },
+      "totalInitMs": {
+        "n": 5,
+        "min": 41.9,
+        "median": 45,
+        "max": 51.1,
+        "mean": 46.1
+      },
+      "wasmHeapAfterInit": 16973824
+    },
+    "warmDecode": {
+      "photo_12mp.heic": {
+        "dims": {
+          "w": 3992,
+          "h": 2992
+        },
+        "mp": 11.94,
+        "firstRunMs": 1180.3,
+        "steadyStateMs": {
+          "n": 6,
+          "min": 932.3,
+          "median": 994,
+          "max": 1196.2,
+          "mean": 1012.2
+        },
+        "msPerMegapixel": 83.2
+      },
+      "example_strukturag.heic": {
+        "dims": {
+          "w": 1280,
+          "h": 854
+        },
+        "mp": 1.09,
+        "firstRunMs": 144.9,
+        "steadyStateMs": {
+          "n": 6,
+          "min": 93.9,
+          "median": 94.5,
+          "max": 98.3,
+          "mean": 95
+        },
+        "msPerMegapixel": 86.4
+      },
+      "nokia_C003.heic": {
+        "dims": {
+          "w": 1280,
+          "h": 720
+        },
+        "mp": 0.92,
+        "firstRunMs": 89.7,
+        "steadyStateMs": {
+          "n": 6,
+          "min": 56.4,
+          "median": 73.8,
+          "max": 82.9,
+          "mean": 67.7
+        },
+        "msPerMegapixel": 80.1
+      }
+    },
+    "memory": {
+      "jsHeapAfterInitMB": 26,
+      "wasmHeapAfterInitMB": 17,
+      "perRun": [
+        {
+          "i": 0,
+          "ms": 1137,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 72
+        },
+        {
+          "i": 1,
+          "ms": 954,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 86.4
+        },
+        {
+          "i": 2,
+          "ms": 1043,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 86.4
+        },
+        {
+          "i": 3,
+          "ms": 949,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 103.7
+        },
+        {
+          "i": 4,
+          "ms": 946,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 103.7
+        },
+        {
+          "i": 5,
+          "ms": 940,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 124.5
+        },
+        {
+          "i": 6,
+          "ms": 934,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 124.5
+        },
+        {
+          "i": 7,
+          "ms": 921,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 124.5
+        },
+        {
+          "i": 8,
+          "ms": 1002,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 124.5
+        },
+        {
+          "i": 9,
+          "ms": 974,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 149.4
+        },
+        {
+          "i": 10,
+          "ms": 960,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 149.4
+        },
+        {
+          "i": 11,
+          "ms": 980,
+          "jsHeapMB": 26,
+          "wasmHeapMB": 149.4
+        }
+      ],
+      "wasmHeapGrowthMB": 132.4,
+      "note": "performance.memory is bucketed to ~5MB in Chromium; wasm HEAPU8 length is exact."
+    }
+  },
+  "asm": {
+    "coldInit": {
+      "scriptParseMs": {
+        "n": 5,
+        "min": 59.5,
+        "median": 64.4,
+        "max": 87,
+        "mean": 68.6
+      },
+      "factoryMs": {
+        "n": 5,
+        "min": 48.9,
+        "median": 50.8,
+        "max": 52,
+        "mean": 50.5
+      },
+      "totalInitMs": {
+        "n": 5,
+        "min": 108.4,
+        "median": 115.2,
+        "max": 138.9,
+        "mean": 119.1
+      },
+      "wasmHeapAfterInit": 16973824
+    },
+    "warmDecode": {
+      "photo_12mp.heic": {
+        "dims": {
+          "w": 3992,
+          "h": 2992
+        },
+        "mp": 11.94,
+        "firstRunMs": 2551.5,
+        "steadyStateMs": {
+          "n": 6,
+          "min": 1891.8,
+          "median": 1996.8,
+          "max": 2350.2,
+          "mean": 2030.5
+        },
+        "msPerMegapixel": 167.2
+      },
+      "example_strukturag.heic": {
+        "dims": {
+          "w": 1280,
+          "h": 854
+        },
+        "mp": 1.09,
+        "firstRunMs": 350.5,
+        "steadyStateMs": {
+          "n": 6,
+          "min": 228.4,
+          "median": 237.8,
+          "max": 436.9,
+          "mean": 268.9
+        },
+        "msPerMegapixel": 217.5
+      },
+      "nokia_C003.heic": {
+        "dims": {
+          "w": 1280,
+          "h": 720
+        },
+        "mp": 0.92,
+        "firstRunMs": 383.5,
+        "steadyStateMs": {
+          "n": 6,
+          "min": 141,
+          "median": 143.2,
+          "max": 157.9,
+          "mean": 145.2
+        },
+        "msPerMegapixel": 155.4
+      }
+    },
+    "memory": {
+      "jsHeapAfterInitMB": 23.1,
+      "wasmHeapAfterInitMB": 17,
+      "perRun": [
+        {
+          "i": 0,
+          "ms": 2544,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 72
+        },
+        {
+          "i": 1,
+          "ms": 2227,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 86.4
+        },
+        {
+          "i": 2,
+          "ms": 1943,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 86.4
+        },
+        {
+          "i": 3,
+          "ms": 1961,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 103.7
+        },
+        {
+          "i": 4,
+          "ms": 1903,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 103.7
+        },
+        {
+          "i": 5,
+          "ms": 1954,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 124.5
+        },
+        {
+          "i": 6,
+          "ms": 1900,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 124.5
+        },
+        {
+          "i": 7,
+          "ms": 1971,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 124.5
+        },
+        {
+          "i": 8,
+          "ms": 1890,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 124.5
+        },
+        {
+          "i": 9,
+          "ms": 1983,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 149.4
+        },
+        {
+          "i": 10,
+          "ms": 1865,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 149.4
+        },
+        {
+          "i": 11,
+          "ms": 1862,
+          "jsHeapMB": 23.1,
+          "wasmHeapMB": 149.4
+        }
+      ],
+      "wasmHeapGrowthMB": 132.4,
+      "note": "performance.memory is bucketed to ~5MB in Chromium; wasm HEAPU8 length is exact."
+    }
+  },
+  "parallel": {
+    "hostCpus": 4,
+    "errs": [],
+    "decodeOnly_1w": {
+      "workers": 1,
+      "images": 3,
+      "wallMs": 3799,
+      "msPerImageWall": 1266,
+      "throughputImgPerSec": 0.79
+    },
+    "decodeOnly_2w": {
+      "workers": 2,
+      "images": 6,
+      "wallMs": 4367,
+      "msPerImageWall": 728,
+      "throughputImgPerSec": 1.37
+    },
+    "decodeOnly_4w": {
+      "workers": 4,
+      "images": 12,
+      "wallMs": 5349,
+      "msPerImageWall": 446,
+      "throughputImgPerSec": 2.24
+    },
+    "decodeOnly_8w": {
+      "workers": 8,
+      "images": 24,
+      "wallMs": 10968,
+      "msPerImageWall": 457,
+      "throughputImgPerSec": 2.19
+    },
+    "fullIngest_1w": {
+      "workers": 1,
+      "images": 3,
+      "wallMs": 4290,
+      "msPerImageWall": 1430,
+      "decodeMs": {
+        "n": 3,
+        "min": 1012.6,
+        "median": 1032.8,
+        "max": 1121.7,
+        "mean": 1055.7
+      },
+      "previewMs": {
+        "n": 3,
+        "min": 37.1,
+        "median": 41.2,
+        "max": 45.9,
+        "mean": 41.4
+      },
+      "thumbMs": {
+        "n": 3,
+        "min": 2.5,
+        "median": 2.8,
+        "max": 3.9,
+        "mean": 3.1
+      },
+      "sidecarMs": {
+        "n": 3,
+        "min": 190.2,
+        "median": 198.6,
+        "max": 201.4,
+        "mean": 196.7
+      },
+      "sidecarBytes": 3323665
+    },
+    "fullIngest_4w": {
+      "workers": 4,
+      "images": 12,
+      "wallMs": 5767,
+      "msPerImageWall": 481,
+      "decodeMs": {
+        "n": 12,
+        "min": 1176,
+        "median": 1282.8,
+        "max": 1535.4,
+        "mean": 1315.5
+      },
+      "previewMs": {
+        "n": 12,
+        "min": 33.9,
+        "median": 45.3,
+        "max": 54.8,
+        "mean": 43.7
+      },
+      "thumbMs": {
+        "n": 12,
+        "min": 2.2,
+        "median": 3.3,
+        "max": 4.6,
+        "mean": 3.3
+      },
+      "sidecarMs": {
+        "n": 12,
+        "min": 188.8,
+        "median": 290.7,
+        "max": 556,
+        "mean": 331.6
+      },
+      "sidecarBytes": 3323665
+    }
+  },
+  "projection500": {
+    "basis": "11.94MP genuine HEIC, measured not extrapolated",
+    "wasm_mainThread_decodeOnly_sec": 497,
+    "asm_mainThread_decodeOnly_sec": 998,
+    "wasm_1worker_decodeOnly_sec": 633,
+    "wasm_4workers_decodeOnly_sec": 223,
+    "wasm_1worker_fullIngest_sec": 715,
+    "wasm_4workers_fullIngest_sec": 241,
+    "note": "fullIngest = HEIC decode + 1600px preview JPEG + 320px thumb JPEG + full-size JPEG sidecar, all in-worker via OffscreenCanvas. Excludes perceptual hash, IndexedDB writes and disk writes."
+  }
+}

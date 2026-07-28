@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>libheif loadability probe</title></head>
+<body>
+<pre id="out">idle</pre>
+<script>
+(function () {
+  'use strict';
+  var R = {};
+  window.__HEIC__ = R;
+  window.__DONE__ = false;
+  function es(e) { return e && e.name ? e.name + ': ' + e.message : String(e); }
+
+  // classic <script src> under file:// is NOT subject to the CORS rules that block
+  // fetch/module/worker, so test it explicitly.
+  function loadClassic(src) {
+    return new Promise(function (res, rej) {
+      var t = setTimeout(function () { rej(new Error('TIMEOUT 25s loading ' + src)); }, 25000);
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function () { clearTimeout(t); res('script onload fired'); };
+      s.onerror = function () { clearTimeout(t); rej(new Error('script onerror for ' + src + ' (blocked or missing)')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  // window.libheif is an Emscripten MODULARIZE factory; call it to get the module.
+  async function probeGlobals(label, initArg) {
+    var g = { globalType: typeof window.libheif };
+    if (typeof window.libheif !== 'function') return g;
+    var t0 = performance.now();
+    var mod;
+    try {
+      mod = window.libheif(initArg || undefined);
+      g.factoryReturns = (mod && typeof mod.then === 'function') ? 'Promise' : 'object (sync)';
+      mod = await Promise.race([
+        Promise.resolve(mod),
+        new Promise(function (_, j) { setTimeout(function () { j(new Error('TIMEOUT 30s initialising libheif')); }, 30000); })
+      ]);
+    } catch (e) { g.factoryError = es(e); return g; }
+    g.initMs = Math.round(performance.now() - t0);
+    g.hasHeifDecoder = typeof mod.HeifDecoder;
+    g.hasHeifImage = typeof mod.HeifImage;
+    try {
+      var d = new mod.HeifDecoder();
+      g.decoderConstructed = true;
+      // decoding non-HEIC bytes must fail cleanly, which proves the codepath is live
+      var imgs = d.decode(new Uint8Array([0, 0, 0, 0, 1, 2, 3, 4]));
+      g.decodeGarbage = 'returned ' + (imgs && imgs.length) + ' images (clean failure, codepath live)';
+    } catch (e) { g.decoderConstructed = es(e); }
+    return g;
+  }
+
+  async function main() {
+    // 1. asm.js build: no wasm, no fetch, should work anywhere a classic script loads
+    try {
+      R.asmjs_load = { status: 'ok', detail: await loadClassic('../../../node_modules/libheif-js/libheif/libheif.js') };
+      R.asmjs_globals = await probeGlobals('asm');
+    } catch (e) { R.asmjs_load = { status: 'fail', detail: es(e) }; }
+
+    R.__DONE_ASM__ = true;
+    window.__DONE__ = true;
+    document.getElementById('out').textContent = JSON.stringify(R, null, 2);
+  }
+
+  // separate entry points so each build gets a clean page
+  window.testBundle = async function () {
+    var o = {};
+    try { o.load = await loadClassic('../../../node_modules/libheif-js/libheif-wasm/libheif-bundle.js'); o.globals = await probeGlobals('bundle'); }
+    catch (e) { o.load = 'FAIL ' + es(e); }
+    return o;
+  };
+  window.testSplit = async function () {
+    var o = {};
+    try { o.load = await loadClassic('../../../node_modules/libheif-js/libheif-wasm/libheif.js'); }
+    catch (e) { o.load = 'FAIL ' + es(e); return o; }
+    // the split build must fetch ./libheif.wasm at init time
+    try {
+      o.globals = await probeGlobals('split');
+      if (window.libheif && typeof window.libheif.ready !== 'undefined') {
+        o.ready = await Promise.race([window.libheif.ready, new Promise(function (_, j) { setTimeout(function () { j(new Error('TIMEOUT 15s on libheif.ready')); }, 15000); })]).then(function () { return 'ready resolved'; }, function (e) { return 'ready rejected: ' + es(e); });
+      }
+      // force the wasm fetch that this build depends on
+      var fr;
+      try { var r = await fetch('../../../node_modules/libheif-js/libheif-wasm/libheif.wasm'); fr = 'fetch ok ' + r.status + ' ' + (await r.arrayBuffer()).byteLength + 'B'; }
+      catch (e) { fr = 'fetch FAILED: ' + es(e); }
+      o.wasmSidecarFetch = fr;
+    } catch (e) { o.error = es(e); }
+    return o;
+  };
+  window.testAsm = function () { return { load: R.asmjs_load, globals: R.asmjs_globals }; };
+
+  window.addEventListener('load', function () { main(); });
+})();
+</script>
+</body>
+</html>

@@ -3,15 +3,17 @@
 node_modules/
 
 # Probe scratch: generated test corpora and benchmark images. The FINDINGS.md
-# files and probe source ARE tracked; the multi-hundred-MB image sets are not.
-tools/probes/**/fixtures/
+# files, probe source, and measured JSON results ARE tracked; the multi-hundred-MB
+# generated image sets are not (every one has a generator script beside it).
 tools/probes/**/corpus/
-tools/probes/**/out/
-tools/probes/**/*.png
-tools/probes/**/*.jpg
-tools/probes/**/*.jpeg
-tools/probes/**/*.heic
-tools/probes/**/*.avif
+tools/probes/**/out/*.png
+tools/probes/**/out/*.jpg
+tools/probes/**/out/*.jpeg
+
+# Exception: the HEIC fixtures are genuine HEVC-in-HEIF files (one a 12MP tiled
+# `grid` image of the kind an iPhone writes). They are real test data, not
+# generated, and are the only regression fixtures for the decode path.
+!tools/probes/02_heic/fixtures/
 
 # Playwright
 test-results/

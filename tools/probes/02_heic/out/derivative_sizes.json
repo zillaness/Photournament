@@ -1,0 +1,22 @@
+{
+  "w": 3992,
+  "h": 2992,
+  "preview1600": {
+    "dims": "1600x1199",
+    "bytes": 548364
+  },
+  "thumb320": {
+    "dims": "320x240",
+    "bytes": 25425
+  },
+  "sidecarFullQ90": {
+    "dims": "3992x2992",
+    "bytes": 3323667
+  },
+  "originalHeicBytes": 2994394,
+  "per500": {
+    "sidecarsGB": 1.66,
+    "previewsMB": 274,
+    "thumbsMB": 13
+  }
+}

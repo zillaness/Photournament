@@ -1,0 +1,120 @@
+{
+  "generatedAt": "2026-07-28T03:21:57.439Z",
+  "runs": [
+    {
+      "label": "file_default/asm",
+      "which": "asm",
+      "console": [],
+      "result": {
+        "load": {
+          "status": "ok",
+          "detail": "script onload fired"
+        },
+        "globals": {
+          "globalType": "function",
+          "factoryReturns": "object (sync)",
+          "initMs": 53,
+          "hasHeifDecoder": "function",
+          "hasHeifImage": "function",
+          "decoderConstructed": true,
+          "decodeGarbage": "returned 0 images (clean failure, codepath live)"
+        }
+      },
+      "ms": 5
+    },
+    {
+      "label": "http_localhost/asm",
+      "which": "asm",
+      "console": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "result": {
+        "load": {
+          "status": "ok",
+          "detail": "script onload fired"
+        },
+        "globals": {
+          "globalType": "function",
+          "factoryReturns": "object (sync)",
+          "initMs": 54,
+          "hasHeifDecoder": "function",
+          "hasHeifImage": "function",
+          "decoderConstructed": true,
+          "decodeGarbage": "returned 0 images (clean failure, codepath live)"
+        }
+      },
+      "ms": 4
+    },
+    {
+      "label": "file_default/bundle",
+      "which": "bundle",
+      "console": [],
+      "result": {
+        "load": "script onload fired",
+        "globals": {
+          "globalType": "function",
+          "factoryReturns": "object (sync)",
+          "initMs": 24,
+          "hasHeifDecoder": "function",
+          "hasHeifImage": "function",
+          "decoderConstructed": true,
+          "decodeGarbage": "returned 0 images (clean failure, codepath live)"
+        }
+      },
+      "ms": 59
+    },
+    {
+      "label": "http_localhost/bundle",
+      "which": "bundle",
+      "console": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "result": {
+        "load": "script onload fired",
+        "globals": {
+          "globalType": "function",
+          "factoryReturns": "object (sync)",
+          "initMs": 21,
+          "hasHeifDecoder": "function",
+          "hasHeifImage": "function",
+          "decoderConstructed": true,
+          "decodeGarbage": "returned 0 images (clean failure, codepath live)"
+        }
+      },
+      "ms": 52
+    },
+    {
+      "label": "file_default/split",
+      "which": "split",
+      "console": [
+        "Access to fetch at 'file:///home/user/Photournament/node_modules/libheif-js/libheif-wasm/libheif.wasm' from origin 'null' has been blocked by CORS policy: Cross origin requests are only supported for protocol schemes: chrome, chrome-extension, chrome-untrusted, data, http, https, isolated-app.",
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "result": {
+        "load": "script onload fired",
+        "globals": {
+          "globalType": "function",
+          "factoryError": "sync fetching of the wasm failed: you can preload it to Module[\"wasmBinary\"] manually, or emcc.py will do that for you when generating HTML (but not JS)"
+        },
+        "wasmSidecarFetch": "fetch FAILED: TypeError: Failed to fetch"
+      },
+      "ms": 17
+    },
+    {
+      "label": "http_localhost/split",
+      "which": "split",
+      "console": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "result": {
+        "load": "script onload fired",
+        "globals": {
+          "globalType": "function",
+          "factoryError": "sync fetching of the wasm failed: you can preload it to Module[\"wasmBinary\"] manually, or emcc.py will do that for you when generating HTML (but not JS)"
+        },
+        "wasmSidecarFetch": "fetch ok 200 1034305B"
+      },
+      "ms": 29
+    }
+  ]
+}

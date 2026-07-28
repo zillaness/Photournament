@@ -1,0 +1,186 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>HEIC worker probe</title>
+<script>
+window.__net = [];
+window.fetch = function (u) { window.__net.push('fetch:' + u); throw new Error('PROBE: fetch blocked'); };
+
+// Absolute URL of the libheif build, derived from the page location so it works
+// identically under file:// and http://.
+window.__buildUrl = (build) => new URL(
+  '../../../../node_modules/libheif-js/' +
+  (build === 'wasm' ? 'libheif-wasm/libheif-bundle.js' : 'libheif/libheif.js'),
+  location.href
+).href;
+
+function mkWorker(code) {
+  const blob = new Blob([code], { type: 'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  return { worker: new Worker(url), url };
+}
+
+// ---------------------------------------------------------------------------
+// Strategy A: blob-URL worker, importScripts(<absolute url of the bundle>)
+// ---------------------------------------------------------------------------
+window.__runBlobImportScripts = function (build, bytes) {
+  const src = window.__buildUrl(build);
+  const code = `
+    self.__net = [];
+    self.fetch = function(u){ self.__net.push('fetch:'+u); throw new Error('PROBE: fetch blocked in worker'); };
+    let lib = null, marks = {};
+    self.onmessage = async (e) => {
+      const m = e.data;
+      try {
+        if (m.cmd === 'init') {
+          marks.t0 = performance.now();
+          importScripts(${JSON.stringify(src)});
+          marks.tScript = performance.now();
+          lib = libheif();
+          marks.tFactory = performance.now();
+          self.postMessage({ ok: true, cmd: 'init',
+            scriptParseMs: marks.tScript - marks.t0,
+            factoryMs: marks.tFactory - marks.tScript,
+            totalInitMs: marks.tFactory - marks.t0,
+            hasDecoder: typeof lib.HeifDecoder === 'function',
+            net: self.__net });
+        } else if (m.cmd === 'decode') {
+          const t0 = performance.now();
+          const d = new lib.HeifDecoder();
+          const imgs = d.decode(new Uint8Array(m.bytes));
+          const img = imgs[0];
+          const w = img.get_width(), h = img.get_height();
+          const tParse = performance.now();
+          const buf = new Uint8ClampedArray(w * h * 4);
+          await new Promise((res, rej) => img.display({ data: buf, width: w, height: h },
+            r => r ? res(r) : rej(new Error('HEIF processing error'))));
+          const tPix = performance.now();
+          if (typeof img.free === 'function') img.free();
+          let sum = 0;
+          for (let i = 0; i < buf.length; i += 4001 * 4) sum += buf[i] + buf[i+1] + buf[i+2];
+          self.postMessage({ ok: true, cmd: 'decode', w, h,
+            containerParseMs: tParse - t0, pixelDecodeMs: tPix - tParse, totalMs: tPix - t0,
+            sampledChannelSum: sum, byteLength: buf.buffer.byteLength,
+            wasmHeap: lib.HEAPU8 ? lib.HEAPU8.length : null,
+            rgba: buf.buffer }, [buf.buffer]);
+        }
+      } catch (err) {
+        self.postMessage({ ok: false, cmd: m.cmd, error: String(err && err.message || err), stack: String(err && err.stack) });
+      }
+    };
+  `;
+  return runProtocol(code, bytes, 'A:blob-worker + importScripts(absolute url)');
+};
+
+// ---------------------------------------------------------------------------
+// Strategy B: blob-URL worker, importScripts with a RELATIVE path
+// (resolved against the blob: URL, expected to fail — proves why A uses abs)
+// ---------------------------------------------------------------------------
+window.__runBlobRelative = function (build) {
+  const rel = '../../../../node_modules/libheif-js/libheif-wasm/libheif-bundle.js';
+  const code = `
+    self.onmessage = () => {
+      try { importScripts(${JSON.stringify(rel)}); self.postMessage({ ok: true, cmd: 'init' }); }
+      catch (e) { self.postMessage({ ok: false, cmd: 'init', error: String(e.message || e) }); }
+    };`;
+  const { worker } = mkWorker(code);
+  return new Promise(resolve => {
+    worker.onmessage = e => { worker.terminate(); resolve(e.data); };
+    worker.onerror = e => { worker.terminate(); resolve({ ok: false, cmd: 'init', error: 'worker.onerror: ' + e.message }); };
+    worker.postMessage({ cmd: 'init' });
+  });
+};
+
+// ---------------------------------------------------------------------------
+// Strategy C: classic (non-blob) worker loaded from a sibling .js file
+// ---------------------------------------------------------------------------
+window.__runClassicFileWorker = function () {
+  return new Promise(resolve => {
+    let w;
+    try { w = new Worker('worker_classic.js'); }
+    catch (e) { return resolve({ ok: false, error: 'constructor threw: ' + e.message }); }
+    const to = setTimeout(() => { try { w.terminate(); } catch (_) {} resolve({ ok: false, error: 'timeout — worker never responded' }); }, 8000);
+    w.onmessage = e => { clearTimeout(to); w.terminate(); resolve(e.data); };
+    w.onerror = e => { clearTimeout(to); try { w.terminate(); } catch (_) {} resolve({ ok: false, error: 'worker.onerror: ' + (e.message || '(no message — likely blocked by origin policy)') }); };
+  });
+};
+
+// ---------------------------------------------------------------------------
+// Strategy D: blob-URL worker with the FULL bundle source inlined into the blob.
+// The source text comes from an inline <script type="text/plain"> block in the
+// page — no fetch, no importScripts. This is the zero-network fallback.
+// ---------------------------------------------------------------------------
+window.__runInlinedBlob = function (bytes) {
+  const el = document.getElementById('libheif-src');
+  if (!el) return Promise.resolve({ ok: false, error: 'no inlined source in this harness' });
+  const libSrc = el.textContent;
+  const code = libSrc + `
+    ;let lib = null;
+    self.onmessage = async (e) => {
+      const m = e.data;
+      try {
+        if (m.cmd === 'init') {
+          const t0 = performance.now();
+          lib = libheif();
+          self.postMessage({ ok: true, cmd: 'init', factoryMs: performance.now() - t0,
+            scriptParseMs: null, totalInitMs: performance.now() - t0,
+            hasDecoder: typeof lib.HeifDecoder === 'function', net: [] });
+        } else if (m.cmd === 'decode') {
+          const t0 = performance.now();
+          const d = new lib.HeifDecoder();
+          const imgs = d.decode(new Uint8Array(m.bytes));
+          const img = imgs[0];
+          const w = img.get_width(), h = img.get_height();
+          const tParse = performance.now();
+          const buf = new Uint8ClampedArray(w * h * 4);
+          await new Promise((res, rej) => img.display({ data: buf, width: w, height: h },
+            r => r ? res(r) : rej(new Error('HEIF processing error'))));
+          const tPix = performance.now();
+          if (typeof img.free === 'function') img.free();
+          let sum = 0;
+          for (let i = 0; i < buf.length; i += 4001 * 4) sum += buf[i] + buf[i+1] + buf[i+2];
+          self.postMessage({ ok: true, cmd: 'decode', w, h,
+            containerParseMs: tParse - t0, pixelDecodeMs: tPix - tParse, totalMs: tPix - t0,
+            sampledChannelSum: sum, byteLength: buf.buffer.byteLength,
+            wasmHeap: lib.HEAPU8 ? lib.HEAPU8.length : null,
+            rgba: buf.buffer }, [buf.buffer]);
+        }
+      } catch (err) { self.postMessage({ ok: false, cmd: m.cmd, error: String(err && err.message || err) }); }
+    };`;
+  return runProtocol(code, bytes, 'D:blob-worker with bundle source inlined in the HTML');
+};
+
+function runProtocol(code, bytes, label) {
+  return new Promise(resolve => {
+    const out = { label, init: null, decode: null, transferProven: null };
+    let w, url;
+    const tCreate = performance.now();
+    try { ({ worker: w, url } = mkWorker(code)); }
+    catch (e) { return resolve({ ...out, fatal: 'Worker constructor threw: ' + e.message }); }
+    out.workerCreateMs = performance.now() - tCreate;
+    const to = setTimeout(() => { try { w.terminate(); } catch (_) {} resolve({ ...out, fatal: 'timeout' }); }, 120000);
+    w.onerror = e => { clearTimeout(to); try { w.terminate(); } catch (_) {} resolve({ ...out, fatal: 'worker.onerror: ' + (e.message || '(no message — blocked)') }); };
+    w.onmessage = e => {
+      const m = e.data;
+      if (m.cmd === 'init') {
+        out.init = m;
+        if (!m.ok) { clearTimeout(to); w.terminate(); return resolve(out); }
+        const copy = bytes.slice();
+        w.postMessage({ cmd: 'decode', bytes: copy });
+      } else {
+        clearTimeout(to);
+        if (m.ok && m.rgba) {
+          out.transferProven = { receivedByteLength: m.rgba.byteLength, isArrayBuffer: m.rgba instanceof ArrayBuffer };
+          delete m.rgba;
+        }
+        out.decode = m;
+        w.terminate();
+        URL.revokeObjectURL(url);
+        resolve(out);
+      }
+    };
+    w.postMessage({ cmd: 'init' });
+  });
+}
+window.__ready = true;
+</script>
+<!-- INLINE_LIBHEIF -->
+</head><body><h1>worker probe</h1></body></html>

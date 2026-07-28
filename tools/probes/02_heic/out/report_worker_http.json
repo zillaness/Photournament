@@ -1,0 +1,59 @@
+{
+  "probe": "02_heic/run_worker",
+  "mode": "http",
+  "inline": false,
+  "url": "http://localhost:8099/tools/probes/02_heic/out/w.html",
+  "htmlBytes": 8931,
+  "A_blobImportScriptsAbsolute": {
+    "label": "A:blob-worker + importScripts(absolute url)",
+    "init": {
+      "ok": true,
+      "cmd": "init",
+      "scriptParseMs": 32.800000000046566,
+      "factoryMs": 22.199999999953434,
+      "totalInitMs": 55,
+      "hasDecoder": true,
+      "net": []
+    },
+    "decode": {
+      "ok": true,
+      "cmd": "decode",
+      "w": 3992,
+      "h": 2992,
+      "containerParseMs": 154,
+      "pixelDecodeMs": 1370.6000000000931,
+      "totalMs": 1524.6000000000931,
+      "sampledChannelSum": 1282876,
+      "byteLength": 47776256,
+      "wasmHeap": 72024064
+    },
+    "transferProven": {
+      "receivedByteLength": 47776256,
+      "isArrayBuffer": true
+    },
+    "workerCreateMs": 1.6999999999534339
+  },
+  "B_blobImportScriptsRelative": {
+    "ok": false,
+    "cmd": "init",
+    "error": "Failed to execute 'importScripts' on 'WorkerGlobalScope': The URL '../../../../node_modules/libheif-js/libheif-wasm/libheif-bundle.js' is invalid."
+  },
+  "C_classicSiblingFileWorker": {
+    "ok": true,
+    "hasDecoder": true
+  },
+  "network": {
+    "allRequestUrls": [
+      "http://localhost:8099/tools/probes/02_heic/out/w.html",
+      "http://localhost:8099/node_modules/libheif-js/libheif-wasm/libheif-bundle.js",
+      "http://localhost:8099/tools/probes/02_heic/out/worker_classic.js"
+    ],
+    "wasmRequests": [],
+    "remoteRequests": []
+  },
+  "console": [
+    "worker created: blob:http://localhost:8099/ec3e9a27-4226-4ea2-9f42-7e21d7278",
+    "worker created: blob:http://localhost:8099/0bfc027f-09ba-420f-aa91-0ffe274e8",
+    "worker created: http://localhost:8099/tools/probes/02_heic/out/worker_classi"
+  ]
+}

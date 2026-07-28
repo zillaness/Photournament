@@ -1,0 +1,643 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Photournament capability probe</title>
+</head>
+<body>
+<h1>Photournament capability probe</h1>
+<button id="pickerDir">showDirectoryPicker</button>
+<button id="pickerFile">showOpenFilePicker</button>
+<pre id="out">not run</pre>
+
+<!-- module script load test: must be a real <script type=module src>, not injected -->
+<script type="module" src="./m.js"></script>
+
+<script>
+/* Classic (non-module) script on purpose: a module script would itself be blocked
+   under file:// and the whole probe would never run. */
+(function () {
+  'use strict';
+
+  var R = {};            // results
+  window.__RESULTS__ = R;
+  window.__DONE__ = false;
+
+  function errStr(e) {
+    if (e === null || e === undefined) return String(e);
+    if (e instanceof Error || (e && e.name && e.message !== undefined)) {
+      return e.name + ': ' + e.message;
+    }
+    if (e && e.type) return 'Event<' + e.type + '>' + (e.message ? ' ' + e.message : '');
+    try { return String(e); } catch (_) { return '<unstringifiable>'; }
+  }
+
+  function withTimeout(p, ms, label) {
+    return Promise.race([
+      Promise.resolve(p),
+      new Promise(function (_, rej) {
+        setTimeout(function () { rej(new Error('TIMEOUT after ' + ms + 'ms: ' + label)); }, ms);
+      })
+    ]);
+  }
+
+  function ok(v)  { return { status: 'ok', detail: v }; }
+  function bad(e) { return { status: 'fail', detail: errStr(e) }; }
+  function na(v)  { return { status: 'n/a', detail: v }; }
+
+  async function run(name, fn, ms) {
+    try {
+      var v = await withTimeout(fn(), ms || 8000, name);
+      R[name] = ok(v);
+    } catch (e) {
+      R[name] = bad(e);
+    }
+  }
+
+  // ---------- shared fixtures ----------
+  var PNG_BLOB = null;      // small real PNG as a Blob
+  var WASM_BYTES = new Uint8Array([
+    0x00,0x61,0x73,0x6d, 0x01,0x00,0x00,0x00,
+    0x01,0x07,0x01,0x60,0x02,0x7f,0x7f,0x01,0x7f,
+    0x03,0x02,0x01,0x00,
+    0x07,0x07,0x01,0x03,0x61,0x64,0x64,0x00,0x00,
+    0x0a,0x09,0x01,0x07,0x00,0x20,0x00,0x20,0x01,0x6a,0x0b
+  ]);
+
+  function makePngBlob() {
+    return new Promise(function (res, rej) {
+      try {
+        var c = document.createElement('canvas');
+        c.width = 8; c.height = 6;
+        var g = c.getContext('2d');
+        g.fillStyle = '#c03030'; g.fillRect(0, 0, 8, 6);
+        g.fillStyle = '#3060c0'; g.fillRect(0, 0, 4, 3);
+        c.toBlob(function (b) { b ? res(b) : rej(new Error('toBlob returned null')); }, 'image/png');
+      } catch (e) { rej(e); }
+    });
+  }
+
+  // ---------- 1. secure context / origin ----------
+  function contextInfo() {
+    return {
+      isSecureContext: window.isSecureContext,
+      origin: (function () { try { return String(window.origin); } catch (e) { return errStr(e); } })(),
+      locationOrigin: location.origin,
+      href: location.href,
+      protocol: location.protocol,
+      crossOriginIsolated: window.crossOriginIsolated,
+      userAgent: navigator.userAgent
+    };
+  }
+
+  // ---------- 2. IndexedDB ----------
+  function idbReq(r) {
+    return new Promise(function (res, rej) {
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error || new Error('IDBRequest error')); };
+      r.onblocked = function () { rej(new Error('IDBRequest blocked')); };
+    });
+  }
+  function openDb(name, version, upgrade) {
+    return new Promise(function (res, rej) {
+      var req;
+      try { req = indexedDB.open(name, version); }
+      catch (e) { rej(e); return; }
+      req.onupgradeneeded = function (ev) { try { upgrade(req.result, ev); } catch (e) { rej(e); } };
+      req.onsuccess = function () { res(req.result); };
+      req.onerror = function () { rej(req.error || new Error('open error (null .error)')); };
+      req.onblocked = function () { rej(new Error('open blocked')); };
+    });
+  }
+  function tx(db, store, mode, fn) {
+    return new Promise(function (res, rej) {
+      var t, s, out;
+      try { t = db.transaction(store, mode); s = t.objectStore(store); }
+      catch (e) { rej(e); return; }
+      t.oncomplete = function () { res(out); };
+      t.onerror = function () { rej(t.error || new Error('tx error')); };
+      t.onabort = function () { rej(t.error || new Error('tx aborted')); };
+      Promise.resolve(fn(s)).then(function (v) { out = v; }, rej);
+    });
+  }
+
+  async function idbProbe() {
+    var DBNAME = 'photournament_probe_' + Date.now();
+    var res = {};
+    var db = await openDb(DBNAME, 1, function (d) {
+      d.createObjectStore('kv', { keyPath: 'id' });
+    });
+    res.opened = true;
+    res.dbName = db.name;
+
+    // plain record
+    await tx(db, 'kv', 'readwrite', function (s) {
+      s.put({ id: 'rec', n: 42, s: 'hello', arr: [1, 2, 3], d: new Date(0), m: new Map([['a', 1]]) });
+    });
+    var rec = await tx(db, 'kv', 'readonly', function (s) { return idbReq(s.get('rec')); });
+    res.recordRoundTrip = !!rec && rec.n === 42 && rec.s === 'hello'
+      && rec.d instanceof Date && rec.m instanceof Map && rec.m.get('a') === 1;
+
+    // Blob
+    var blob = new Blob([WASM_BYTES, 'blob-payload'], { type: 'application/octet-stream' });
+    await tx(db, 'kv', 'readwrite', function (s) { s.put({ id: 'blob', b: blob }); });
+    var got = await tx(db, 'kv', 'readonly', function (s) { return idbReq(s.get('blob')); });
+    res.blobIsBlob = got && got.b instanceof Blob;
+    res.blobSize = got && got.b ? got.b.size : null;
+    var txt = got && got.b ? await got.b.text() : null;
+    res.blobRoundTrip = !!txt && txt.indexOf('blob-payload') >= 0;
+
+    // File
+    try {
+      var f = new File(['file-payload'], 'IMG_1234.HEIC', { type: 'image/heic', lastModified: 1234567890 });
+      await tx(db, 'kv', 'readwrite', function (s) { s.put({ id: 'file', f: f }); });
+      var gf = await tx(db, 'kv', 'readonly', function (s) { return idbReq(s.get('file')); });
+      res.fileIsFile = gf && gf.f instanceof File;
+      res.fileName = gf && gf.f ? gf.f.name : null;
+      res.fileLastModified = gf && gf.f ? gf.f.lastModified : null;
+      res.fileRoundTrip = gf && gf.f ? (await gf.f.text()) === 'file-payload' : false;
+    } catch (e) { res.fileError = errStr(e); }
+
+    // ArrayBuffer
+    try {
+      var ab = WASM_BYTES.buffer.slice(0);
+      await tx(db, 'kv', 'readwrite', function (s) { s.put({ id: 'ab', ab: ab }); });
+      var ga = await tx(db, 'kv', 'readonly', function (s) { return idbReq(s.get('ab')); });
+      res.arrayBufferRoundTrip = ga && ga.ab instanceof ArrayBuffer && ga.ab.byteLength === WASM_BYTES.byteLength;
+    } catch (e) { res.arrayBufferError = errStr(e); }
+
+    // ImageBitmap
+    try {
+      if (!PNG_BLOB) PNG_BLOB = await makePngBlob();
+      var bmp = await createImageBitmap(PNG_BLOB);
+      await tx(db, 'kv', 'readwrite', function (s) { s.put({ id: 'bmp', bmp: bmp }); });
+      var gb = await tx(db, 'kv', 'readonly', function (s) { return idbReq(s.get('bmp')); });
+      res.imageBitmapIsImageBitmap = gb && typeof ImageBitmap !== 'undefined' && gb.bmp instanceof ImageBitmap;
+      res.imageBitmapDims = gb && gb.bmp ? (gb.bmp.width + 'x' + gb.bmp.height) : null;
+    } catch (e) { res.imageBitmapError = errStr(e); }
+
+    // delete record
+    await tx(db, 'kv', 'readwrite', function (s) { s.delete('rec'); });
+    var after = await tx(db, 'kv', 'readonly', function (s) { return idbReq(s.get('rec')); });
+    res.deleteWorks = after === undefined;
+
+    // list databases
+    try {
+      if (indexedDB.databases) {
+        var list = await indexedDB.databases();
+        res.databasesApi = list.map(function (x) { return x.name; }).indexOf(DBNAME) >= 0
+          ? 'lists our db (' + list.length + ' total)' : 'available but db not listed (' + list.length + ')';
+      } else { res.databasesApi = 'indexedDB.databases absent'; }
+    } catch (e) { res.databasesApi = errStr(e); }
+
+    db.close();
+    // drop DB
+    await new Promise(function (r2) {
+      var d = indexedDB.deleteDatabase(DBNAME);
+      d.onsuccess = d.onerror = d.onblocked = function () { r2(); };
+      setTimeout(r2, 2000);
+    });
+    res.dbDeleted = true;
+    return res;
+  }
+
+  // Second-open persistence check (does data survive within same page life / re-open?)
+  async function idbPersistProbe() {
+    var NAME = 'photournament_probe_persist';
+    var db = await openDb(NAME, 1, function (d) { d.createObjectStore('kv'); });
+    var prior = await tx(db, 'kv', 'readonly', function (s) { return idbReq(s.get('marker')); });
+    await tx(db, 'kv', 'readwrite', function (s) { s.put({ written: Date.now() }, 'marker'); });
+    db.close();
+    var db2 = await openDb(NAME, 1, function (d) { d.createObjectStore('kv'); });
+    var again = await tx(db2, 'kv', 'readonly', function (s) { return idbReq(s.get('marker')); });
+    db2.close();
+    return {
+      priorSessionMarker: prior ? prior.written : null,
+      survivesReopenInSamePage: !!(again && again.written)
+    };
+  }
+
+  // ---------- 3. storage manager ----------
+  async function storageProbe() {
+    var out = {};
+    out.hasNavigatorStorage = !!navigator.storage;
+    if (!navigator.storage) return out;
+    out.hasEstimate = typeof navigator.storage.estimate === 'function';
+    out.hasPersist = typeof navigator.storage.persist === 'function';
+    out.hasPersisted = typeof navigator.storage.persisted === 'function';
+    out.hasGetDirectory = typeof navigator.storage.getDirectory === 'function';
+    if (out.hasEstimate) {
+      try {
+        var e = await navigator.storage.estimate();
+        out.estimate = { quota: e.quota, usage: e.usage, quotaGB: e.quota ? +(e.quota / 1e9).toFixed(2) : null, usageDetails: e.usageDetails || null };
+      } catch (er) { out.estimateError = errStr(er); }
+    }
+    if (out.hasPersisted) {
+      try { out.persistedBefore = await navigator.storage.persisted(); }
+      catch (er) { out.persistedBeforeError = errStr(er); }
+    }
+    if (out.hasPersist) {
+      try { out.persistResult = await withTimeout(navigator.storage.persist(), 5000, 'persist'); }
+      catch (er) { out.persistError = errStr(er); }
+    }
+    if (out.hasPersisted) {
+      try { out.persistedAfter = await navigator.storage.persisted(); }
+      catch (er) { out.persistedAfterError = errStr(er); }
+    }
+    // OPFS -- relevant fallback if FSA picker is unavailable
+    if (out.hasGetDirectory) {
+      try {
+        var root = await withTimeout(navigator.storage.getDirectory(), 4000, 'getDirectory');
+        var fh = await root.getFileHandle('probe.txt', { create: true });
+        var w = await fh.createWritable();
+        await w.write('opfs-payload');
+        await w.close();
+        var file = await fh.getFile();
+        out.opfs = 'read/write OK, roundtrip=' + ((await file.text()) === 'opfs-payload');
+        await root.removeEntry('probe.txt');
+      } catch (er) { out.opfs = errStr(er); }
+    }
+    return out;
+  }
+
+  // ---------- 4. File System Access pickers ----------
+  function fsaSurface() {
+    var out = {
+      showDirectoryPicker_in_window: 'showDirectoryPicker' in window,
+      showOpenFilePicker_in_window: 'showOpenFilePicker' in window,
+      showSaveFilePicker_in_window: 'showSaveFilePicker' in window,
+      FileSystemHandle: typeof window.FileSystemHandle,
+      FileSystemDirectoryHandle: typeof window.FileSystemDirectoryHandle,
+      FileSystemFileHandle: typeof window.FileSystemFileHandle,
+      FileSystemWritableFileStream: typeof window.FileSystemWritableFileStream
+    };
+    out.showDirectoryPicker_length = (typeof window.showDirectoryPicker === 'function')
+      ? window.showDirectoryPicker.length : null;
+    out.showOpenFilePicker_length = (typeof window.showOpenFilePicker === 'function')
+      ? window.showOpenFilePicker.length : null;
+    out.showDirectoryPicker_toString = (typeof window.showDirectoryPicker === 'function')
+      ? String(window.showDirectoryPicker) : null;
+    // handle-level methods that persistence in PRD 7.10 depends on
+    if (window.FileSystemHandle && window.FileSystemHandle.prototype) {
+      out.handle_queryPermission = typeof window.FileSystemHandle.prototype.queryPermission;
+      out.handle_requestPermission = typeof window.FileSystemHandle.prototype.requestPermission;
+      out.handle_isSameEntry = typeof window.FileSystemHandle.prototype.isSameEntry;
+    }
+    if (window.FileSystemDirectoryHandle && window.FileSystemDirectoryHandle.prototype) {
+      out.dir_entries = typeof window.FileSystemDirectoryHandle.prototype.entries;
+      out.dir_values = typeof window.FileSystemDirectoryHandle.prototype.values;
+      out.dir_getFileHandle = typeof window.FileSystemDirectoryHandle.prototype.getFileHandle;
+      out.dir_getDirectoryHandle = typeof window.FileSystemDirectoryHandle.prototype.getDirectoryHandle;
+      out.dir_removeEntry = typeof window.FileSystemDirectoryHandle.prototype.removeEntry;
+    }
+    if (window.FileSystemFileHandle && window.FileSystemFileHandle.prototype) {
+      out.file_createWritable = typeof window.FileSystemFileHandle.prototype.createWritable;
+    }
+    if (window.DataTransferItem && window.DataTransferItem.prototype) {
+      out.DataTransferItem_getAsFileSystemHandle = typeof window.DataTransferItem.prototype.getAsFileSystemHandle;
+      out.DataTransferItem_webkitGetAsEntry = typeof window.DataTransferItem.prototype.webkitGetAsEntry;
+      out.DataTransferItem_getAsFile = typeof window.DataTransferItem.prototype.getAsFile;
+    }
+    out.HTMLInputElement_webkitdirectory = ('webkitdirectory' in document.createElement('input'));
+    return out;
+  }
+
+  // called from a REAL user gesture (Playwright click => trusted)
+  window.__pickerResult = {};
+  function wirePicker(id, key, fn) {
+    document.getElementById(id).addEventListener('click', function () {
+      var started = Date.now();
+      var p;
+      try {
+        p = fn();
+      } catch (e) {
+        window.__pickerResult[key] = { phase: 'sync-throw', error: errStr(e), userActivation: navUA() };
+        return;
+      }
+      window.__pickerResult[key] = { phase: 'pending', userActivation: navUA() };
+      withTimeout(p, 4000, key).then(function (v) {
+        window.__pickerResult[key] = {
+          phase: 'resolved',
+          value: (v && v.kind) ? v.kind : (Array.isArray(v) ? 'array[' + v.length + ']' : String(v)),
+          ms: Date.now() - started, userActivation: navUA()
+        };
+      }, function (e) {
+        window.__pickerResult[key] = {
+          phase: 'rejected', error: errStr(e),
+          errorName: (e && e.name) || null,
+          ms: Date.now() - started, userActivation: navUA()
+        };
+      });
+    });
+  }
+  function navUA() {
+    try {
+      return navigator.userActivation
+        ? { isActive: navigator.userActivation.isActive, hasBeenActive: navigator.userActivation.hasBeenActive }
+        : 'navigator.userActivation absent';
+    } catch (e) { return errStr(e); }
+  }
+  wirePicker('pickerDir', 'showDirectoryPicker', function () {
+    if (typeof window.showDirectoryPicker !== 'function') throw new TypeError('window.showDirectoryPicker is not a function (API ABSENT)');
+    return window.showDirectoryPicker({ mode: 'readwrite' });
+  });
+  wirePicker('pickerFile', 'showOpenFilePicker', function () {
+    if (typeof window.showOpenFilePicker !== 'function') throw new TypeError('window.showOpenFilePicker is not a function (API ABSENT)');
+    return window.showOpenFilePicker({ multiple: true });
+  });
+
+  // ---------- 5. workers ----------
+  var WORKER_BODY = "self.onmessage=function(e){self.postMessage({echo:e.data,kind:'inline'});};";
+  var WORKER_BODY_MOD = "self.onmessage=(e)=>{self.postMessage({echo:e.data,kind:'inline-module'});};";
+
+  function spawnAndPing(makeWorker, label, ms) {
+    return new Promise(function (res, rej) {
+      var w;
+      try { w = makeWorker(); }
+      catch (e) { rej(new Error('construct: ' + errStr(e))); return; }
+      var t = setTimeout(function () {
+        try { w.terminate(); } catch (_) {}
+        rej(new Error('TIMEOUT ' + ms + 'ms waiting for message (' + label + ') — constructed without throwing but never responded'));
+      }, ms);
+      w.onerror = function (ev) {
+        clearTimeout(t);
+        try { w.terminate(); } catch (_) {}
+        rej(new Error('onerror: ' + (ev.message || '(no message — opaque, typical of a cross-origin/blocked worker script)')
+          + (ev.filename ? ' @' + ev.filename : '')));
+      };
+      w.onmessageerror = function () { clearTimeout(t); rej(new Error('onmessageerror')); };
+      w.onmessage = function (ev) {
+        clearTimeout(t);
+        try { w.terminate(); } catch (_) {}
+        res({ roundTrip: true, reply: ev.data });
+      };
+      try { w.postMessage({ ping: 'photournament' }); }
+      catch (e) { clearTimeout(t); rej(new Error('postMessage: ' + errStr(e))); }
+    });
+  }
+
+  function blobUrl(body, type) {
+    return URL.createObjectURL(new Blob([body], { type: type || 'text/javascript' }));
+  }
+  function dataUrl(body) {
+    return 'data:text/javascript;base64,' + btoa(body);
+  }
+
+  // Heavy worker: does the whole ingest pipeline (createImageBitmap + OffscreenCanvas + convertToBlob + wasm)
+  var HEAVY_WORKER = [
+    "self.onmessage = async function (e) {",
+    "  var out = { steps: {} };",
+    "  try {",
+    "    var bmp = await createImageBitmap(e.data.blob);",
+    "    out.steps.createImageBitmap = bmp.width + 'x' + bmp.height;",
+    "    var oc = new OffscreenCanvas(bmp.width, bmp.height);",
+    "    var ctx = oc.getContext('2d');",
+    "    out.steps.offscreen2d = !!ctx;",
+    "    ctx.drawImage(bmp, 0, 0);",
+    "    var px = ctx.getImageData(0, 0, 1, 1).data;",
+    "    out.steps.getImageData = Array.from(px).join(',');",
+    "    var jb = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.8 });",
+    "    out.steps.convertToBlob = jb.type + ' ' + jb.size + 'B';",
+    "    var mod = await WebAssembly.instantiate(e.data.wasm, {});",
+    "    out.steps.wasm = mod.instance.exports.add(20, 22);",
+    "    out.steps.crypto = !!(self.crypto && self.crypto.subtle);",
+    "    if (self.crypto && self.crypto.subtle) {",
+    "      var d = await self.crypto.subtle.digest('SHA-256', new Uint8Array([1,2,3]));",
+    "      out.steps.digestBytes = d.byteLength;",
+    "    }",
+    "    out.steps.indexedDBInWorker = (typeof indexedDB !== 'undefined');",
+    "    out.steps.fetchInWorker = (typeof fetch === 'function');",
+    "    out.steps.isSecureContext = self.isSecureContext;",
+    "    out.steps.location = String(self.location.href).slice(0, 80);",
+    "  } catch (err) { out.error = (err && err.name) + ': ' + (err && err.message); }",
+    "  self.postMessage(out);",
+    "};"
+  ].join('\n');
+
+  function runHeavyWorker(url) {
+    return new Promise(function (res, rej) {
+      var w;
+      try { w = new Worker(url); } catch (e) { rej(new Error('construct: ' + errStr(e))); return; }
+      var t = setTimeout(function () { try { w.terminate(); } catch (_) {} rej(new Error('TIMEOUT 10s')); }, 10000);
+      w.onerror = function (ev) { clearTimeout(t); rej(new Error('onerror: ' + (ev.message || '(opaque)'))); };
+      w.onmessage = function (ev) { clearTimeout(t); try { w.terminate(); } catch (_) {} res(ev.data); };
+      w.postMessage({ blob: PNG_BLOB, wasm: WASM_BYTES.buffer.slice(0) });
+    });
+  }
+
+  // ---------- 6. network-ish ----------
+  function xhrGet(url) {
+    return new Promise(function (res, rej) {
+      var x = new XMLHttpRequest();
+      try { x.open('GET', url, true); } catch (e) { rej(new Error('open: ' + errStr(e))); return; }
+      x.onload = function () { res({ status: x.status, len: (x.responseText || '').length, body: (x.responseText || '').slice(0, 40) }); };
+      x.onerror = function () { rej(new Error('XHR onerror (status=' + x.status + ') — network/CORS level failure')); };
+      x.ontimeout = function () { rej(new Error('XHR timeout')); };
+      x.timeout = 5000;
+      try { x.send(); } catch (e) { rej(new Error('send: ' + errStr(e))); }
+    });
+  }
+
+  // ---------- main ----------
+  async function main() {
+    R.context = ok(contextInfo());
+
+    try { PNG_BLOB = await makePngBlob(); R.pngFixture = ok({ size: PNG_BLOB.size, type: PNG_BLOB.type }); }
+    catch (e) { R.pngFixture = bad(e); }
+
+    await run('indexedDB', idbProbe, 20000);
+    await run('indexedDB_reopen', idbPersistProbe, 15000);
+    await run('storage', storageProbe, 15000);
+
+    R.fsa_surface = ok(fsaSurface());
+
+    // workers
+    await run('worker_relative_classic', function () {
+      return spawnAndPing(function () { return new Worker('./w.js'); }, 'relative classic', 6000);
+    }, 8000);
+    await run('worker_relative_module', function () {
+      return spawnAndPing(function () { return new Worker('./wm.js', { type: 'module' }); }, 'relative module', 6000);
+    }, 8000);
+    await run('worker_blob_classic', function () {
+      return spawnAndPing(function () { return new Worker(blobUrl(WORKER_BODY)); }, 'blob classic', 6000);
+    }, 8000);
+    await run('worker_blob_module', function () {
+      return spawnAndPing(function () { return new Worker(blobUrl(WORKER_BODY_MOD), { type: 'module' }); }, 'blob module', 6000);
+    }, 8000);
+    await run('worker_data_classic', function () {
+      return spawnAndPing(function () { return new Worker(dataUrl(WORKER_BODY)); }, 'data classic', 6000);
+    }, 8000);
+    await run('worker_data_module', function () {
+      return spawnAndPing(function () { return new Worker(dataUrl(WORKER_BODY_MOD), { type: 'module' }); }, 'data module', 6000);
+    }, 8000);
+
+    // fetch / xhr
+    await run('fetch_relative', async function () {
+      var r = await fetch('./local.txt');
+      var t = await r.text();
+      return { status: r.status, type: r.type, body: t.trim() };
+    }, 8000);
+    await run('xhr_relative', function () { return xhrGet('./local.txt'); }, 8000);
+    await run('fetch_data_url', async function () {
+      var r = await fetch('data:text/plain;base64,' + btoa('DATA_URL_OK'));
+      return { status: r.status, type: r.type, body: await r.text() };
+    }, 8000);
+    await run('fetch_blob_url', async function () {
+      var u = URL.createObjectURL(new Blob(['BLOB_URL_OK']));
+      var r = await fetch(u);
+      return { status: r.status, body: await r.text() };
+    }, 8000);
+
+    // module script tag (declared at top of body)
+    R.module_script_tag = window.__MODULE_SCRIPT_LOADED__
+      ? ok('external <script type="module" src="./m.js"> executed')
+      : { status: 'fail', detail: 'external module script did NOT execute (blocked or errored) after full load' };
+
+    // dynamic import()
+    await run('dynamic_import', async function () {
+      var m = await import('./m.js');
+      return 'import() resolved, ok=' + m.ok;
+    }, 6000);
+
+    // inline module script (no src)
+    await run('inline_module_script', function () {
+      return new Promise(function (res, rej) {
+        var s = document.createElement('script');
+        s.type = 'module';
+        s.textContent = 'window.__INLINE_MODULE__=true;';
+        document.body.appendChild(s);
+        setTimeout(function () {
+          window.__INLINE_MODULE__ ? res('inline module executed') : rej(new Error('inline module did not execute'));
+        }, 300);
+      });
+    }, 4000);
+
+    // imaging on main thread
+    await run('createImageBitmap_main', async function () {
+      var b = await createImageBitmap(PNG_BLOB);
+      return b.width + 'x' + b.height;
+    }, 6000);
+    await run('offscreencanvas_main', async function () {
+      var oc = new OffscreenCanvas(8, 6);
+      var g = oc.getContext('2d');
+      g.fillStyle = '#0f0'; g.fillRect(0, 0, 8, 6);
+      var jb = await oc.convertToBlob({ type: 'image/jpeg', quality: 0.8 });
+      return { ctx: !!g, blob: jb.type + ' ' + jb.size + 'B' };
+    }, 6000);
+    await run('canvas_toDataURL_and_getImageData', async function () {
+      var c = document.createElement('canvas'); c.width = 4; c.height = 4;
+      var g = c.getContext('2d');
+      var img = await createImageBitmap(PNG_BLOB);
+      g.drawImage(img, 0, 0);
+      var d = g.getImageData(0, 0, 1, 1).data;         // taints check
+      var u = c.toDataURL('image/jpeg', 0.7);
+      return { pixel: Array.from(d).join(','), dataURLPrefix: u.slice(0, 24), dataURLLen: u.length };
+    }, 6000);
+
+    // wasm main thread
+    await run('wasm_main', async function () {
+      var m = await WebAssembly.instantiate(WASM_BYTES.buffer.slice(0), {});
+      var mod = await WebAssembly.compile(WASM_BYTES.buffer.slice(0));
+      return { add_20_22: m.instance.exports.add(20, 22), compileOk: mod instanceof WebAssembly.Module };
+    }, 8000);
+    await run('wasm_streaming_relative', async function () {
+      if (!WebAssembly.instantiateStreaming) throw new Error('instantiateStreaming absent');
+      var m = await WebAssembly.instantiateStreaming(fetch('./tiny.wasm'), {});
+      return 'add=' + m.instance.exports.add(1, 2);
+    }, 8000);
+
+    // heavy pipeline in blob worker
+    await run('worker_blob_imaging_pipeline', function () { return runHeavyWorker(blobUrl(HEAVY_WORKER)); }, 14000);
+    await run('worker_relative_imaging_pipeline', function () { return runHeavyWorker('./heavy.js'); }, 14000);
+
+    // crypto
+    await run('crypto_subtle_digest', async function () {
+      if (!crypto.subtle) throw new Error('crypto.subtle is undefined (non-secure context)');
+      var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('photournament'));
+      var hex = Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+      // digest a Blob's bytes, which is the real fingerprinting path
+      var ab = await PNG_BLOB.arrayBuffer();
+      var d2 = await crypto.subtle.digest('SHA-256', ab);
+      return { sha256_of_photournament: hex, blobDigestBytes: d2.byteLength, randomUUID: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : 'absent' };
+    }, 8000);
+
+    // structuredClone (direct, not via IDB)
+    await run('structuredClone_direct', async function () {
+      var out = {};
+      var bmp = await createImageBitmap(PNG_BLOB);
+      out.blob = structuredClone(PNG_BLOB) instanceof Blob;
+      out.file = structuredClone(new File(['x'], 'a.jpg')) instanceof File;
+      out.arrayBuffer = structuredClone(new ArrayBuffer(8)).byteLength === 8;
+      out.imageBitmap = structuredClone(bmp) instanceof ImageBitmap;
+      try { structuredClone(function () {}); out.functionThrows = false; } catch (e) { out.functionThrows = errStr(e); }
+      return out;
+    }, 8000);
+
+    // localStorage / sessionStorage / cookies (secondary persistence)
+    R.web_storage = (function () {
+      var o = {};
+      try { localStorage.setItem('pt', '1'); o.localStorage = localStorage.getItem('pt') === '1'; localStorage.removeItem('pt'); }
+      catch (e) { o.localStorage = errStr(e); }
+      try { sessionStorage.setItem('pt', '1'); o.sessionStorage = sessionStorage.getItem('pt') === '1'; sessionStorage.removeItem('pt'); }
+      catch (e) { o.sessionStorage = errStr(e); }
+      try { document.cookie = 'pt=1'; o.cookie = document.cookie.indexOf('pt=1') >= 0; }
+      catch (e) { o.cookie = errStr(e); }
+      try { o.caches = typeof caches; } catch (e) { o.caches = errStr(e); }
+      return ok(o);
+    })();
+
+    // drag & drop surface via a synthetic DataTransfer
+    await run('datatransfer_surface', function () {
+      var out = {};
+      var dt = new DataTransfer();
+      dt.items.add(new File(['a'], 'a.jpg', { type: 'image/jpeg' }));
+      var item = dt.items[0];
+      out.itemsAddWorks = dt.items.length === 1;
+      out.kind = item.kind;
+      out.type = item.type;
+      out.getAsFile = !!item.getAsFile();
+      out.getAsFileSystemHandle_present = typeof item.getAsFileSystemHandle === 'function';
+      out.webkitGetAsEntry_present = typeof item.webkitGetAsEntry === 'function';
+      if (typeof item.getAsFileSystemHandle === 'function') {
+        out.getAsFileSystemHandle_arity = item.getAsFileSystemHandle.length;
+        return Promise.resolve(item.getAsFileSystemHandle()).then(function (h) {
+          out.getAsFileSystemHandle_result = h ? ('handle kind=' + h.kind) : 'null (expected for synthetic DataTransfer — no real OS drag)';
+          return out;
+        }, function (e) {
+          out.getAsFileSystemHandle_result = 'rejected ' + errStr(e);
+          return out;
+        });
+      }
+      return Promise.resolve(out);
+    }, 6000);
+
+    // download path (used by "download bundle" in PRD 7.8)
+    R.download_anchor = (function () {
+      var a = document.createElement('a');
+      return ok({ downloadAttr: 'download' in a, msSaveBlob: typeof navigator.msSaveBlob });
+    })();
+
+    window.__DONE__ = true;
+    document.getElementById('out').textContent = JSON.stringify(R, null, 2);
+    document.title = 'PROBE DONE';
+  }
+
+  window.addEventListener('error', function (e) {
+    (R.__pageErrors = R.__pageErrors || []).push(String(e.message) + ' @' + e.filename + ':' + e.lineno);
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    (R.__unhandled = R.__unhandled || []).push(errStr(e.reason));
+  });
+
+  // give the external module script a beat to run/fail before we sample it
+  window.addEventListener('load', function () { setTimeout(function () {
+    main().catch(function (e) {
+      R.__fatal = errStr(e);
+      window.__DONE__ = true;
+      document.title = 'PROBE DONE';
+    });
+  }, 250); });
+})();
+</script>
+</body>
+</html>

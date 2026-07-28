@@ -1,0 +1,161 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>HEIC decode probe harness</title>
+<script>
+// ---------------------------------------------------------------------------
+// Network tripwire. Installed BEFORE the libheif script tag runs so that any
+// fetch/XHR/WebSocket/EventSource/importScripts issued by the bundle during
+// parse or init is recorded (and thrown from).
+// ---------------------------------------------------------------------------
+window.__net = [];
+(function () {
+  const rec = (kind, url) => {
+    window.__net.push({ kind, url: String(url), t: performance.now() });
+  };
+  const origFetch = window.fetch;
+  window.fetch = function (...a) {
+    rec('fetch', a[0] && a[0].url ? a[0].url : a[0]);
+    throw new Error('PROBE: fetch() was called — network access is not allowed');
+  };
+  const OrigXHR = window.XMLHttpRequest;
+  window.XMLHttpRequest = function () {
+    const x = new OrigXHR();
+    const open = x.open;
+    x.open = function (m, u, ...r) { rec('xhr', u); return open.call(this, m, u, ...r); };
+    return x;
+  };
+  window.XMLHttpRequest.prototype = OrigXHR.prototype;
+  const OrigWS = window.WebSocket;
+  if (OrigWS) window.WebSocket = function (u) { rec('websocket', u); throw new Error('PROBE: WebSocket blocked'); };
+  const OrigES = window.EventSource;
+  if (OrigES) window.EventSource = function (u) { rec('eventsource', u); throw new Error('PROBE: EventSource blocked'); };
+  window.__origFetch = origFetch;
+})();
+
+window.__marks = {};
+window.__marks.scriptTagStart = performance.now();
+window.__navStart = performance.timeOrigin;
+</script>
+<!-- BUILD_SCRIPT_TAG -->
+<script>
+window.__marks.scriptTagEnd = performance.now();
+// The script tag exposes an emscripten MODULARIZE factory. Calling it is where
+// the wasm is actually compiled + instantiated, so it is timed separately.
+window.__marks.factoryStart = performance.now();
+window.__lib = libheif();
+window.__marks.factoryEnd = performance.now();
+
+window.__probe = {
+  buildInfo() {
+    const lib = window.__lib;
+    return {
+      globalType: typeof libheif,
+      hasDecoder: typeof lib.HeifDecoder === 'function',
+      keys: Object.keys(lib).filter(k => /Heif|HEAP|_heif/.test(k)).slice(0, 20),
+      netEvents: window.__net.slice(),
+      // parse/eval of the .js text (1.4MB wasm-bundle / 2.1MB asm.js)
+      scriptParseMs: window.__marks.scriptTagEnd - window.__marks.scriptTagStart,
+      // factory() = base64-decode + wasm compile + instantiate (or asm.js warmup)
+      factoryMs: window.__marks.factoryEnd - window.__marks.factoryStart,
+      parseInitMs: window.__marks.factoryEnd - window.__marks.scriptTagStart,
+      wasmHeapBytes: lib.HEAPU8 ? lib.HEAPU8.length : null,
+      heapBytes: (typeof performance !== 'undefined' && performance.memory)
+        ? performance.memory.usedJSHeapSize : null
+    };
+  },
+
+  // bytes: number[] (transferred from node) -> decode, paint to canvas, return PNG dataURL
+  async decode(bytesArr, opts) {
+    opts = opts || {};
+    const bytes = new Uint8Array(bytesArr);
+    const r = { net: [] };
+    const t0 = performance.now();
+    const decoder = new window.__lib.HeifDecoder();
+    const data = decoder.decode(bytes);
+    const tParsed = performance.now();
+    r.containerParseMs = tParsed - t0;
+    r.imageCount = data.length;
+    if (!data.length) throw new Error('no images decoded');
+    const image = data[0];
+    const width = image.get_width();
+    const height = image.get_height();
+    r.width = width; r.height = height;
+    r.megapixels = +((width * height) / 1e6).toFixed(2);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(width, height);
+    const tAlloc = performance.now();
+    r.canvasAllocMs = tAlloc - tParsed;
+
+    await new Promise((resolve, reject) => {
+      image.display(imageData, (d) => d ? resolve(d) : reject(new Error('HEIF processing error')));
+    });
+    const tPixels = performance.now();
+    r.pixelDecodeMs = tPixels - tAlloc;
+    r.totalDecodeMs = tPixels - t0;
+
+    // sanity: is it actually pixels and not a black/empty buffer?
+    let sum = 0, nonOpaque = 0;
+    const d = imageData.data;
+    for (let i = 0; i < d.length; i += 4001 * 4) { sum += d[i] + d[i + 1] + d[i + 2]; if (d[i + 3] !== 255) nonOpaque++; }
+    r.sampledChannelSum = sum;
+    r.sampledNonOpaque = nonOpaque;
+    r.firstPixels = Array.from(d.slice(0, 16));
+
+    r.rgbaByteLength = d.byteLength;
+    r.bufferIsTransferable = (d.buffer instanceof ArrayBuffer) && !(d.buffer.byteLength === 0);
+
+    if (opts.png) {
+      ctx.putImageData(imageData, 0, 0);
+      const tPut = performance.now();
+      r.putImageDataMs = tPut - tPixels;
+      r.png = canvas.toDataURL('image/png');
+      r.pngEncodeMs = performance.now() - tPut;
+    }
+    if (opts.jpeg) {
+      if (!opts.png) ctx.putImageData(imageData, 0, 0);
+      const tJ = performance.now();
+      r.jpeg = canvas.toDataURL('image/jpeg', 0.9);
+      r.jpegEncodeMs = performance.now() - tJ;
+      r.jpegBytes = Math.floor((r.jpeg.length - r.jpeg.indexOf(',') - 1) * 3 / 4);
+    }
+    if (typeof image.free === 'function') image.free();
+    r.net = window.__net.slice();
+    r.heapAfter = performance.memory ? performance.memory.usedJSHeapSize : null;
+    return r;
+  },
+
+  // decode N times without keeping references, to look for leaks / heap growth
+  async decodeRepeat(bytesArr, n) {
+    const bytes = new Uint8Array(bytesArr);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const t0 = performance.now();
+      const decoder = new window.__lib.HeifDecoder();
+      const data = decoder.decode(bytes);
+      const image = data[0];
+      const w = image.get_width(), h = image.get_height();
+      const buf = new Uint8ClampedArray(w * h * 4);
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((res, rej) => image.display({ data: buf, width: w, height: h }, d => d ? res(d) : rej(new Error('fail'))));
+      if (typeof image.free === 'function') image.free();
+      out.push({
+        i, ms: performance.now() - t0,
+        heap: performance.memory ? performance.memory.usedJSHeapSize : null,
+        wasmHeap: window.__lib.HEAPU8 ? window.__lib.HEAPU8.length : null
+      });
+    }
+    return out;
+  }
+};
+window.__ready = true;
+</script>
+</head>
+<body><h1>HEIC decode probe</h1><p id="s">loading…</p>
+<script>document.getElementById('s').textContent = 'libheif global: ' + (typeof libheif);</script>
+</body>
+</html>

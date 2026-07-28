@@ -1,0 +1,15 @@
+<meta charset="utf-8">
+<title>Photournament ingest pipeline probe</title>
+<style>
+  body { font: 13px/1.5 system-ui, sans-serif; margin: 20px; }
+  #spinner { width: 40px; height: 40px; background: #37c; margin: 12px 0; }
+  pre { background: #f4f4f4; padding: 8px; }
+  #grid { display: flex; flex-wrap: wrap; gap: 2px; }
+  #grid img { display: block; }
+</style>
+<h1>Ingest pipeline probe</h1>
+<input id="picker" type="file" webkitdirectory multiple>
+<div id="spinner"></div>
+<pre id="log">boot</pre>
+<div id="grid"></div>
+<script src="pipeline.js"></script>

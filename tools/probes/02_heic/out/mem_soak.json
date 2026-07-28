@@ -1,0 +1,505 @@
+{
+  "probe": "02_heic/mem_soak",
+  "decodes": 60,
+  "fixture": "photo_12mp.heic (3992x2992, 11.94MP)",
+  "withImageFree": {
+    "startHeapMB": 72,
+    "endHeapMB": 446.4,
+    "maxHeapMB": 446.4,
+    "heapAtDecode": {
+      "1": 72,
+      "5": 103.7,
+      "10": 149.4,
+      "20": 215.2,
+      "30": 258.3,
+      "45": 372,
+      "60": 446.4
+    },
+    "growthLast20MB": 74.4,
+    "msFirst": 1097,
+    "msLast10Median": 1021,
+    "curve": [
+      {
+        "i": 0,
+        "ms": 1097,
+        "wasmHeapMB": 72
+      },
+      {
+        "i": 1,
+        "ms": 1017,
+        "wasmHeapMB": 86.4
+      },
+      {
+        "i": 2,
+        "ms": 1031,
+        "wasmHeapMB": 86.4
+      },
+      {
+        "i": 3,
+        "ms": 1071,
+        "wasmHeapMB": 103.7
+      },
+      {
+        "i": 4,
+        "ms": 998,
+        "wasmHeapMB": 103.7
+      },
+      {
+        "i": 5,
+        "ms": 1020,
+        "wasmHeapMB": 124.5
+      },
+      {
+        "i": 6,
+        "ms": 1006,
+        "wasmHeapMB": 124.5
+      },
+      {
+        "i": 7,
+        "ms": 1040,
+        "wasmHeapMB": 124.5
+      },
+      {
+        "i": 8,
+        "ms": 1034,
+        "wasmHeapMB": 124.5
+      },
+      {
+        "i": 9,
+        "ms": 1012,
+        "wasmHeapMB": 149.4
+      },
+      {
+        "i": 10,
+        "ms": 1001,
+        "wasmHeapMB": 149.4
+      },
+      {
+        "i": 11,
+        "ms": 1030,
+        "wasmHeapMB": 149.4
+      },
+      {
+        "i": 12,
+        "ms": 1045,
+        "wasmHeapMB": 149.4
+      },
+      {
+        "i": 13,
+        "ms": 1036,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 14,
+        "ms": 1083,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 15,
+        "ms": 1004,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 16,
+        "ms": 1011,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 17,
+        "ms": 1076,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 18,
+        "ms": 991,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 19,
+        "ms": 993,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 20,
+        "ms": 1001,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 21,
+        "ms": 1005,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 22,
+        "ms": 1014,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 23,
+        "ms": 1008,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 24,
+        "ms": 1010,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 25,
+        "ms": 992,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 26,
+        "ms": 982,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 27,
+        "ms": 1025,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 28,
+        "ms": 1029,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 29,
+        "ms": 1042,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 30,
+        "ms": 1041,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 31,
+        "ms": 1017,
+        "wasmHeapMB": 310
+      },
+      {
+        "i": 32,
+        "ms": 1002,
+        "wasmHeapMB": 310
+      },
+      {
+        "i": 33,
+        "ms": 993,
+        "wasmHeapMB": 310
+      },
+      {
+        "i": 34,
+        "ms": 1002,
+        "wasmHeapMB": 310
+      },
+      {
+        "i": 35,
+        "ms": 1002,
+        "wasmHeapMB": 310
+      },
+      {
+        "i": 36,
+        "ms": 1021,
+        "wasmHeapMB": 310
+      },
+      {
+        "i": 37,
+        "ms": 1031,
+        "wasmHeapMB": 310
+      },
+      {
+        "i": 38,
+        "ms": 1024,
+        "wasmHeapMB": 310
+      },
+      {
+        "i": 39,
+        "ms": 1019,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 40,
+        "ms": 999,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 41,
+        "ms": 993,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 42,
+        "ms": 1016,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 43,
+        "ms": 996,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 44,
+        "ms": 993,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 45,
+        "ms": 1001,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 46,
+        "ms": 1018,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 47,
+        "ms": 1025,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 48,
+        "ms": 1014,
+        "wasmHeapMB": 372
+      },
+      {
+        "i": 49,
+        "ms": 1004,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 50,
+        "ms": 1012,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 51,
+        "ms": 995,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 52,
+        "ms": 990,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 53,
+        "ms": 1021,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 54,
+        "ms": 1002,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 55,
+        "ms": 1005,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 56,
+        "ms": 1075,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 57,
+        "ms": 1040,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 58,
+        "ms": 1023,
+        "wasmHeapMB": 446.4
+      },
+      {
+        "i": 59,
+        "ms": 1070,
+        "wasmHeapMB": 446.4
+      }
+    ]
+  },
+  "withoutImageFree": {
+    "decodes": 30,
+    "startHeapMB": 72,
+    "endHeapMB": 258.3,
+    "curve": [
+      {
+        "i": 0,
+        "ms": 1030,
+        "wasmHeapMB": 72
+      },
+      {
+        "i": 1,
+        "ms": 1009,
+        "wasmHeapMB": 86.4
+      },
+      {
+        "i": 2,
+        "ms": 1093,
+        "wasmHeapMB": 86.4
+      },
+      {
+        "i": 3,
+        "ms": 1084,
+        "wasmHeapMB": 103.7
+      },
+      {
+        "i": 4,
+        "ms": 1009,
+        "wasmHeapMB": 103.7
+      },
+      {
+        "i": 5,
+        "ms": 1006,
+        "wasmHeapMB": 124.5
+      },
+      {
+        "i": 6,
+        "ms": 1013,
+        "wasmHeapMB": 124.5
+      },
+      {
+        "i": 7,
+        "ms": 1016,
+        "wasmHeapMB": 124.5
+      },
+      {
+        "i": 8,
+        "ms": 996,
+        "wasmHeapMB": 124.5
+      },
+      {
+        "i": 9,
+        "ms": 1022,
+        "wasmHeapMB": 149.4
+      },
+      {
+        "i": 10,
+        "ms": 1019,
+        "wasmHeapMB": 149.4
+      },
+      {
+        "i": 11,
+        "ms": 1008,
+        "wasmHeapMB": 149.4
+      },
+      {
+        "i": 12,
+        "ms": 1065,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 13,
+        "ms": 1038,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 14,
+        "ms": 1033,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 15,
+        "ms": 1056,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 16,
+        "ms": 1021,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 17,
+        "ms": 1039,
+        "wasmHeapMB": 179.3
+      },
+      {
+        "i": 18,
+        "ms": 1033,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 19,
+        "ms": 1030,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 20,
+        "ms": 1015,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 21,
+        "ms": 1015,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 22,
+        "ms": 996,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 23,
+        "ms": 1035,
+        "wasmHeapMB": 215.2
+      },
+      {
+        "i": 24,
+        "ms": 1054,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 25,
+        "ms": 1006,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 26,
+        "ms": 1028,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 27,
+        "ms": 1001,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 28,
+        "ms": 1001,
+        "wasmHeapMB": 258.3
+      },
+      {
+        "i": 29,
+        "ms": 985,
+        "wasmHeapMB": 258.3
+      }
+    ]
+  },
+  "unsupportedInput": [
+    {
+      "label": "jpeg fed to HeifDecoder",
+      "threw": false,
+      "imageCount": 0
+    },
+    {
+      "label": "truncated heic (first 50KB)",
+      "threw": false,
+      "imageCount": 1,
+      "dims": "3992x2992"
+    },
+    {
+      "label": "4KB of 0x41",
+      "threw": false,
+      "imageCount": 0
+    },
+    {
+      "label": "empty buffer",
+      "threw": false,
+      "imageCount": 0
+    }
+  ],
+  "pageErrors": []
+}

@@ -1,0 +1,86 @@
+{
+  "probe": "02_heic/run_worker",
+  "mode": "file",
+  "inline": true,
+  "url": "file:///home/user/Photournament/tools/probes/02_heic/out/w_inline.html",
+  "htmlBytes": 1471072,
+  "A_blobImportScriptsAbsolute": {
+    "label": "A:blob-worker + importScripts(absolute url)",
+    "init": {
+      "ok": true,
+      "cmd": "init",
+      "scriptParseMs": 22.100000000093132,
+      "factoryMs": 21.199999999953434,
+      "totalInitMs": 43.300000000046566,
+      "hasDecoder": true,
+      "net": []
+    },
+    "decode": {
+      "ok": true,
+      "cmd": "decode",
+      "w": 3992,
+      "h": 2992,
+      "containerParseMs": 94,
+      "pixelDecodeMs": 1021.6000000000931,
+      "totalMs": 1115.6000000000931,
+      "sampledChannelSum": 1282876,
+      "byteLength": 47776256,
+      "wasmHeap": 72024064
+    },
+    "transferProven": {
+      "receivedByteLength": 47776256,
+      "isArrayBuffer": true
+    },
+    "workerCreateMs": 1.5999999998603016
+  },
+  "B_blobImportScriptsRelative": {
+    "ok": false,
+    "cmd": "init",
+    "error": "Failed to execute 'importScripts' on 'WorkerGlobalScope': The URL '../../../../node_modules/libheif-js/libheif-wasm/libheif-bundle.js' is invalid."
+  },
+  "C_classicSiblingFileWorker": {
+    "ok": false,
+    "error": "constructor threw: Failed to construct 'Worker': Script at 'file:///home/user/Photournament/tools/probes/02_heic/out/worker_classic.js' cannot be accessed from origin 'null'."
+  },
+  "D_inlinedSourceBlobWorker": {
+    "label": "D:blob-worker with bundle source inlined in the HTML",
+    "init": {
+      "ok": true,
+      "cmd": "init",
+      "factoryMs": 23.5,
+      "scriptParseMs": null,
+      "totalInitMs": 23.5,
+      "hasDecoder": true,
+      "net": []
+    },
+    "decode": {
+      "ok": true,
+      "cmd": "decode",
+      "w": 3992,
+      "h": 2992,
+      "containerParseMs": 96.0999999998603,
+      "pixelDecodeMs": 1222.4000000001397,
+      "totalMs": 1318.5,
+      "sampledChannelSum": 1282876,
+      "byteLength": 47776256,
+      "wasmHeap": 72024064
+    },
+    "transferProven": {
+      "receivedByteLength": 47776256,
+      "isArrayBuffer": true
+    },
+    "workerCreateMs": 7.300000000046566
+  },
+  "network": {
+    "allRequestUrls": [
+      "file:///home/user/Photournament/tools/probes/02_heic/out/w_inline.html"
+    ],
+    "wasmRequests": [],
+    "remoteRequests": []
+  },
+  "console": [
+    "worker created: blob:null/90304255-f83c-4864-a342-4e0d233ce1a6",
+    "worker created: blob:null/9f9e8d31-2293-4550-a131-3261c46ac4e1",
+    "worker created: blob:null/e288b10f-497e-4642-a98b-60abd3eb8b90"
+  ]
+}

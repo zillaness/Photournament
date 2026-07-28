@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Photournament persistence probe</title></head>
+<body>
+<h1>persistence probe</h1>
+<button id="pickerNoGestureMarker">unused</button>
+<iframe id="sandboxed" sandbox="allow-scripts" src="about:blank" style="width:200px;height:60px"></iframe>
+<pre id="out">idle</pre>
+<script>
+(function () {
+  'use strict';
+  var DB = 'photournament_persist_v1';
+  function errStr(e) {
+    if (!e) return String(e);
+    if (e.name && e.message !== undefined) return e.name + ': ' + e.message;
+    return String(e);
+  }
+  function open() {
+    return new Promise(function (res, rej) {
+      var r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = function () {
+        var d = r.result;
+        if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+      };
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    });
+  }
+  function txn(db, mode, fn) {
+    return new Promise(function (res, rej) {
+      var t = db.transaction('kv', mode), s = t.objectStore('kv'), out;
+      t.oncomplete = function () { res(out); };
+      t.onerror = t.onabort = function () { rej(t.error || new Error('tx failed')); };
+      Promise.resolve(fn(s)).then(function (v) { out = v; }, rej);
+    });
+  }
+  function req(r) { return new Promise(function (res, rej) { r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); }
+
+  // read whatever a previous visit / previous browser run left behind
+  window.readState = async function () {
+    var out = { origin: String(window.origin), href: location.href };
+    try {
+      var db = await open();
+      var marker = await txn(db, 'readonly', function (s) { return req(s.get('marker')); });
+      var blob = await txn(db, 'readonly', function (s) { return req(s.get('blob')); });
+      var big = await txn(db, 'readonly', function (s) { return req(s.get('big')); });
+      var handle = await txn(db, 'readonly', function (s) { return req(s.get('dirHandle')); });
+      out.marker = marker || null;
+      out.blobFound = !!blob;
+      out.blobSize = blob ? blob.size : null;
+      out.blobText = blob ? (await blob.slice(0, 24).text()) : null;
+      out.bigFound = !!big;
+      out.bigSize = big ? big.size : null;
+      out.handleFound = !!handle;
+      if (handle) {
+        out.handleKind = handle.kind;
+        out.handleName = handle.name;
+        out.handleIsDirHandle = (typeof FileSystemDirectoryHandle !== 'undefined') && (handle instanceof FileSystemDirectoryHandle);
+        try { out.handlePermission = await handle.queryPermission({ mode: 'readwrite' }); }
+        catch (e) { out.handlePermission = errStr(e); }
+        try {
+          var names = [];
+          for await (var [n] of handle.entries()) { names.push(n); if (names.length > 5) break; }
+          out.handleReadBack = 'entries(): ' + JSON.stringify(names);
+        } catch (e) { out.handleReadBack = errStr(e); }
+      }
+      db.close();
+    } catch (e) { out.error = errStr(e); }
+    try { out.estimate = await navigator.storage.estimate(); } catch (e) { out.estimate = errStr(e); }
+    return out;
+  };
+
+  // write a marker, a Blob, a ~N MB payload, and (if obtainable) a FileSystemDirectoryHandle
+  window.writeState = async function (megabytes) {
+    var out = { origin: String(window.origin) };
+    var t0 = performance.now();
+    try {
+      var db = await open();
+      await txn(db, 'readwrite', function (s) { s.put({ written: Date.now(), tag: 'PHOTOURNAMENT' }, 'marker'); });
+      await txn(db, 'readwrite', function (s) {
+        s.put(new Blob(['SIDECAR_JPEG_STANDIN_' + 'x'.repeat(4096)], { type: 'image/jpeg' }), 'blob');
+      });
+      // realistic payload: many preview-sized blobs, mimicking 7.9's thumbnail+preview cache
+      var n = megabytes;
+      var chunk = new Uint8Array(1024 * 1024);
+      for (var i = 0; i < chunk.length; i++) chunk[i] = i & 255;
+      var parts = [];
+      for (var j = 0; j < n; j++) parts.push(chunk);
+      var big = new Blob(parts, { type: 'image/jpeg' });
+      await txn(db, 'readwrite', function (s) { s.put(big, 'big'); });
+      out.bigWrittenBytes = big.size;
+      out.bigWriteMs = Math.round(performance.now() - t0);
+
+      // FileSystemDirectoryHandle round-trip (OPFS root is a real FileSystemDirectoryHandle)
+      try {
+        var root = await navigator.storage.getDirectory();
+        await root.getFileHandle('keep.txt', { create: true });
+        await txn(db, 'readwrite', function (s) { s.put(root, 'dirHandle'); });
+        out.handleStored = 'stored OPFS root handle (kind=' + root.kind + ')';
+      } catch (e) { out.handleStored = 'could not obtain/store handle: ' + errStr(e); }
+
+      db.close();
+      out.ok = true;
+    } catch (e) { out.error = errStr(e); }
+    try { out.estimate = await navigator.storage.estimate(); } catch (e) { out.estimate = errStr(e); }
+    return out;
+  };
+
+  // control experiments that disambiguate picker failure modes
+  window.pickerNoGesture = async function () {
+    try { await window.showDirectoryPicker(); return 'resolved (unexpected)'; }
+    catch (e) { return errStr(e); }
+  };
+  window.pickerInSandboxedIframe = function () {
+    return new Promise(function (res) {
+      var f = document.getElementById('sandboxed');
+      window.addEventListener('message', function h(ev) {
+        if (ev.data && ev.data.__pickerIframe) { window.removeEventListener('message', h); res(ev.data.__pickerIframe); }
+      });
+      var doc = f.contentDocument;
+      if (!doc) { res('no contentDocument (iframe fully opaque to parent)'); return; }
+      var s = doc.createElement('script');
+      s.textContent =
+        "var o={origin:String(self.origin),secure:self.isSecureContext,has:('showDirectoryPicker' in self)};" +
+        "var b=document.createElement('button');b.id='b';b.textContent='pick';document.body.appendChild(b);" +
+        "b.onclick=function(){try{self.showDirectoryPicker().then(function(){parent.postMessage({__pickerIframe:Object.assign(o,{result:'resolved'})},'*');}," +
+        "function(e){parent.postMessage({__pickerIframe:Object.assign(o,{result:e.name+': '+e.message})},'*');});}" +
+        "catch(e){parent.postMessage({__pickerIframe:Object.assign(o,{result:'sync '+e.name+': '+e.message})},'*');}};";
+      doc.body.appendChild(s);
+      setTimeout(function () {
+        try { doc.getElementById('b').click(); } catch (e) { res('click failed: ' + errStr(e)); }
+      }, 100);
+      setTimeout(function () { res('TIMEOUT waiting for iframe result'); }, 6000);
+    });
+  };
+  window.__READY__ = true;
+})();
+</script>
+</body>
+</html>

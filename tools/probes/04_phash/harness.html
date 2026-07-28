@@ -1,0 +1,41 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Photournament pHash probe harness</title>
+<body style="font:14px system-ui;padding:16px">
+<h1>pHash probe harness</h1>
+<p id="status">idle</p>
+<script src="./phash.js"></script>
+<script src="./lib/scenegen.js"></script>
+<script src="./lib/corpus.js"></script>
+<script src="./lib/bench.js"></script>
+<script>
+  window.__log = [];
+  function setStatus(s) { document.getElementById('status').textContent = s; window.__log.push(s); }
+  window.runCorpus = function () {
+    return Corpus.build(function (i, n) { setStatus('corpus ' + i + '/' + n); })
+      .then(function (r) { setStatus('corpus done: ' + r.records.length); return r; });
+  };
+  window.runBench = function (n) {
+    return Bench.run(n, function (i, t, phase) { setStatus('bench ' + (phase || 'gen') + ' ' + i + '/' + t); })
+      .then(function (r) { setStatus('bench done'); return r; });
+  };
+  window.selfTest = function () {
+    // sanity: hashing a flat grey image and a gradient must not crash, and
+    // identical input must give identical output.
+    var c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+    var g = ctx.createLinearGradient(0, 0, 64, 64); g.addColorStop(0, '#000'); g.addColorStop(1, '#fff');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64);
+    var id = ctx.getImageData(0, 0, 64, 64);
+    var a = PhotournamentHash.hashImageData(id), b = PhotournamentHash.hashImageData(id);
+    return {
+      stable: a.dhash === b.dhash && a.phash === b.phash,
+      dhash: a.dhash, phash: a.phash,
+      selfDistD: PhotournamentHash.hamming(a.dhash, b.dhash),
+      selfDistP: PhotournamentHash.hamming(a.phash, b.phash),
+      hexLen: a.dhash.length,
+      hammingMax: PhotournamentHash.hamming('ffffffffffffffff', '0000000000000000')
+    };
+  };
+</script>
+</body>

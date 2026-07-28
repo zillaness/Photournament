@@ -1,0 +1,56 @@
+{
+  "probe": "02_heic/run_worker",
+  "mode": "file",
+  "inline": false,
+  "url": "file:///home/user/Photournament/tools/probes/02_heic/out/w.html",
+  "htmlBytes": 8931,
+  "A_blobImportScriptsAbsolute": {
+    "label": "A:blob-worker + importScripts(absolute url)",
+    "init": {
+      "ok": true,
+      "cmd": "init",
+      "scriptParseMs": 61,
+      "factoryMs": 32.5,
+      "totalInitMs": 93.5,
+      "hasDecoder": true,
+      "net": []
+    },
+    "decode": {
+      "ok": true,
+      "cmd": "decode",
+      "w": 3992,
+      "h": 2992,
+      "containerParseMs": 166.70000000018626,
+      "pixelDecodeMs": 1428.1999999999534,
+      "totalMs": 1594.9000000001397,
+      "sampledChannelSum": 1282876,
+      "byteLength": 47776256,
+      "wasmHeap": 72024064
+    },
+    "transferProven": {
+      "receivedByteLength": 47776256,
+      "isArrayBuffer": true
+    },
+    "workerCreateMs": 1.3999999999068677
+  },
+  "B_blobImportScriptsRelative": {
+    "ok": false,
+    "cmd": "init",
+    "error": "Failed to execute 'importScripts' on 'WorkerGlobalScope': The URL '../../../../node_modules/libheif-js/libheif-wasm/libheif-bundle.js' is invalid."
+  },
+  "C_classicSiblingFileWorker": {
+    "ok": false,
+    "error": "constructor threw: Failed to construct 'Worker': Script at 'file:///home/user/Photournament/tools/probes/02_heic/out/worker_classic.js' cannot be accessed from origin 'null'."
+  },
+  "network": {
+    "allRequestUrls": [
+      "file:///home/user/Photournament/tools/probes/02_heic/out/w.html"
+    ],
+    "wasmRequests": [],
+    "remoteRequests": []
+  },
+  "console": [
+    "worker created: blob:null/25d535e8-bc0b-418f-98be-d2864ba80f72",
+    "worker created: blob:null/ac8b8e22-04ae-40bc-8f75-be11154bac77"
+  ]
+}

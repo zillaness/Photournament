@@ -1,0 +1,2454 @@
+{
+  "generatedAt": "2026-07-28T03:13:34.772Z",
+  "node": "v22.22.2",
+  "runs": [
+    {
+      "name": "file_default",
+      "url": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+      "args": [],
+      "channel": "headless-shell (playwright default)",
+      "console": [
+        "[error] Access to script at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/m.js' from origin 'null' has been blocked by CORS policy: Cross origin requests are only supported for protocol schemes: chrome, chrome-untrusted, data, http, https.",
+        "[error] Failed to load resource: net::ERR_FAILED",
+        "[error] Fetch API cannot load file:///home/user/Photournament/tools/probes/01_capability_matrix/local.txt. URL scheme \"file\" is not supported.",
+        "[error] Access to XMLHttpRequest at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/local.txt' from origin 'null' has been blocked by CORS policy: Cross origin requests are only supported for protocol schemes: chrome, chrome-untrusted, data, http, https.",
+        "[error] Failed to load resource: net::ERR_FAILED",
+        "[error] Fetch API cannot load file:///home/user/Photournament/tools/probes/01_capability_matrix/tiny.wasm. URL scheme \"file\" is not supported."
+      ],
+      "pageErrors": [],
+      "browserVersion": "141.0.7390.37",
+      "results": {
+        "context": {
+          "status": "ok",
+          "detail": {
+            "isSecureContext": true,
+            "origin": "null",
+            "locationOrigin": "file://",
+            "href": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+            "protocol": "file:",
+            "crossOriginIsolated": false,
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36"
+          }
+        },
+        "pngFixture": {
+          "status": "ok",
+          "detail": {
+            "size": 127,
+            "type": "image/png"
+          }
+        },
+        "indexedDB": {
+          "status": "ok",
+          "detail": {
+            "opened": true,
+            "dbName": "photournament_probe_1785208415326",
+            "recordRoundTrip": true,
+            "blobIsBlob": true,
+            "blobSize": 53,
+            "blobRoundTrip": true,
+            "fileIsFile": true,
+            "fileName": "IMG_1234.HEIC",
+            "fileLastModified": 1234567890,
+            "fileRoundTrip": true,
+            "arrayBufferRoundTrip": true,
+            "imageBitmapIsImageBitmap": true,
+            "imageBitmapDims": "8x6",
+            "deleteWorks": true,
+            "databasesApi": "lists our db (1 total)",
+            "dbDeleted": true
+          }
+        },
+        "indexedDB_reopen": {
+          "status": "ok",
+          "detail": {
+            "priorSessionMarker": null,
+            "survivesReopenInSamePage": true
+          }
+        },
+        "storage": {
+          "status": "ok",
+          "detail": {
+            "hasNavigatorStorage": true,
+            "hasEstimate": true,
+            "hasPersist": true,
+            "hasPersisted": true,
+            "hasGetDirectory": true,
+            "estimate": {
+              "quota": 956725333,
+              "usage": 3557,
+              "quotaGB": 0.96,
+              "usageDetails": {
+                "indexedDB": 3557
+              }
+            },
+            "persistedBefore": false,
+            "persistResult": false,
+            "persistedAfter": false,
+            "opfs": "SecurityError: It was determined that certain files are unsafe for access within a Web application, or that too many calls are being made on file resources."
+          }
+        },
+        "fsa_surface": {
+          "status": "ok",
+          "detail": {
+            "showDirectoryPicker_in_window": true,
+            "showOpenFilePicker_in_window": true,
+            "showSaveFilePicker_in_window": true,
+            "FileSystemHandle": "function",
+            "FileSystemDirectoryHandle": "function",
+            "FileSystemFileHandle": "function",
+            "FileSystemWritableFileStream": "function",
+            "showDirectoryPicker_length": 0,
+            "showOpenFilePicker_length": 0,
+            "showDirectoryPicker_toString": "function showDirectoryPicker() { [native code] }",
+            "handle_queryPermission": "function",
+            "handle_requestPermission": "function",
+            "handle_isSameEntry": "function",
+            "dir_entries": "function",
+            "dir_values": "function",
+            "dir_getFileHandle": "function",
+            "dir_getDirectoryHandle": "function",
+            "dir_removeEntry": "function",
+            "file_createWritable": "function",
+            "DataTransferItem_getAsFileSystemHandle": "function",
+            "DataTransferItem_webkitGetAsEntry": "function",
+            "DataTransferItem_getAsFile": "function",
+            "HTMLInputElement_webkitdirectory": true
+          }
+        },
+        "worker_relative_classic": {
+          "status": "fail",
+          "detail": "Error: construct: SecurityError: Failed to construct 'Worker': Script at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/w.js' cannot be accessed from origin 'null'."
+        },
+        "worker_relative_module": {
+          "status": "fail",
+          "detail": "Error: construct: SecurityError: Failed to construct 'Worker': Script at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/wm.js' cannot be accessed from origin 'null'."
+        },
+        "worker_blob_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_blob_module": {
+          "status": "fail",
+          "detail": "Error: onerror: (no message — opaque, typical of a cross-origin/blocked worker script)"
+        },
+        "worker_data_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_data_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "fetch_relative": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch"
+        },
+        "xhr_relative": {
+          "status": "fail",
+          "detail": "Error: XHR onerror (status=0) — network/CORS level failure"
+        },
+        "fetch_data_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "DATA_URL_OK"
+          }
+        },
+        "fetch_blob_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "body": "BLOB_URL_OK"
+          }
+        },
+        "module_script_tag": {
+          "status": "fail",
+          "detail": "external module script did NOT execute (blocked or errored) after full load"
+        },
+        "dynamic_import": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch dynamically imported module: file:///home/user/Photournament/tools/probes/01_capability_matrix/m.js"
+        },
+        "inline_module_script": {
+          "status": "ok",
+          "detail": "inline module executed"
+        },
+        "createImageBitmap_main": {
+          "status": "ok",
+          "detail": "8x6"
+        },
+        "offscreencanvas_main": {
+          "status": "ok",
+          "detail": {
+            "ctx": true,
+            "blob": "image/jpeg 760B"
+          }
+        },
+        "canvas_toDataURL_and_getImageData": {
+          "status": "ok",
+          "detail": {
+            "pixel": "48,96,192,255",
+            "dataURLPrefix": "data:image/jpeg;base64,/",
+            "dataURLLen": 1055
+          }
+        },
+        "wasm_main": {
+          "status": "ok",
+          "detail": {
+            "add_20_22": 42,
+            "compileOk": true
+          }
+        },
+        "wasm_streaming_relative": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch"
+        },
+        "worker_blob_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "blob:null/9e29c22a-4924-4205-b20c-87462046da23"
+            }
+          }
+        },
+        "worker_relative_imaging_pipeline": {
+          "status": "fail",
+          "detail": "Error: construct: SecurityError: Failed to construct 'Worker': Script at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/heavy.js' cannot be accessed from origin 'null'."
+        },
+        "crypto_subtle_digest": {
+          "status": "ok",
+          "detail": {
+            "sha256_of_photournament": "86f43de22a3f5a0ad4789af07a0f9d9d1a3675fdc9b138afcda5c239ffcee5b2",
+            "blobDigestBytes": 32,
+            "randomUUID": "2e42456e-e27d-4f4d-be94-33a127490b23"
+          }
+        },
+        "structuredClone_direct": {
+          "status": "ok",
+          "detail": {
+            "blob": true,
+            "file": true,
+            "arrayBuffer": true,
+            "imageBitmap": true,
+            "functionThrows": "DataCloneError: Failed to execute 'structuredClone' on 'Window': function () {} could not be cloned."
+          }
+        },
+        "web_storage": {
+          "status": "ok",
+          "detail": {
+            "localStorage": true,
+            "sessionStorage": true,
+            "cookie": false,
+            "caches": "object"
+          }
+        },
+        "datatransfer_surface": {
+          "status": "ok",
+          "detail": {
+            "itemsAddWorks": true,
+            "kind": "file",
+            "type": "image/jpeg",
+            "getAsFile": true,
+            "getAsFileSystemHandle_present": true,
+            "webkitGetAsEntry_present": true,
+            "getAsFileSystemHandle_arity": 0,
+            "getAsFileSystemHandle_result": "null (expected for synthetic DataTransfer — no real OS drag)"
+          }
+        },
+        "download_anchor": {
+          "status": "ok",
+          "detail": {
+            "downloadAttr": true,
+            "msSaveBlob": "undefined"
+          }
+        }
+      },
+      "picker": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 5,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        },
+        "showOpenFilePicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showOpenFilePicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 9,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    },
+    {
+      "name": "http_default",
+      "url": "http://localhost:8099/probe.html",
+      "args": [],
+      "channel": "headless-shell (playwright default)",
+      "console": [],
+      "pageErrors": [],
+      "browserVersion": "141.0.7390.37",
+      "results": {
+        "context": {
+          "status": "ok",
+          "detail": {
+            "isSecureContext": true,
+            "origin": "http://localhost:8099",
+            "locationOrigin": "http://localhost:8099",
+            "href": "http://localhost:8099/probe.html",
+            "protocol": "http:",
+            "crossOriginIsolated": false,
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36"
+          }
+        },
+        "pngFixture": {
+          "status": "ok",
+          "detail": {
+            "size": 127,
+            "type": "image/png"
+          }
+        },
+        "indexedDB": {
+          "status": "ok",
+          "detail": {
+            "opened": true,
+            "dbName": "photournament_probe_1785208425366",
+            "recordRoundTrip": true,
+            "blobIsBlob": true,
+            "blobSize": 53,
+            "blobRoundTrip": true,
+            "fileIsFile": true,
+            "fileName": "IMG_1234.HEIC",
+            "fileLastModified": 1234567890,
+            "fileRoundTrip": true,
+            "arrayBufferRoundTrip": true,
+            "imageBitmapIsImageBitmap": true,
+            "imageBitmapDims": "8x6",
+            "deleteWorks": true,
+            "databasesApi": "lists our db (1 total)",
+            "dbDeleted": true
+          }
+        },
+        "indexedDB_reopen": {
+          "status": "ok",
+          "detail": {
+            "priorSessionMarker": null,
+            "survivesReopenInSamePage": true
+          }
+        },
+        "storage": {
+          "status": "ok",
+          "detail": {
+            "hasNavigatorStorage": true,
+            "hasEstimate": true,
+            "hasPersist": true,
+            "hasPersisted": true,
+            "hasGetDirectory": true,
+            "estimate": {
+              "quota": 931147087,
+              "usage": 3612,
+              "quotaGB": 0.93,
+              "usageDetails": {
+                "indexedDB": 3612
+              }
+            },
+            "persistedBefore": false,
+            "persistResult": false,
+            "persistedAfter": false,
+            "opfs": "read/write OK, roundtrip=true"
+          }
+        },
+        "fsa_surface": {
+          "status": "ok",
+          "detail": {
+            "showDirectoryPicker_in_window": true,
+            "showOpenFilePicker_in_window": true,
+            "showSaveFilePicker_in_window": true,
+            "FileSystemHandle": "function",
+            "FileSystemDirectoryHandle": "function",
+            "FileSystemFileHandle": "function",
+            "FileSystemWritableFileStream": "function",
+            "showDirectoryPicker_length": 0,
+            "showOpenFilePicker_length": 0,
+            "showDirectoryPicker_toString": "function showDirectoryPicker() { [native code] }",
+            "handle_queryPermission": "function",
+            "handle_requestPermission": "function",
+            "handle_isSameEntry": "function",
+            "dir_entries": "function",
+            "dir_values": "function",
+            "dir_getFileHandle": "function",
+            "dir_getDirectoryHandle": "function",
+            "dir_removeEntry": "function",
+            "file_createWritable": "function",
+            "DataTransferItem_getAsFileSystemHandle": "function",
+            "DataTransferItem_webkitGetAsEntry": "function",
+            "DataTransferItem_getAsFile": "function",
+            "HTMLInputElement_webkitdirectory": true
+          }
+        },
+        "worker_relative_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "classic-file",
+              "ts": 1785208425405
+            }
+          }
+        },
+        "worker_relative_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "module-file",
+              "ts": 1785208425413
+            }
+          }
+        },
+        "worker_blob_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_blob_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "worker_data_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_data_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "fetch_relative": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "PHOTOURNAMENT_PROBE_LOCAL_TXT_OK"
+          }
+        },
+        "xhr_relative": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "len": 33,
+            "body": "PHOTOURNAMENT_PROBE_LOCAL_TXT_OK\n"
+          }
+        },
+        "fetch_data_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "DATA_URL_OK"
+          }
+        },
+        "fetch_blob_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "body": "BLOB_URL_OK"
+          }
+        },
+        "module_script_tag": {
+          "status": "ok",
+          "detail": "external <script type=\"module\" src=\"./m.js\"> executed"
+        },
+        "dynamic_import": {
+          "status": "ok",
+          "detail": "import() resolved, ok=true"
+        },
+        "inline_module_script": {
+          "status": "ok",
+          "detail": "inline module executed"
+        },
+        "createImageBitmap_main": {
+          "status": "ok",
+          "detail": "8x6"
+        },
+        "offscreencanvas_main": {
+          "status": "ok",
+          "detail": {
+            "ctx": true,
+            "blob": "image/jpeg 760B"
+          }
+        },
+        "canvas_toDataURL_and_getImageData": {
+          "status": "ok",
+          "detail": {
+            "pixel": "48,96,192,255",
+            "dataURLPrefix": "data:image/jpeg;base64,/",
+            "dataURLLen": 1055
+          }
+        },
+        "wasm_main": {
+          "status": "ok",
+          "detail": {
+            "add_20_22": 42,
+            "compileOk": true
+          }
+        },
+        "wasm_streaming_relative": {
+          "status": "ok",
+          "detail": "add=3"
+        },
+        "worker_blob_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "blob:http://localhost:8099/ea1a6d4f-13c1-4b8c-9378-ad7569b33d8f"
+            }
+          }
+        },
+        "worker_relative_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "http://localhost:8099/heavy.js"
+            }
+          }
+        },
+        "crypto_subtle_digest": {
+          "status": "ok",
+          "detail": {
+            "sha256_of_photournament": "86f43de22a3f5a0ad4789af07a0f9d9d1a3675fdc9b138afcda5c239ffcee5b2",
+            "blobDigestBytes": 32,
+            "randomUUID": "649ec3f2-6685-4d61-bb88-127a5ab75702"
+          }
+        },
+        "structuredClone_direct": {
+          "status": "ok",
+          "detail": {
+            "blob": true,
+            "file": true,
+            "arrayBuffer": true,
+            "imageBitmap": true,
+            "functionThrows": "DataCloneError: Failed to execute 'structuredClone' on 'Window': function () {} could not be cloned."
+          }
+        },
+        "web_storage": {
+          "status": "ok",
+          "detail": {
+            "localStorage": true,
+            "sessionStorage": true,
+            "cookie": true,
+            "caches": "object"
+          }
+        },
+        "datatransfer_surface": {
+          "status": "ok",
+          "detail": {
+            "itemsAddWorks": true,
+            "kind": "file",
+            "type": "image/jpeg",
+            "getAsFile": true,
+            "getAsFileSystemHandle_present": true,
+            "webkitGetAsEntry_present": true,
+            "getAsFileSystemHandle_arity": 0,
+            "getAsFileSystemHandle_result": "null (expected for synthetic DataTransfer — no real OS drag)"
+          }
+        },
+        "download_anchor": {
+          "status": "ok",
+          "detail": {
+            "downloadAttr": true,
+            "msSaveBlob": "undefined"
+          }
+        }
+      },
+      "picker": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 10,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        },
+        "showOpenFilePicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showOpenFilePicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 8,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    },
+    {
+      "name": "file_allowFileAccess",
+      "url": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+      "args": [
+        "--allow-file-access-from-files"
+      ],
+      "channel": "headless-shell (playwright default)",
+      "console": [
+        "[error] Fetch API cannot load file:///home/user/Photournament/tools/probes/01_capability_matrix/local.txt. URL scheme \"file\" is not supported.",
+        "[error] Fetch API cannot load file:///home/user/Photournament/tools/probes/01_capability_matrix/tiny.wasm. URL scheme \"file\" is not supported."
+      ],
+      "pageErrors": [],
+      "browserVersion": "141.0.7390.37",
+      "results": {
+        "context": {
+          "status": "ok",
+          "detail": {
+            "isSecureContext": true,
+            "origin": "file://",
+            "locationOrigin": "file://",
+            "href": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+            "protocol": "file:",
+            "crossOriginIsolated": false,
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36"
+          }
+        },
+        "pngFixture": {
+          "status": "ok",
+          "detail": {
+            "size": 127,
+            "type": "image/png"
+          }
+        },
+        "indexedDB": {
+          "status": "ok",
+          "detail": {
+            "opened": true,
+            "dbName": "photournament_probe_1785208435347",
+            "recordRoundTrip": true,
+            "blobIsBlob": true,
+            "blobSize": 53,
+            "blobRoundTrip": true,
+            "fileIsFile": true,
+            "fileName": "IMG_1234.HEIC",
+            "fileLastModified": 1234567890,
+            "fileRoundTrip": true,
+            "arrayBufferRoundTrip": true,
+            "imageBitmapIsImageBitmap": true,
+            "imageBitmapDims": "8x6",
+            "deleteWorks": true,
+            "databasesApi": "lists our db (1 total)",
+            "dbDeleted": true
+          }
+        },
+        "indexedDB_reopen": {
+          "status": "ok",
+          "detail": {
+            "priorSessionMarker": null,
+            "survivesReopenInSamePage": true
+          }
+        },
+        "storage": {
+          "status": "ok",
+          "detail": {
+            "hasNavigatorStorage": true,
+            "hasEstimate": true,
+            "hasPersist": true,
+            "hasPersisted": true,
+            "hasGetDirectory": true,
+            "estimate": {
+              "quota": 1110432926,
+              "usage": 3557,
+              "quotaGB": 1.11,
+              "usageDetails": {
+                "indexedDB": 3557
+              }
+            },
+            "persistedBefore": false,
+            "persistResult": false,
+            "persistedAfter": false,
+            "opfs": "read/write OK, roundtrip=true"
+          }
+        },
+        "fsa_surface": {
+          "status": "ok",
+          "detail": {
+            "showDirectoryPicker_in_window": true,
+            "showOpenFilePicker_in_window": true,
+            "showSaveFilePicker_in_window": true,
+            "FileSystemHandle": "function",
+            "FileSystemDirectoryHandle": "function",
+            "FileSystemFileHandle": "function",
+            "FileSystemWritableFileStream": "function",
+            "showDirectoryPicker_length": 0,
+            "showOpenFilePicker_length": 0,
+            "showDirectoryPicker_toString": "function showDirectoryPicker() { [native code] }",
+            "handle_queryPermission": "function",
+            "handle_requestPermission": "function",
+            "handle_isSameEntry": "function",
+            "dir_entries": "function",
+            "dir_values": "function",
+            "dir_getFileHandle": "function",
+            "dir_getDirectoryHandle": "function",
+            "dir_removeEntry": "function",
+            "file_createWritable": "function",
+            "DataTransferItem_getAsFileSystemHandle": "function",
+            "DataTransferItem_webkitGetAsEntry": "function",
+            "DataTransferItem_getAsFile": "function",
+            "HTMLInputElement_webkitdirectory": true
+          }
+        },
+        "worker_relative_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "classic-file",
+              "ts": 1785208435377
+            }
+          }
+        },
+        "worker_relative_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "module-file",
+              "ts": 1785208435384
+            }
+          }
+        },
+        "worker_blob_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_blob_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "worker_data_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_data_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "fetch_relative": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch"
+        },
+        "xhr_relative": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "len": 33,
+            "body": "PHOTOURNAMENT_PROBE_LOCAL_TXT_OK\n"
+          }
+        },
+        "fetch_data_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "DATA_URL_OK"
+          }
+        },
+        "fetch_blob_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "body": "BLOB_URL_OK"
+          }
+        },
+        "module_script_tag": {
+          "status": "ok",
+          "detail": "external <script type=\"module\" src=\"./m.js\"> executed"
+        },
+        "dynamic_import": {
+          "status": "ok",
+          "detail": "import() resolved, ok=true"
+        },
+        "inline_module_script": {
+          "status": "ok",
+          "detail": "inline module executed"
+        },
+        "createImageBitmap_main": {
+          "status": "ok",
+          "detail": "8x6"
+        },
+        "offscreencanvas_main": {
+          "status": "ok",
+          "detail": {
+            "ctx": true,
+            "blob": "image/jpeg 760B"
+          }
+        },
+        "canvas_toDataURL_and_getImageData": {
+          "status": "ok",
+          "detail": {
+            "pixel": "48,96,192,255",
+            "dataURLPrefix": "data:image/jpeg;base64,/",
+            "dataURLLen": 1055
+          }
+        },
+        "wasm_main": {
+          "status": "ok",
+          "detail": {
+            "add_20_22": 42,
+            "compileOk": true
+          }
+        },
+        "wasm_streaming_relative": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch"
+        },
+        "worker_blob_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "blob:file:///fda702a6-e012-442f-91af-6c728d5bfeca"
+            }
+          }
+        },
+        "worker_relative_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "file:///home/user/Photournament/tools/probes/01_capability_matrix/heavy.js"
+            }
+          }
+        },
+        "crypto_subtle_digest": {
+          "status": "ok",
+          "detail": {
+            "sha256_of_photournament": "86f43de22a3f5a0ad4789af07a0f9d9d1a3675fdc9b138afcda5c239ffcee5b2",
+            "blobDigestBytes": 32,
+            "randomUUID": "34d3fae9-4108-4fcd-9ca0-9de094728c0f"
+          }
+        },
+        "structuredClone_direct": {
+          "status": "ok",
+          "detail": {
+            "blob": true,
+            "file": true,
+            "arrayBuffer": true,
+            "imageBitmap": true,
+            "functionThrows": "DataCloneError: Failed to execute 'structuredClone' on 'Window': function () {} could not be cloned."
+          }
+        },
+        "web_storage": {
+          "status": "ok",
+          "detail": {
+            "localStorage": true,
+            "sessionStorage": true,
+            "cookie": false,
+            "caches": "object"
+          }
+        },
+        "datatransfer_surface": {
+          "status": "ok",
+          "detail": {
+            "itemsAddWorks": true,
+            "kind": "file",
+            "type": "image/jpeg",
+            "getAsFile": true,
+            "getAsFileSystemHandle_present": true,
+            "webkitGetAsEntry_present": true,
+            "getAsFileSystemHandle_arity": 0,
+            "getAsFileSystemHandle_result": "null (expected for synthetic DataTransfer — no real OS drag)"
+          }
+        },
+        "download_anchor": {
+          "status": "ok",
+          "detail": {
+            "downloadAttr": true,
+            "msSaveBlob": "undefined"
+          }
+        }
+      },
+      "picker": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 14,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        },
+        "showOpenFilePicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showOpenFilePicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 12,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    },
+    {
+      "name": "file_allowFileAccess_plus",
+      "url": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+      "args": [
+        "--allow-file-access-from-files",
+        "--allow-running-insecure-content",
+        "--disable-web-security"
+      ],
+      "channel": "headless-shell (playwright default)",
+      "console": [
+        "[error] Fetch API cannot load file:///home/user/Photournament/tools/probes/01_capability_matrix/local.txt. URL scheme \"file\" is not supported.",
+        "[error] Fetch API cannot load file:///home/user/Photournament/tools/probes/01_capability_matrix/tiny.wasm. URL scheme \"file\" is not supported."
+      ],
+      "pageErrors": [],
+      "browserVersion": "141.0.7390.37",
+      "results": {
+        "context": {
+          "status": "ok",
+          "detail": {
+            "isSecureContext": true,
+            "origin": "file://",
+            "locationOrigin": "file://",
+            "href": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+            "protocol": "file:",
+            "crossOriginIsolated": false,
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36"
+          }
+        },
+        "pngFixture": {
+          "status": "ok",
+          "detail": {
+            "size": 127,
+            "type": "image/png"
+          }
+        },
+        "indexedDB": {
+          "status": "ok",
+          "detail": {
+            "opened": true,
+            "dbName": "photournament_probe_1785208445230",
+            "recordRoundTrip": true,
+            "blobIsBlob": true,
+            "blobSize": 53,
+            "blobRoundTrip": true,
+            "fileIsFile": true,
+            "fileName": "IMG_1234.HEIC",
+            "fileLastModified": 1234567890,
+            "fileRoundTrip": true,
+            "arrayBufferRoundTrip": true,
+            "imageBitmapIsImageBitmap": true,
+            "imageBitmapDims": "8x6",
+            "deleteWorks": true,
+            "databasesApi": "lists our db (1 total)",
+            "dbDeleted": true
+          }
+        },
+        "indexedDB_reopen": {
+          "status": "ok",
+          "detail": {
+            "priorSessionMarker": null,
+            "survivesReopenInSamePage": true
+          }
+        },
+        "storage": {
+          "status": "ok",
+          "detail": {
+            "hasNavigatorStorage": true,
+            "hasEstimate": true,
+            "hasPersist": true,
+            "hasPersisted": true,
+            "hasGetDirectory": true,
+            "estimate": {
+              "quota": 1087712475,
+              "usage": 3557,
+              "quotaGB": 1.09,
+              "usageDetails": {
+                "indexedDB": 3557
+              }
+            },
+            "persistedBefore": false,
+            "persistResult": false,
+            "persistedAfter": false,
+            "opfs": "read/write OK, roundtrip=true"
+          }
+        },
+        "fsa_surface": {
+          "status": "ok",
+          "detail": {
+            "showDirectoryPicker_in_window": true,
+            "showOpenFilePicker_in_window": true,
+            "showSaveFilePicker_in_window": true,
+            "FileSystemHandle": "function",
+            "FileSystemDirectoryHandle": "function",
+            "FileSystemFileHandle": "function",
+            "FileSystemWritableFileStream": "function",
+            "showDirectoryPicker_length": 0,
+            "showOpenFilePicker_length": 0,
+            "showDirectoryPicker_toString": "function showDirectoryPicker() { [native code] }",
+            "handle_queryPermission": "function",
+            "handle_requestPermission": "function",
+            "handle_isSameEntry": "function",
+            "dir_entries": "function",
+            "dir_values": "function",
+            "dir_getFileHandle": "function",
+            "dir_getDirectoryHandle": "function",
+            "dir_removeEntry": "function",
+            "file_createWritable": "function",
+            "DataTransferItem_getAsFileSystemHandle": "function",
+            "DataTransferItem_webkitGetAsEntry": "function",
+            "DataTransferItem_getAsFile": "function",
+            "HTMLInputElement_webkitdirectory": true
+          }
+        },
+        "worker_relative_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "classic-file",
+              "ts": 1785208445260
+            }
+          }
+        },
+        "worker_relative_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "module-file",
+              "ts": 1785208445266
+            }
+          }
+        },
+        "worker_blob_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_blob_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "worker_data_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_data_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "fetch_relative": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch"
+        },
+        "xhr_relative": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "len": 33,
+            "body": "PHOTOURNAMENT_PROBE_LOCAL_TXT_OK\n"
+          }
+        },
+        "fetch_data_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "DATA_URL_OK"
+          }
+        },
+        "fetch_blob_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "body": "BLOB_URL_OK"
+          }
+        },
+        "module_script_tag": {
+          "status": "ok",
+          "detail": "external <script type=\"module\" src=\"./m.js\"> executed"
+        },
+        "dynamic_import": {
+          "status": "ok",
+          "detail": "import() resolved, ok=true"
+        },
+        "inline_module_script": {
+          "status": "ok",
+          "detail": "inline module executed"
+        },
+        "createImageBitmap_main": {
+          "status": "ok",
+          "detail": "8x6"
+        },
+        "offscreencanvas_main": {
+          "status": "ok",
+          "detail": {
+            "ctx": true,
+            "blob": "image/jpeg 760B"
+          }
+        },
+        "canvas_toDataURL_and_getImageData": {
+          "status": "ok",
+          "detail": {
+            "pixel": "48,96,192,255",
+            "dataURLPrefix": "data:image/jpeg;base64,/",
+            "dataURLLen": 1055
+          }
+        },
+        "wasm_main": {
+          "status": "ok",
+          "detail": {
+            "add_20_22": 42,
+            "compileOk": true
+          }
+        },
+        "wasm_streaming_relative": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch"
+        },
+        "worker_blob_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "blob:file:///213ddb39-9b96-4027-87e0-a49212f88019"
+            }
+          }
+        },
+        "worker_relative_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "file:///home/user/Photournament/tools/probes/01_capability_matrix/heavy.js"
+            }
+          }
+        },
+        "crypto_subtle_digest": {
+          "status": "ok",
+          "detail": {
+            "sha256_of_photournament": "86f43de22a3f5a0ad4789af07a0f9d9d1a3675fdc9b138afcda5c239ffcee5b2",
+            "blobDigestBytes": 32,
+            "randomUUID": "c14725c9-a5ae-4756-8ce7-29a0b70452c1"
+          }
+        },
+        "structuredClone_direct": {
+          "status": "ok",
+          "detail": {
+            "blob": true,
+            "file": true,
+            "arrayBuffer": true,
+            "imageBitmap": true,
+            "functionThrows": "DataCloneError: Failed to execute 'structuredClone' on 'Window': function () {} could not be cloned."
+          }
+        },
+        "web_storage": {
+          "status": "ok",
+          "detail": {
+            "localStorage": true,
+            "sessionStorage": true,
+            "cookie": false,
+            "caches": "object"
+          }
+        },
+        "datatransfer_surface": {
+          "status": "ok",
+          "detail": {
+            "itemsAddWorks": true,
+            "kind": "file",
+            "type": "image/jpeg",
+            "getAsFile": true,
+            "getAsFileSystemHandle_present": true,
+            "webkitGetAsEntry_present": true,
+            "getAsFileSystemHandle_arity": 0,
+            "getAsFileSystemHandle_result": "null (expected for synthetic DataTransfer — no real OS drag)"
+          }
+        },
+        "download_anchor": {
+          "status": "ok",
+          "detail": {
+            "downloadAttr": true,
+            "msSaveBlob": "undefined"
+          }
+        }
+      },
+      "picker": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 11,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        },
+        "showOpenFilePicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showOpenFilePicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 12,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    },
+    {
+      "name": "file_fullChromium",
+      "url": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+      "args": [],
+      "channel": "chromium",
+      "console": [
+        "[error] Access to script at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/m.js' from origin 'null' has been blocked by CORS policy: Cross origin requests are only supported for protocol schemes: chrome, chrome-extension, chrome-untrusted, data, http, https, isolated-app.",
+        "[error] Failed to load resource: net::ERR_FAILED",
+        "[error] Access to fetch at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/local.txt' from origin 'null' has been blocked by CORS policy: Cross origin requests are only supported for protocol schemes: chrome, chrome-extension, chrome-untrusted, data, http, https, isolated-app.",
+        "[error] Failed to load resource: net::ERR_FAILED",
+        "[error] Access to XMLHttpRequest at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/local.txt' from origin 'null' has been blocked by CORS policy: Cross origin requests are only supported for protocol schemes: chrome, chrome-extension, chrome-untrusted, data, http, https, isolated-app.",
+        "[error] Failed to load resource: net::ERR_FAILED",
+        "[error] Access to fetch at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/tiny.wasm' from origin 'null' has been blocked by CORS policy: Cross origin requests are only supported for protocol schemes: chrome, chrome-extension, chrome-untrusted, data, http, https, isolated-app.",
+        "[error] Failed to load resource: net::ERR_FAILED"
+      ],
+      "pageErrors": [],
+      "browserVersion": "141.0.7390.37",
+      "results": {
+        "context": {
+          "status": "ok",
+          "detail": {
+            "isSecureContext": true,
+            "origin": "null",
+            "locationOrigin": "file://",
+            "href": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+            "protocol": "file:",
+            "crossOriginIsolated": false,
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36"
+          }
+        },
+        "pngFixture": {
+          "status": "ok",
+          "detail": {
+            "size": 127,
+            "type": "image/png"
+          }
+        },
+        "indexedDB": {
+          "status": "ok",
+          "detail": {
+            "opened": true,
+            "dbName": "photournament_probe_1785208455913",
+            "recordRoundTrip": true,
+            "blobIsBlob": true,
+            "blobSize": 53,
+            "blobRoundTrip": true,
+            "fileIsFile": true,
+            "fileName": "IMG_1234.HEIC",
+            "fileLastModified": 1234567890,
+            "fileRoundTrip": true,
+            "arrayBufferRoundTrip": true,
+            "imageBitmapIsImageBitmap": true,
+            "imageBitmapDims": "8x6",
+            "deleteWorks": true,
+            "databasesApi": "lists our db (1 total)",
+            "dbDeleted": true
+          }
+        },
+        "indexedDB_reopen": {
+          "status": "ok",
+          "detail": {
+            "priorSessionMarker": null,
+            "survivesReopenInSamePage": true
+          }
+        },
+        "storage": {
+          "status": "ok",
+          "detail": {
+            "hasNavigatorStorage": true,
+            "hasEstimate": true,
+            "hasPersist": true,
+            "hasPersisted": true,
+            "hasGetDirectory": true,
+            "estimate": {
+              "quota": 934952589,
+              "usage": 3557,
+              "quotaGB": 0.93,
+              "usageDetails": {
+                "indexedDB": 3557
+              }
+            },
+            "persistedBefore": false,
+            "persistResult": false,
+            "persistedAfter": false,
+            "opfs": "SecurityError: It was determined that certain files are unsafe for access within a Web application, or that too many calls are being made on file resources."
+          }
+        },
+        "fsa_surface": {
+          "status": "ok",
+          "detail": {
+            "showDirectoryPicker_in_window": true,
+            "showOpenFilePicker_in_window": true,
+            "showSaveFilePicker_in_window": true,
+            "FileSystemHandle": "function",
+            "FileSystemDirectoryHandle": "function",
+            "FileSystemFileHandle": "function",
+            "FileSystemWritableFileStream": "function",
+            "showDirectoryPicker_length": 0,
+            "showOpenFilePicker_length": 0,
+            "showDirectoryPicker_toString": "function showDirectoryPicker() { [native code] }",
+            "handle_queryPermission": "function",
+            "handle_requestPermission": "function",
+            "handle_isSameEntry": "function",
+            "dir_entries": "function",
+            "dir_values": "function",
+            "dir_getFileHandle": "function",
+            "dir_getDirectoryHandle": "function",
+            "dir_removeEntry": "function",
+            "file_createWritable": "function",
+            "DataTransferItem_getAsFileSystemHandle": "function",
+            "DataTransferItem_webkitGetAsEntry": "function",
+            "DataTransferItem_getAsFile": "function",
+            "HTMLInputElement_webkitdirectory": true
+          }
+        },
+        "worker_relative_classic": {
+          "status": "fail",
+          "detail": "Error: construct: SecurityError: Failed to construct 'Worker': Script at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/w.js' cannot be accessed from origin 'null'."
+        },
+        "worker_relative_module": {
+          "status": "fail",
+          "detail": "Error: construct: SecurityError: Failed to construct 'Worker': Script at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/wm.js' cannot be accessed from origin 'null'."
+        },
+        "worker_blob_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_blob_module": {
+          "status": "fail",
+          "detail": "Error: onerror: (no message — opaque, typical of a cross-origin/blocked worker script)"
+        },
+        "worker_data_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_data_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "fetch_relative": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch"
+        },
+        "xhr_relative": {
+          "status": "fail",
+          "detail": "Error: XHR onerror (status=0) — network/CORS level failure"
+        },
+        "fetch_data_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "DATA_URL_OK"
+          }
+        },
+        "fetch_blob_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "body": "BLOB_URL_OK"
+          }
+        },
+        "module_script_tag": {
+          "status": "fail",
+          "detail": "external module script did NOT execute (blocked or errored) after full load"
+        },
+        "dynamic_import": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch dynamically imported module: file:///home/user/Photournament/tools/probes/01_capability_matrix/m.js"
+        },
+        "inline_module_script": {
+          "status": "ok",
+          "detail": "inline module executed"
+        },
+        "createImageBitmap_main": {
+          "status": "ok",
+          "detail": "8x6"
+        },
+        "offscreencanvas_main": {
+          "status": "ok",
+          "detail": {
+            "ctx": true,
+            "blob": "image/jpeg 760B"
+          }
+        },
+        "canvas_toDataURL_and_getImageData": {
+          "status": "ok",
+          "detail": {
+            "pixel": "48,96,192,255",
+            "dataURLPrefix": "data:image/jpeg;base64,/",
+            "dataURLLen": 1055
+          }
+        },
+        "wasm_main": {
+          "status": "ok",
+          "detail": {
+            "add_20_22": 42,
+            "compileOk": true
+          }
+        },
+        "wasm_streaming_relative": {
+          "status": "fail",
+          "detail": "TypeError: Failed to fetch"
+        },
+        "worker_blob_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "blob:null/5ac06332-2e37-4fcf-9d56-f68cfa8a6dcb"
+            }
+          }
+        },
+        "worker_relative_imaging_pipeline": {
+          "status": "fail",
+          "detail": "Error: construct: SecurityError: Failed to construct 'Worker': Script at 'file:///home/user/Photournament/tools/probes/01_capability_matrix/heavy.js' cannot be accessed from origin 'null'."
+        },
+        "crypto_subtle_digest": {
+          "status": "ok",
+          "detail": {
+            "sha256_of_photournament": "86f43de22a3f5a0ad4789af07a0f9d9d1a3675fdc9b138afcda5c239ffcee5b2",
+            "blobDigestBytes": 32,
+            "randomUUID": "fcafe5dc-8a53-4186-bb9d-179d2f4427ed"
+          }
+        },
+        "structuredClone_direct": {
+          "status": "ok",
+          "detail": {
+            "blob": true,
+            "file": true,
+            "arrayBuffer": true,
+            "imageBitmap": true,
+            "functionThrows": "DataCloneError: Failed to execute 'structuredClone' on 'Window': function () {} could not be cloned."
+          }
+        },
+        "web_storage": {
+          "status": "ok",
+          "detail": {
+            "localStorage": true,
+            "sessionStorage": true,
+            "cookie": false,
+            "caches": "object"
+          }
+        },
+        "datatransfer_surface": {
+          "status": "ok",
+          "detail": {
+            "itemsAddWorks": true,
+            "kind": "file",
+            "type": "image/jpeg",
+            "getAsFile": true,
+            "getAsFileSystemHandle_present": true,
+            "webkitGetAsEntry_present": true,
+            "getAsFileSystemHandle_arity": 0,
+            "getAsFileSystemHandle_result": "null (expected for synthetic DataTransfer — no real OS drag)"
+          }
+        },
+        "download_anchor": {
+          "status": "ok",
+          "detail": {
+            "downloadAttr": true,
+            "msSaveBlob": "undefined"
+          }
+        }
+      },
+      "picker": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 9,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        },
+        "showOpenFilePicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showOpenFilePicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 11,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    },
+    {
+      "name": "http_fullChromium",
+      "url": "http://localhost:8099/probe.html",
+      "args": [],
+      "channel": "chromium",
+      "console": [
+        "[error] Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "pageErrors": [],
+      "browserVersion": "141.0.7390.37",
+      "results": {
+        "context": {
+          "status": "ok",
+          "detail": {
+            "isSecureContext": true,
+            "origin": "http://localhost:8099",
+            "locationOrigin": "http://localhost:8099",
+            "href": "http://localhost:8099/probe.html",
+            "protocol": "http:",
+            "crossOriginIsolated": false,
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36"
+          }
+        },
+        "pngFixture": {
+          "status": "ok",
+          "detail": {
+            "size": 127,
+            "type": "image/png"
+          }
+        },
+        "indexedDB": {
+          "status": "ok",
+          "detail": {
+            "opened": true,
+            "dbName": "photournament_probe_1785208466096",
+            "recordRoundTrip": true,
+            "blobIsBlob": true,
+            "blobSize": 53,
+            "blobRoundTrip": true,
+            "fileIsFile": true,
+            "fileName": "IMG_1234.HEIC",
+            "fileLastModified": 1234567890,
+            "fileRoundTrip": true,
+            "arrayBufferRoundTrip": true,
+            "imageBitmapIsImageBitmap": true,
+            "imageBitmapDims": "8x6",
+            "deleteWorks": true,
+            "databasesApi": "lists our db (1 total)",
+            "dbDeleted": true
+          }
+        },
+        "indexedDB_reopen": {
+          "status": "ok",
+          "detail": {
+            "priorSessionMarker": null,
+            "survivesReopenInSamePage": true
+          }
+        },
+        "storage": {
+          "status": "ok",
+          "detail": {
+            "hasNavigatorStorage": true,
+            "hasEstimate": true,
+            "hasPersist": true,
+            "hasPersisted": true,
+            "hasGetDirectory": true,
+            "estimate": {
+              "quota": 917288826,
+              "usage": 3612,
+              "quotaGB": 0.92,
+              "usageDetails": {
+                "indexedDB": 3612
+              }
+            },
+            "persistedBefore": false,
+            "persistResult": false,
+            "persistedAfter": false,
+            "opfs": "read/write OK, roundtrip=true"
+          }
+        },
+        "fsa_surface": {
+          "status": "ok",
+          "detail": {
+            "showDirectoryPicker_in_window": true,
+            "showOpenFilePicker_in_window": true,
+            "showSaveFilePicker_in_window": true,
+            "FileSystemHandle": "function",
+            "FileSystemDirectoryHandle": "function",
+            "FileSystemFileHandle": "function",
+            "FileSystemWritableFileStream": "function",
+            "showDirectoryPicker_length": 0,
+            "showOpenFilePicker_length": 0,
+            "showDirectoryPicker_toString": "function showDirectoryPicker() { [native code] }",
+            "handle_queryPermission": "function",
+            "handle_requestPermission": "function",
+            "handle_isSameEntry": "function",
+            "dir_entries": "function",
+            "dir_values": "function",
+            "dir_getFileHandle": "function",
+            "dir_getDirectoryHandle": "function",
+            "dir_removeEntry": "function",
+            "file_createWritable": "function",
+            "DataTransferItem_getAsFileSystemHandle": "function",
+            "DataTransferItem_webkitGetAsEntry": "function",
+            "DataTransferItem_getAsFile": "function",
+            "HTMLInputElement_webkitdirectory": true
+          }
+        },
+        "worker_relative_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "classic-file",
+              "ts": 1785208466150
+            }
+          }
+        },
+        "worker_relative_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "module-file",
+              "ts": 1785208466168
+            }
+          }
+        },
+        "worker_blob_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_blob_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "worker_data_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_data_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "fetch_relative": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "PHOTOURNAMENT_PROBE_LOCAL_TXT_OK"
+          }
+        },
+        "xhr_relative": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "len": 33,
+            "body": "PHOTOURNAMENT_PROBE_LOCAL_TXT_OK\n"
+          }
+        },
+        "fetch_data_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "DATA_URL_OK"
+          }
+        },
+        "fetch_blob_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "body": "BLOB_URL_OK"
+          }
+        },
+        "module_script_tag": {
+          "status": "ok",
+          "detail": "external <script type=\"module\" src=\"./m.js\"> executed"
+        },
+        "dynamic_import": {
+          "status": "ok",
+          "detail": "import() resolved, ok=true"
+        },
+        "inline_module_script": {
+          "status": "ok",
+          "detail": "inline module executed"
+        },
+        "createImageBitmap_main": {
+          "status": "ok",
+          "detail": "8x6"
+        },
+        "offscreencanvas_main": {
+          "status": "ok",
+          "detail": {
+            "ctx": true,
+            "blob": "image/jpeg 760B"
+          }
+        },
+        "canvas_toDataURL_and_getImageData": {
+          "status": "ok",
+          "detail": {
+            "pixel": "48,96,192,255",
+            "dataURLPrefix": "data:image/jpeg;base64,/",
+            "dataURLLen": 1055
+          }
+        },
+        "wasm_main": {
+          "status": "ok",
+          "detail": {
+            "add_20_22": 42,
+            "compileOk": true
+          }
+        },
+        "wasm_streaming_relative": {
+          "status": "ok",
+          "detail": "add=3"
+        },
+        "worker_blob_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "blob:http://localhost:8099/d5dbbb41-5d23-45ef-9429-19173f7af1d4"
+            }
+          }
+        },
+        "worker_relative_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "http://localhost:8099/heavy.js"
+            }
+          }
+        },
+        "crypto_subtle_digest": {
+          "status": "ok",
+          "detail": {
+            "sha256_of_photournament": "86f43de22a3f5a0ad4789af07a0f9d9d1a3675fdc9b138afcda5c239ffcee5b2",
+            "blobDigestBytes": 32,
+            "randomUUID": "b7c60b8e-2c63-497c-bc41-97f9fcc74645"
+          }
+        },
+        "structuredClone_direct": {
+          "status": "ok",
+          "detail": {
+            "blob": true,
+            "file": true,
+            "arrayBuffer": true,
+            "imageBitmap": true,
+            "functionThrows": "DataCloneError: Failed to execute 'structuredClone' on 'Window': function () {} could not be cloned."
+          }
+        },
+        "web_storage": {
+          "status": "ok",
+          "detail": {
+            "localStorage": true,
+            "sessionStorage": true,
+            "cookie": true,
+            "caches": "object"
+          }
+        },
+        "datatransfer_surface": {
+          "status": "ok",
+          "detail": {
+            "itemsAddWorks": true,
+            "kind": "file",
+            "type": "image/jpeg",
+            "getAsFile": true,
+            "getAsFileSystemHandle_present": true,
+            "webkitGetAsEntry_present": true,
+            "getAsFileSystemHandle_arity": 0,
+            "getAsFileSystemHandle_result": "null (expected for synthetic DataTransfer — no real OS drag)"
+          }
+        },
+        "download_anchor": {
+          "status": "ok",
+          "detail": {
+            "downloadAttr": true,
+            "msSaveBlob": "undefined"
+          }
+        }
+      },
+      "picker": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 11,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        },
+        "showOpenFilePicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showOpenFilePicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 10,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    },
+    {
+      "name": "file_fullChromium_allowFileAccess",
+      "url": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+      "args": [
+        "--allow-file-access-from-files"
+      ],
+      "channel": "chromium",
+      "console": [],
+      "pageErrors": [],
+      "browserVersion": "141.0.7390.37",
+      "results": {
+        "context": {
+          "status": "ok",
+          "detail": {
+            "isSecureContext": true,
+            "origin": "file://",
+            "locationOrigin": "file://",
+            "href": "file:///home/user/Photournament/tools/probes/01_capability_matrix/probe.html",
+            "protocol": "file:",
+            "crossOriginIsolated": false,
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36"
+          }
+        },
+        "pngFixture": {
+          "status": "ok",
+          "detail": {
+            "size": 127,
+            "type": "image/png"
+          }
+        },
+        "indexedDB": {
+          "status": "ok",
+          "detail": {
+            "opened": true,
+            "dbName": "photournament_probe_1785208476278",
+            "recordRoundTrip": true,
+            "blobIsBlob": true,
+            "blobSize": 53,
+            "blobRoundTrip": true,
+            "fileIsFile": true,
+            "fileName": "IMG_1234.HEIC",
+            "fileLastModified": 1234567890,
+            "fileRoundTrip": true,
+            "arrayBufferRoundTrip": true,
+            "imageBitmapIsImageBitmap": true,
+            "imageBitmapDims": "8x6",
+            "deleteWorks": true,
+            "databasesApi": "lists our db (1 total)",
+            "dbDeleted": true
+          }
+        },
+        "indexedDB_reopen": {
+          "status": "ok",
+          "detail": {
+            "priorSessionMarker": null,
+            "survivesReopenInSamePage": true
+          }
+        },
+        "storage": {
+          "status": "ok",
+          "detail": {
+            "hasNavigatorStorage": true,
+            "hasEstimate": true,
+            "hasPersist": true,
+            "hasPersisted": true,
+            "hasGetDirectory": true,
+            "estimate": {
+              "quota": 1123003270,
+              "usage": 3556,
+              "quotaGB": 1.12,
+              "usageDetails": {
+                "indexedDB": 3556
+              }
+            },
+            "persistedBefore": false,
+            "persistResult": false,
+            "persistedAfter": false,
+            "opfs": "read/write OK, roundtrip=true"
+          }
+        },
+        "fsa_surface": {
+          "status": "ok",
+          "detail": {
+            "showDirectoryPicker_in_window": true,
+            "showOpenFilePicker_in_window": true,
+            "showSaveFilePicker_in_window": true,
+            "FileSystemHandle": "function",
+            "FileSystemDirectoryHandle": "function",
+            "FileSystemFileHandle": "function",
+            "FileSystemWritableFileStream": "function",
+            "showDirectoryPicker_length": 0,
+            "showOpenFilePicker_length": 0,
+            "showDirectoryPicker_toString": "function showDirectoryPicker() { [native code] }",
+            "handle_queryPermission": "function",
+            "handle_requestPermission": "function",
+            "handle_isSameEntry": "function",
+            "dir_entries": "function",
+            "dir_values": "function",
+            "dir_getFileHandle": "function",
+            "dir_getDirectoryHandle": "function",
+            "dir_removeEntry": "function",
+            "file_createWritable": "function",
+            "DataTransferItem_getAsFileSystemHandle": "function",
+            "DataTransferItem_webkitGetAsEntry": "function",
+            "DataTransferItem_getAsFile": "function",
+            "HTMLInputElement_webkitdirectory": true
+          }
+        },
+        "worker_relative_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "classic-file",
+              "ts": 1785208476315
+            }
+          }
+        },
+        "worker_relative_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "module-file",
+              "ts": 1785208476324
+            }
+          }
+        },
+        "worker_blob_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_blob_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "worker_data_classic": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline"
+            }
+          }
+        },
+        "worker_data_module": {
+          "status": "ok",
+          "detail": {
+            "roundTrip": true,
+            "reply": {
+              "echo": {
+                "ping": "photournament"
+              },
+              "kind": "inline-module"
+            }
+          }
+        },
+        "fetch_relative": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "PHOTOURNAMENT_PROBE_LOCAL_TXT_OK"
+          }
+        },
+        "xhr_relative": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "len": 33,
+            "body": "PHOTOURNAMENT_PROBE_LOCAL_TXT_OK\n"
+          }
+        },
+        "fetch_data_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "type": "basic",
+            "body": "DATA_URL_OK"
+          }
+        },
+        "fetch_blob_url": {
+          "status": "ok",
+          "detail": {
+            "status": 200,
+            "body": "BLOB_URL_OK"
+          }
+        },
+        "module_script_tag": {
+          "status": "ok",
+          "detail": "external <script type=\"module\" src=\"./m.js\"> executed"
+        },
+        "dynamic_import": {
+          "status": "ok",
+          "detail": "import() resolved, ok=true"
+        },
+        "inline_module_script": {
+          "status": "ok",
+          "detail": "inline module executed"
+        },
+        "createImageBitmap_main": {
+          "status": "ok",
+          "detail": "8x6"
+        },
+        "offscreencanvas_main": {
+          "status": "ok",
+          "detail": {
+            "ctx": true,
+            "blob": "image/jpeg 760B"
+          }
+        },
+        "canvas_toDataURL_and_getImageData": {
+          "status": "ok",
+          "detail": {
+            "pixel": "48,96,192,255",
+            "dataURLPrefix": "data:image/jpeg;base64,/",
+            "dataURLLen": 1055
+          }
+        },
+        "wasm_main": {
+          "status": "ok",
+          "detail": {
+            "add_20_22": 42,
+            "compileOk": true
+          }
+        },
+        "wasm_streaming_relative": {
+          "status": "ok",
+          "detail": "add=3"
+        },
+        "worker_blob_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "blob:file:///87092943-c28a-4214-a597-714a0a83b50f"
+            }
+          }
+        },
+        "worker_relative_imaging_pipeline": {
+          "status": "ok",
+          "detail": {
+            "steps": {
+              "createImageBitmap": "8x6",
+              "offscreen2d": true,
+              "getImageData": "48,96,192,255",
+              "convertToBlob": "image/jpeg 785B",
+              "wasm": 42,
+              "crypto": true,
+              "digestBytes": 32,
+              "indexedDBInWorker": true,
+              "fetchInWorker": true,
+              "isSecureContext": true,
+              "location": "file:///home/user/Photournament/tools/probes/01_capability_matrix/heavy.js"
+            }
+          }
+        },
+        "crypto_subtle_digest": {
+          "status": "ok",
+          "detail": {
+            "sha256_of_photournament": "86f43de22a3f5a0ad4789af07a0f9d9d1a3675fdc9b138afcda5c239ffcee5b2",
+            "blobDigestBytes": 32,
+            "randomUUID": "3a033289-45dc-4b6e-976b-dcb95260f1a0"
+          }
+        },
+        "structuredClone_direct": {
+          "status": "ok",
+          "detail": {
+            "blob": true,
+            "file": true,
+            "arrayBuffer": true,
+            "imageBitmap": true,
+            "functionThrows": "DataCloneError: Failed to execute 'structuredClone' on 'Window': function () {} could not be cloned."
+          }
+        },
+        "web_storage": {
+          "status": "ok",
+          "detail": {
+            "localStorage": true,
+            "sessionStorage": true,
+            "cookie": false,
+            "caches": "object"
+          }
+        },
+        "datatransfer_surface": {
+          "status": "ok",
+          "detail": {
+            "itemsAddWorks": true,
+            "kind": "file",
+            "type": "image/jpeg",
+            "getAsFile": true,
+            "getAsFileSystemHandle_present": true,
+            "webkitGetAsEntry_present": true,
+            "getAsFileSystemHandle_arity": 0,
+            "getAsFileSystemHandle_result": "null (expected for synthetic DataTransfer — no real OS drag)"
+          }
+        },
+        "download_anchor": {
+          "status": "ok",
+          "detail": {
+            "downloadAttr": true,
+            "msSaveBlob": "undefined"
+          }
+        }
+      },
+      "picker": {
+        "showDirectoryPicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showDirectoryPicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 10,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        },
+        "showOpenFilePicker": {
+          "phase": "rejected",
+          "error": "AbortError: Failed to execute 'showOpenFilePicker' on 'Window': The user aborted a request.",
+          "errorName": "AbortError",
+          "ms": 12,
+          "userActivation": {
+            "isActive": true,
+            "hasBeenActive": true
+          }
+        }
+      }
+    }
+  ]
+}

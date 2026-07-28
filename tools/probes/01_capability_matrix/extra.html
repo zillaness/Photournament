@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>extra capability probe</title></head>
+<body>
+<a id="dl" download="photournament-bundle.txt">download</a>
+<pre id="out">idle</pre>
+<script>
+(function () {
+  'use strict';
+  function es(e) { return e && e.name ? e.name + ': ' + e.message : String(e); }
+  function blobUrl(b) { return URL.createObjectURL(new Blob([b], { type: 'text/javascript' })); }
+
+  function ping(w, ms, payload) {
+    return new Promise(function (res, rej) {
+      var t = setTimeout(function () { try { w.terminate(); } catch (e) {} rej(new Error('TIMEOUT ' + ms + 'ms')); }, ms);
+      w.onerror = function (ev) { clearTimeout(t); rej(new Error('onerror: ' + (ev.message || '(opaque)'))); };
+      w.onmessage = function (ev) { clearTimeout(t); try { w.terminate(); } catch (e) {} res(ev.data); };
+      w.postMessage(payload || {});
+    });
+  }
+
+  // Can a blob-URL worker importScripts() a same-directory script?
+  // This is how you would normally pull libheif into an ingest worker.
+  var IMPORT_BODY =
+    "self.onmessage=function(e){var o={};" +
+    "try{ importScripts(e.data.url); o.importScripts='ok'; o.libheifType=typeof self.libheif;" +
+    "  if(typeof self.libheif==='function'){ var t0=Date.now(); var m=self.libheif();" +
+    "    o.hasHeifDecoder=typeof m.HeifDecoder; var d=new m.HeifDecoder();" +
+    "    o.decoded=d.decode(new Uint8Array([0,0,0,0])).length+' images from garbage (codepath live)';" +
+    "    o.initMs=Date.now()-t0; } }" +
+    "catch(err){ o.importScripts='FAILED '+err.name+': '+err.message; }" +
+    "o.location=String(self.location.href).slice(0,60); self.postMessage(o);};";
+
+  // Can a worker be built by inlining the library source into the blob itself?
+  var INLINE_LIB_BODY =
+    "self.onmessage=function(e){var o={};" +
+    "try{ (0,eval)(e.data.src); o.evalOk=true; o.libheifType=typeof self.libheif;" +
+    "  if(typeof self.libheif==='function'){var m=self.libheif(); o.hasHeifDecoder=typeof m.HeifDecoder;" +
+    "  var d=new m.HeifDecoder(); o.decoded=d.decode(new Uint8Array([0,0,0,0])).length+' images from garbage (codepath live)';}}" +
+    "catch(err){ o.error=err.name+': '+err.message; }" +
+    "self.postMessage(o);};";
+
+  window.runExtra = async function (libUrl) {
+    var R = {};
+
+    // 1. importScripts of a relative URL from a BLOB worker
+    try {
+      R.blobWorker_importScripts_relative =
+        await ping(new Worker(blobUrl(IMPORT_BODY)), 20000, { url: new URL('./w.js', location.href).href });
+    } catch (e) { R.blobWorker_importScripts_relative = es(e); }
+
+    // 2. importScripts of libheif (the real 2.1MB file) from a BLOB worker
+    try {
+      R.blobWorker_importScripts_libheif =
+        await ping(new Worker(blobUrl(IMPORT_BODY)), 30000, { url: new URL(libUrl, location.href).href });
+    } catch (e) { R.blobWorker_importScripts_libheif = es(e); }
+
+    // 3. importScripts from a SAME-ORIGIN (relative) worker script
+    try {
+      R.relativeWorker_importScripts_libheif =
+        await ping(new Worker('./importer.js'), 30000, { url: new URL(libUrl, location.href).href });
+    } catch (e) { R.relativeWorker_importScripts_libheif = es(e); }
+
+    // 4. inline the library source into the worker blob (no network at all)
+    //    First the page must obtain the source; on file:// it cannot fetch it, so
+    //    record how the source was obtained too.
+    var src = null, how;
+    try { var r = await fetch(libUrl); src = await r.text(); how = 'fetch ok (' + src.length + ' chars)'; }
+    catch (e) { how = 'fetch FAILED: ' + es(e); }
+    R.librarySourceFetchable = how;
+    if (src) {
+      try { R.blobWorker_inlinedLibrary = await ping(new Worker(blobUrl(INLINE_LIB_BODY)), 40000, { src: src }); }
+      catch (e) { R.blobWorker_inlinedLibrary = es(e); }
+    } else {
+      R.blobWorker_inlinedLibrary = 'skipped — page could not read the library source on this origin';
+    }
+
+    // 5. download an object URL through a[download]
+    try {
+      var a = document.getElementById('dl');
+      a.href = URL.createObjectURL(new Blob(['01_hero_for_cover_IMG_1234.jpg\n'], { type: 'text/plain' }));
+      a.click();
+      R.downloadClicked = 'clicked a[download] with a blob: URL';
+    } catch (e) { R.downloadClicked = es(e); }
+
+    return R;
+  };
+  window.__READY__ = true;
+})();
+</script>
+</body>
+</html>

@@ -114,6 +114,19 @@ Ordered by value. Items 1 and 2 are the real gaps; the rest are smaller.
   Stage A alternative for small pools; it trades the bracket's balanced-draw
   fairness for speed and a very legible mental model, so the second-chance
   round matters more, not less, if it lands.
+- **Bracket standings: the action bar floats over the list.** (Samuel,
+  2026-07-28, screenshot, real run: nerf_field_setup, stopped early at 16
+  finalists.) On the stopped-early/complete standings screen, "Resume
+  ranking", "Undo last comparison" and "Next: check for duplicates" render
+  ON TOP of the standings rows, vertically mid-list — left buttons overlap
+  rows 12–13, the Next button overlaps 12–14 on the right — instead of
+  sitting in their own bar above or below the scroller. Cosmetic but
+  disorienting, and clickable rows sit UNDER buttons. Likely the completion
+  painter reuses S.bar, whose layout assumes the two-pane match view; the
+  standings box (.bk-results) scrolls beneath it with no reserved space or
+  background. Fix direction: give the done-state its own pinned bar (top or
+  bottom) with a real background, and reserve its height in the scroller.
+  Queued by request — not fixed in this pass.
 
 ### 1. Near-duplicate grouping review (PRD 7.7) — the largest gap
 

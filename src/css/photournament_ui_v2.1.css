@@ -1,9 +1,9 @@
 /**
  * file: photournament_ui_v2.1.css
- * version: 2.1
+ * version: 2.1a
  * author: Samuel Cao
  * created: 2026-07-28
- * last_updated: 2026-07-28
+ * last_updated: 2026-07-29
  * description: Complete replacement stylesheet for Photournament. Consolidates
  *   src/css/00_base.css, src/css/10_screens.css and the four JS-injected style
  *   blocks (pt-tree-style, pt-grid-style, pt-bracket-style, pt-export-style)
@@ -1451,6 +1451,31 @@ kbd {
 #app .bk-row:nth-child(-n+3) .bk-rank { color: var(--text); }
 #app .bk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; font-size: var(--fs-body); }
 
+/* Done state, .bk-done set by the completion painter. The stage stops being
+   the two-pane match grid and becomes the standings scroller. The constraint:
+   .bk-results only scrolls if its height comes down from the stage's 1fr
+   track, so the stage must be a bounded column that clips — as a plain block
+   the list kept its auto content height and ran straight through the bar's
+   grid row below. */
+#app .bk.bk-done .bk-stage {
+  display: flex; flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+#app .bk.bk-done .bk-results { flex: 1; }
+
+/* Under a finished list the bar is a destination, not chrome to be recessed:
+   opaque on its own reserved grid row, so no standings row can ever read
+   through it or sit clickable beneath a button. Three classes so it out-ranks
+   the 40%-resting rule above. */
+#app .bk.bk-done .bk-bar {
+  opacity: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 8px 12px;
+}
+
 /* ==========================================================================
    13. SCREEN: DUPLICATES
    ==========================================================================
@@ -1640,6 +1665,18 @@ kbd {
 }
 
 /** CHANGELOG
+ * v2.1a (2026-07-29): The bracket standings action bar no longer floats over
+ *   the ranked list. The completion painter used to force the stage to
+ *   display:block, and a block stage cannot hand its 1fr track height down —
+ *   .bk-results grew to full content height and overflowed through the bar's
+ *   grid row, leaving Resume/Undo/Next sitting mid-list at 40% opacity over
+ *   rows that were still clickable underneath them. New .bk-done rules: the
+ *   stage becomes a clipped column so the list scrolls inside its own track,
+ *   and the bar becomes an opaque --surface footer with a --line hairline on
+ *   its reserved row. Opacity is pinned to 1 there because the resting-40%
+ *   treatment exists for chrome that competes with a live comparison; on the
+ *   results screen the bar's buttons ARE the next step. Additive only — no
+ *   existing selector changed, so the file keeps its name per the v2.0a note.
  * v2.1 (2026-07-28): Light theme and a match-the-OS theme, dark still the default.
  *   - Theme selection is a data-theme attribute on :root (absent or "dark" |
  *     "light"), with color-scheme riding along so native scrollbars and form

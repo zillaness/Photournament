@@ -114,7 +114,12 @@ Ordered by value. Items 1 and 2 are the real gaps; the rest are smaller.
   Stage A alternative for small pools; it trades the bracket's balanced-draw
   fairness for speed and a very legible mental model, so the second-chance
   round matters more, not less, if it lands.
-- **Bracket standings: the action bar floats over the list.** (Samuel,
+- **[RESOLVED 2026-07-29]** ~~Bracket standings: the action bar floats over
+  the list.~~ Fixed: the completion painter's display:block broke the .bk
+  grid's height chain; a .bk-done class now bounds the scroller inside its
+  track and pins the bar as an opaque footer. The same fix repaired Resume
+  ranking from the standings, which had been rendering zero panes. Original
+  report kept below for the diagnosis trail. (Samuel,
   2026-07-28, screenshot, real run: nerf_field_setup, stopped early at 16
   finalists.) On the stopped-early/complete standings screen, "Resume
   ranking", "Undo last comparison" and "Next: check for duplicates" render

@@ -1,9 +1,9 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.6
+ * @version 1.7
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-07-29
  * @description Stage B bracket with the second-chance (repechage) round and Stage C burst runoff. Registers the 'bracket' and 'runoff' screens plus the pure PT.bracket ranking engine.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -1058,6 +1058,7 @@
   }
 
   function paintMatch(u, E, m) {
+    S.body.classList.remove('bk-done');
     S.stage.style.display = '';
     PT.dom.clear(S.head);
     PT.dom.clear(S.bar);
@@ -1089,8 +1090,11 @@
     if (E.broke) S.head.appendChild(el('span', { class: 'bk-tag bk-tag-warn', text: 'log/bracket mismatch: ' + E.broke }));
 
     // Attach before loading so the panes have a measurable size by the time an
-    // image fires its load event.
-    if (!S.stage.firstChild) {
+    // image fires its load event. The stage may also hold the standings list —
+    // Resume ranking and Undo arrive here from the done painter — and that
+    // list must not stay behind as a third grid child.
+    if (S.stage.firstChild !== S.panes[0].pane) {
+      PT.dom.clear(S.stage);
       S.stage.appendChild(S.panes[0].pane);
       S.stage.appendChild(S.panes[1].pane);
     }
@@ -1194,7 +1198,12 @@
     PT.dom.clear(S.head);
     PT.dom.clear(S.bar);
     PT.dom.clear(S.stage);
-    S.stage.style.display = 'block';
+    // The standings list must scroll INSIDE the stage's grid track. An inline
+    // display:block here let it keep its full content height and overflow
+    // straight through the bar's grid row, floating the action buttons on top
+    // of rows that stayed clickable beneath them. .bk-done (CSS §12) bounds
+    // the scroller and raises the bar to an opaque pinned footer.
+    S.body.classList.add('bk-done');
     S.lastMid = null;
     PT.dom.releaseImg(S.panes[0].img);
     PT.dom.releaseImg(S.panes[1].img);
@@ -1647,4 +1656,18 @@
  *   zoom just works on the corrected pixels.
  * v1.6 (2026-07-28): Expand chips on the runoff cells and the burst picker,
  *   opening the lightbox over the group.
+ * v1.7 (2026-07-29): The standings action bar no longer floats mid-list. The
+ *   completion painter forced the stage to display:block, which broke the .bk
+ *   grid's height chain: .bk-results fell back to auto content height, the
+ *   whole list overflowed the stage's 1fr track straight through the bar's
+ *   row, and Resume/Undo/Next sat on top of rows that were still clickable
+ *   underneath. Replaced the inline style with a .bk-done class on the screen
+ *   body; the stylesheet bounds the scroller inside its track and gives the
+ *   bar an opaque bordered footer of its own. The two-pane match painter is
+ *   untouched beyond removing the class on re-entry — and one repair to that
+ *   re-entry: the match painter only attached the panes to an EMPTY stage, so
+ *   Resume ranking / Undo from the standings left the results list in the
+ *   stage and no panes on screen. It now reclaims the stage whenever the
+ *   panes are not already its content, which is a no-op on every ordinary
+ *   match repaint (no image flash, no zoom reset).
 */

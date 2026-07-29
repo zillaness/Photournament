@@ -2004,10 +2004,28 @@ kbd {
 /* The entry card paints nothing, so the mark meets the page there. */
 #app .screen-welcome .card { --mark-plate: var(--bg); }
 
-#app .pt-lockup { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+#app .pt-lockup { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
 #app .pt-lockup h1 { margin: 0; }
 
-#app .screen-welcome .pt-brandmark { width: 46px; height: 46px; }
+/*
+ * In the lockup the mark matches the WORDMARK'S WHOLE BLOCK — cap height plus
+ * both rails — not the cap height alone. Sized to the caps (46px) it read as
+ * an undersized afterthought beside the double-underlined word.
+ *
+ * The ratio is taken from the topbar pairing, which was approved by eye:
+ * there the mark is 22px against a 14px wordmark whose visible block
+ * (127.5 units per 100 of font size) is 17.85px — mark ≈ 1.23× block. The
+ * display wordmark at 64px has an 81.6px block; 1.23× ≈ 100px. Stated in
+ * pixels per breakpoint because binding a replaced SVG to a sibling's height
+ * with stretch + aspect-ratio resolves against the wrong axis and balloons.
+ */
+#app .pt-lockup .pt-brandmark {
+  width: 100px;
+  height: 100px;
+  flex: none;
+}
+
+/* (The lockup mark is sized by the stretch rule above, not per-screen.) */
 
 /* ==========================================================================
    15. THE WORDMARK
@@ -2305,13 +2323,12 @@ kbd {
    for the length of the ingest and blinked back — two objects pretending to be
    one.
 
-   They are now genuinely one object in one slot. The nine walking cells are an
-   overlay laid out on the SPRITE'S OWN GEOMETRY — 24% cells at 12.5%, 38% and
-   63.5%, the same numbers the symbol uses — so each cell covers the mark's
-   corresponding square exactly. Fading that overlay in flattens the logo into
-   the plain nine-square grid and starts it walking; fading it out lets the
-   recursion bloom back through. Nothing moves, nothing resizes, and at every
-   frame of the transition the thing on screen is still the mark.
+   One slot, two layers that trade places. While ingest runs the slot shows
+   the PLAIN NINE-CELL cut of the logo — a full-bleed 3x3 grid, no plate, no
+   recursion, one cell walking — which is the original throbber, kept by
+   request. When the work ends the cells fade out and the recursive identity
+   fades in with a small settle, so the animation ending and the work ending
+   are still the same event.
 
    The cells borrow the mark's own two colours, so the throbber IS the basic
    nine-cell version of the logo rather than a differently-coloured spinner.
@@ -2329,6 +2346,9 @@ kbd {
 #app .pt-markcells {
   position: absolute;
   inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
   opacity: 0;
   /* Slower out than in: the logo resolving is the payoff, and it should not be
      over before the eye has arrived. */
@@ -2340,23 +2360,17 @@ kbd {
   transition: opacity 520ms ease-in;
 }
 
+/* While the cells walk, the throbber IS the whole picture — the plain
+   nine-cell cut of the logo, no plate, no recursion. The identity returns
+   when the work ends. */
+#app .pt-markslot .pt-brandmark { transition: opacity 260ms ease-out; }
+#app .pt-markslot[data-state="live"] .pt-brandmark { opacity: 0; }
+
 #app .pt-markcells i {
-  position: absolute;
-  width: 24%;
-  height: 24%;
-  /* rx 3 in the symbol's 100-unit space, scaled by the 0.75 plate inset, as a
-     fraction of the cell: 2.25 / 24. */
-  border-radius: 9.4%;
+  border-radius: 2px;
   background: var(--line-2);
   animation: pt-markcell 3.6s steps(1, end) infinite;
 }
-#app .pt-markcells i:nth-child(3n+1) { left: 12.5%; }
-#app .pt-markcells i:nth-child(3n+2) { left: 38%; }
-#app .pt-markcells i:nth-child(3n+3) { left: 63.5%; }
-#app .pt-markcells i:nth-child(-n+3) { top: 12.5%; }
-#app .pt-markcells i:nth-child(n+4):nth-child(-n+6) { top: 38%; }
-#app .pt-markcells i:nth-child(n+7) { top: 63.5%; }
-
 #app .pt-markcells i:nth-child(1) { animation-delay: 0.0s; }
 #app .pt-markcells i:nth-child(2) { animation-delay: 0.4s; }
 #app .pt-markcells i:nth-child(3) { animation-delay: 0.8s; }
@@ -2365,8 +2379,8 @@ kbd {
 #app .pt-markcells i:nth-child(8) { animation-delay: 2.0s; }
 #app .pt-markcells i:nth-child(7) { animation-delay: 2.4s; }
 #app .pt-markcells i:nth-child(4) { animation-delay: 2.8s; }
-/* The centre goes last, so the walk lands on the one cell the mark itself keeps
-   lit — the highlight arrives home just as the overlay starts to clear. */
+/* The centre goes last, so the walk lands on the one cell the mark itself
+   keeps lit — the highlight arrives home just as the logo returns. */
 #app .pt-markcells i:nth-child(5) { animation-delay: 3.2s; }
 
 @keyframes pt-markcell {
@@ -2392,7 +2406,8 @@ kbd {
  */
 @media (prefers-reduced-motion: reduce) {
   #app .pt-markcells,
-  #app .pt-markslot[data-state="rest"] .pt-markcells { transition: none; }
+  #app .pt-markslot[data-state="rest"] .pt-markcells,
+  #app .pt-markslot .pt-brandmark { transition: none; }
   #app .pt-markcells i { animation: none; }
   #app .pt-markslot[data-state="rest"] .pt-brandmark { animation: none; }
 }
@@ -2400,8 +2415,15 @@ kbd {
 #app .topbar-left { gap: 9px; }
 
 @media (max-width: 720px) {
-  /* Must out-rank the desktop sizes above, which carry extra selectors. */
-  #app .screen-welcome .pt-brandmark { width: 38px; height: 38px; }
+  /* Same 1.23x ratio against the 40px wordmark's 51px block.  * v2.1b (2026-07-29): Two lockup calls from a real run. The entry mark now
+ *   matches the wordmark's whole visible block at the eye-approved topbar
+ *   ratio (1.23x -> 100px desktop, 63px mobile) instead of the cap height
+ *   alone, where it read as an undersized afterthought. And the ingest
+ *   throbber rolled back to the original plain full-slot 3x3 by request —
+ *   the identity yields while the cells walk and still resolves back, with
+ *   its settle, when the work ends.
+*/
+  #app .pt-lockup .pt-brandmark { width: 63px; height: 63px; }
   #app .pt-brandmark-bar { width: 19px; height: 19px; }
   #app .pt-markslot { width: 38px; height: 38px; }
   #app .pt-markslot .pt-brandmark { width: 100%; height: 100%; }

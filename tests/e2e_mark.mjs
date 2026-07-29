@@ -1,6 +1,6 @@
 /**
  * file: e2e_mark.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -145,15 +145,15 @@ const live = await page.evaluate(`(() => {
   return {
     state: slot.dataset.state || '(none)',
     cellCount: cells.length,
-    // Percentages, so a change to the slot size cannot mask a geometry drift.
-    boxes: cells.map(c => {
-      const b = c.getBoundingClientRect();
-      return [
-        +(((b.left - sb.left) / sb.width) * 100).toFixed(1),
-        +(((b.top - sb.top) / sb.height) * 100).toFixed(1),
-        +((b.width / sb.width) * 100).toFixed(1)
-      ];
-    }),
+    // The throbber is the PLAIN nine-cell grid filling the slot (the original,
+    // kept by request) — first cell at the origin, last cell reaching the far
+    // corner, three columns.
+    gridFills: (() => {
+      const first = cells[0].getBoundingClientRect();
+      const last = cells[8].getBoundingClientRect();
+      return Math.abs(first.left - sb.left) < 1.5 && Math.abs(first.top - sb.top) < 1.5 &&
+             Math.abs(last.right - sb.right) < 1.5 && Math.abs(last.bottom - sb.bottom) < 1.5;
+    })(),
     animated: cells.every(c => getComputedStyle(c).animationName === 'pt-markcell'),
     overlayOpacity: +getComputedStyle(slot.querySelector('.pt-markcells')).opacity,
     plate: paint(cs.getPropertyValue('--mark-plate').trim()),
@@ -171,15 +171,15 @@ check('nine cells', live.cellCount === 9, live.cellCount);
 check('the overlay is up while work is happening', live.state === 'live', live.state);
 check('the cells are walking', live.animated === true);
 
-// The symbol insets the mark by 12.5 and steps 34 units in a 100-unit box scaled
-// by 0.75: 12.5, 38, 63.5, each 24 wide. Anything else is a visible resize.
-const COL = [12.5, 38, 63.5];
-const geo = live.boxes.every((b, i) =>
-  Math.abs(b[0] - COL[i % 3]) < 0.6 &&
-  Math.abs(b[1] - COL[Math.floor(i / 3)]) < 0.6 &&
-  Math.abs(b[2] - 24) < 0.6);
-check('the cells sit on the sprite’s own geometry', geo,
-  geo ? '12.5/38/63.5 @ 24%' : JSON.stringify(live.boxes));
+check('the cells fill the slot as the plain 3×3', live.gridFills === true);
+
+// The identity yields the slot entirely while the cells walk. Waited for
+// rather than sampled — the first paint catches the 260ms fade mid-flight.
+const yielded = await page.waitForFunction(() => {
+  const m = document.querySelector('.pt-markslot .pt-brandmark');
+  return m && getComputedStyle(m).opacity === '0';
+}, { timeout: 3000 }).then(() => true).catch(() => false);
+check('the identity yields while the cells walk', yielded === true);
 
 /* --- 3. it transitions, and it ends on the identity ------------------- */
 
@@ -211,7 +211,8 @@ const settled = await page.evaluate(() => {
   return {
     opacity: +getComputedStyle(slot.querySelector('.pt-markcells')).opacity,
     transform: getComputedStyle(slot.querySelector('.pt-brandmark')).transform,
-    markVisible: slot.querySelector('.pt-brandmark').getBoundingClientRect().width > 20
+    markVisible: slot.querySelector('.pt-brandmark').getBoundingClientRect().width > 20 &&
+      +getComputedStyle(slot.querySelector('.pt-brandmark')).opacity === 1
   };
 });
 
@@ -229,4 +230,7 @@ process.exit(failed === 0 ? 0 : 1);
 /* CHANGELOG
  * v1.0 (2026-07-28): Initial release. Plate-follows-surface, sprite geometry for
  *   the walking cells, and the two-way transition between working and settled.
- */
+  * v1.1 (2026-07-29): The working state rolled back to the plain full-slot 3×3
+ *   throbber by request; asserts the grid fills the slot, the identity yields
+ *   while the cells walk, and still returns — visible, unscaled — at rest.
+*/

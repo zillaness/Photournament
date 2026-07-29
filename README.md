@@ -36,7 +36,7 @@ browser profile.
 ```
 npm install
 npm run build     # -> dist/photournament_v1.0.html  (and a slim, no-HEIC build)
-npm test          # unit tests, artifact smoke, and thirteen end-to-end runs
+npm test          # unit tests, artifact smoke, and fourteen end-to-end runs
 ```
 
 The build concatenates `src/` into one self-contained HTML file. That is not a

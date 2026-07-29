@@ -1,6 +1,6 @@
 /**
  * file: e2e_stop.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -180,6 +180,8 @@ check('keys are inert behind the confirm dialog', selAfter === selBefore,
 const modalText = await page.evaluate(() => document.getElementById('modal-body').textContent);
 // 1 kept + 12 never judged (screen 2's 9 + screen 3's 3) = 13 standing.
 check('the modal counts 13 standing', /\b13\b/.test(modalText), modalText.slice(0, 140));
+check('no best-of-duplicates path when nothing is grouped',
+  await page.evaluate(() => !document.querySelector('[data-t="finish-early-dupes"]')));
 check('the modal separates kept from unjudged',
   /1 you kept/.test(modalText) && /12 not yet judged/.test(modalText));
 
@@ -218,6 +220,54 @@ check('the target did not cap the finish', exported.winners > exported.target,
 
 check('zero console errors', errors.length === 0, errors.length ? '\n  ' + errors.join('\n  ') : '0');
 
+/* --- keeping nothing closes the folder out, no empty bracket march -------- */
+
+const ctx2 = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+const p2 = await ctx2.newPage();
+await p2.goto('file://' + ARTIFACT);
+await p2.setInputFiles('#dir-files', tmp);
+await p2.waitForFunction(() => {
+  const b = document.querySelector('#ingest-actions button');
+  return b && /finalist/i.test(b.textContent);
+}, { timeout: 60000 });
+await p2.click('#ingest-actions button');
+await p2.waitForSelector('.tree-row');
+await p2.fill('input.tree-alloc[data-path$="/Roll"]', '4');
+await p2.evaluate(() => {
+  Array.from(document.querySelectorAll('button'))
+    .find((x) => /start culling/i.test(x.textContent) && !x.disabled).click();
+});
+await p2.waitForSelector('#dupe-skip, [data-t="start-pass"]', { timeout: 30000 });
+if (await p2.$('#dupe-skip')) await p2.click('#dupe-skip');
+await p2.waitForSelector('[data-t="start-pass"]');
+await p2.click('[data-t="start-pass"]');
+await p2.waitForSelector('.photo-cell');
+// Advance every screen keeping nothing.
+for (let i = 0; i < 4; i++) {
+  const done = await p2.evaluate(() => !document.querySelector('[data-t="advance"]'));
+  if (done) break;
+  await p2.click('[data-t="advance"]');
+  await p2.waitForTimeout(250);
+}
+const emptySetup = await p2.evaluate(() => ({
+  finishEmpty: !!document.querySelector('[data-t="finish-empty"]'),
+  bracketOffered: !!document.querySelector('[data-t="tobracket"]')
+}));
+check('an empty pool offers finish, not the bracket',
+  emptySetup.finishEmpty === true && emptySetup.bracketOffered === false,
+  JSON.stringify(emptySetup));
+await p2.click('[data-t="finish-empty"]');
+await p2.waitForTimeout(600);
+const closedOut = await p2.evaluate(() => {
+  const s = window.PT.store.get();
+  const u = Object.values(s.session.units)[0];
+  return { phase: u.phase, winners: u.winners.length, stage: s.session.stage };
+});
+check('the folder closes with zero finalists, straight to the end',
+  closedOut.phase === 'done' && closedOut.winners === 0 && closedOut.stage === 'export',
+  JSON.stringify(closedOut));
+await ctx2.close();
+
 await browser.close();
 console.log(failed === 0 ? '\nSTOP-EARLY OK' : `\n${failed} CHECK(S) FAILED`);
 process.exit(failed === 0 ? 0 : 1);
@@ -226,4 +276,7 @@ process.exit(failed === 0 ? 0 : 1);
  * v1.0 (2026-07-28): Initial release. Mid-pass finish-early from the topbar:
  *   kept + unjudged survive, judged-out photos join the cut pile, the unit
  *   completes, and export shows the uncapped survivor count.
- */
+  * v1.2 (2026-07-29): Asserts the best-of-duplicates path is absent when nothing
+ *   is grouped, and that a keep-nothing pass closes the folder out directly —
+ *   zero finalists, no empty bracket, no empty duplicates round.
+*/

@@ -9254,7 +9254,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 60_screen_grid.js ===== */
 /**
  * @file 60_screen_grid.js
- * @version 1.6
+ * @version 1.7
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -9830,7 +9830,10 @@ v1.0 - 2026-07-28 - Samuel Cao
         disabled: unit.cut.length === 0,
         onclick: function () { goSafe('rescue', { unitId: G.unitId }); }
       }),
-      el('button', {
+      // An empty pool has nothing to rank and nothing to dedupe; offering the
+      // bracket then marches the user through two purposeless screens. The
+      // folder closes out directly instead: zero finalists, on to the next.
+      canPass ? el('button', {
         class: 'btn', dataset: { t: 'tobracket' }, text: 'Move on to the bracket',
         onclick: function () {
           editUnit(G.unitId, 'unit:toBracket', function (u) { u.phase = 'bracket'; });
@@ -9838,6 +9841,18 @@ v1.0 - 2026-07-28 - Samuel Cao
             editUnit(G.unitId, 'unit:toBracket:revert', function (u) { u.phase = 'gridA'; });
             render();
           }
+        }
+      }) : el('button', {
+        class: 'btn', dataset: { t: 'finish-empty' }, text: 'Finish this folder — nothing kept',
+        title: 'Close this folder with zero finalists and move on',
+        onclick: function () {
+          editUnit(G.unitId, 'unit:finishEmpty', function (u) {
+            u.winners = [];
+            u.currentPass = null;
+            u.phase = 'done';
+          });
+          releaseCells();
+          PT.advance();
         }
       }),
       // The exit for "I'm already happy": no more passes, no ranking, keep
@@ -9854,7 +9869,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 
     if (!canPass) {
       wrap.appendChild(el('div', { class: 'notice notice-warn', dataset: { t: 'empty' },
-        text: 'The pool is empty. Rescue something from the cut pile, or move on.' }));
+        text: 'The pool is empty. Rescue something from the cut pile, or finish the folder with nothing kept.' }));
     }
   }
 
@@ -10131,6 +10146,39 @@ v1.0 - 2026-07-28 - Samuel Cao
       return;
     }
 
+    // The standing set as DECISIONS: one face per bundled burst. When bursts
+    // are standing, "keep everything" has a duplicate question inside it, and
+    // the modal must offer to answer it rather than silently export every
+    // frame of every burst.
+    var p0 = unit.currentPass;
+    var faces = p0
+      ? p0.kept.concat(p0.order.slice(p0.index * p0.gridSize))
+      : S.slotsFor(unit).map(function (sl) { return sl.face; });
+    var dupExtras = standing.length - faces.length;
+
+    /**
+     * The shared fold: cut what was judged out, keep the standing, and route.
+     * 'done' takes the standing whole; 'runoff' seats one face per burst as
+     * the finalists and sends the unit to the best-of-duplicates round, where
+     * each burst gets its decision (and extras can still be kept) before
+     * export.
+     */
+    function commitStop(winnerIds, phase) {
+      editUnit(G.unitId, 'unit:finishEarly', function (u) {
+        if (u.currentPass) {
+          var keep = Object.create(null);
+          standing.forEach(function (id) { keep[id] = 1; });
+          u.cut = u.cut.concat(u.pool.filter(function (id) { return !keep[id]; }));
+          u.currentPass = null;
+          u.lastPassSnapshot = null;
+          u.lastSummary = null;
+        }
+        u.pool = standing.slice();
+        u.winners = winnerIds.slice();
+        u.phase = phase;
+      });
+    }
+
     var p = unit.currentPass;
     var judged = 0;
     if (p) p.kept.forEach(function (f) { judged += S.expandSlot(p, f).length; });
@@ -10146,32 +10194,32 @@ v1.0 - 2026-07-28 - Samuel Cao
         : 'All ' + standing.length + ' photos still in the pool become this folder’s finalists.' }));
     body.appendChild(el('p', { class: 'small dim', text:
       'They are taken as they are, skipping the head-to-head ranking' +
-      (unit.target ? ' and the target of ' + unit.target : '') + '. The cut pile stays as it is.' }));
+      (unit.target ? ' and the target of ' + unit.target : '') + '. The cut pile stays as it is.' +
+      (dupExtras > 0
+        ? ' ' + dupExtras + ' of the standing are extra frames inside duplicate groups \u2014 ' +
+          '\u201cbest of duplicates\u201d decides those before export instead of keeping every frame.'
+        : '') }));
     body.appendChild(el('div', { class: 'row', style: 'margin-top:16px' }, [
       el('span', { class: 'spacer' }),
       el('button', { class: 'btn btn-quiet', text: 'Keep culling',
         onclick: function () { PT.dom.$('#modal').close(); } }),
+      dupExtras > 0 ? el('button', {
+        class: 'btn', dataset: { t: 'finish-early-dupes' },
+        text: 'Keep ' + standing.length + ' \u2014 best of duplicates first',
+        title: 'Stop culling, then decide each burst before export',
+        onclick: function () {
+          PT.dom.$('#modal').close();
+          commitStop(faces, 'runoff');
+          releaseCells();
+          goSafe('runoff', { unitId: G.unitId });
+        }
+      }) : null,
       el('button', {
         class: 'btn btn-primary', dataset: { t: 'finish-early-confirm' },
         text: 'Keep ' + standing.length + ' and finish',
         onclick: function () {
           PT.dom.$('#modal').close();
-          editUnit(G.unitId, 'unit:finishEarly', function (u) {
-            var live = u.currentPass;
-            if (live) {
-              // Fold the part-finished pass in honestly: what was passed over
-              // on completed screens joins the cut pile, everything else stays.
-              var keep = Object.create(null);
-              standing.forEach(function (id) { keep[id] = 1; });
-              u.cut = u.cut.concat(u.pool.filter(function (id) { return !keep[id]; }));
-              u.currentPass = null;
-              u.lastPassSnapshot = null;
-              u.lastSummary = null;
-            }
-            u.pool = standing.slice();
-            u.winners = standing.slice();
-            u.phase = 'done';
-          });
+          commitStop(standing, 'done');
           releaseCells();
           PT.advance();
         }
@@ -10578,6 +10626,12 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   the photo to every later screen.
  * v1.6 (2026-07-28): Expand chip in the burst picker, opening the lightbox
  *   over the group's members.
+ * v1.7 (2026-07-29): Two exits stop being dead ends. Stop early grows a third
+ *   path when bursts are standing — keep everything but route through the
+ *   best-of-duplicates round first, one face per burst seated as finalists,
+ *   instead of silently exporting every frame — and an empty pool closes the
+ *   folder out directly with zero finalists rather than marching the user
+ *   through an empty bracket and an empty duplicates round.
 */
 
 </script>

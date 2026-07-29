@@ -903,6 +903,22 @@ kbd {
  * the column header row sets its own 11px font and `ch` would resolve against it,
  * throwing the header out of line with the rows beneath it.
  */
+/*
+ * The marquee sweep on the duplicate review. Fixed-position because the
+ * coordinates are viewport-space; pointer-events none so the sweep never
+ * blocks its own hit-testing. Accent is fine here — the box is chrome over
+ * chrome, never over a photograph alone.
+ */
+#dupe-marquee {
+  position: fixed;
+  z-index: 60;
+  border: 1px solid var(--accent);
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+#app .dupe-list.marqueeing { user-select: none; cursor: crosshair; }
+
 /* The broadcast row: one value for every folder, above the per-row tree. */
 #app .tree-all { gap: 10px; padding: 10px 14px; align-items: center; }
 #app .tree-all .tree-alloc { width: 88px; flex: none; }

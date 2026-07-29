@@ -36,7 +36,7 @@ browser profile.
 ```
 npm install
 npm run build     # -> dist/photournament_v1.0.html  (and a slim, no-HEIC build)
-npm test          # unit tests, artifact smoke, and twelve end-to-end runs
+npm test          # unit tests, artifact smoke, and thirteen end-to-end runs
 ```
 
 The build concatenates `src/` into one self-contained HTML file. That is not a
@@ -66,7 +66,8 @@ for the measured constraint table.
    bracket seats one competitor per group, each wearing a badge with the member
    count. Open the badge anywhere to switch which frame stands for the group,
    expand any frame to judge it at preview size, and split, merge or remove by
-   hand when the grouping itself is wrong.
+   hand when the grouping itself is wrong — tick photos one by one, or drag a
+   box across the review to sweep many into one action.
 4. **Grid passes** — a screen of photos at a time, keeping at most the quota you
    committed to before the pass started. The cap does not move mid-pass; that is
    the entire point. **Stop early** in the top bar ends the folder whenever you

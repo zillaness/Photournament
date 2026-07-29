@@ -1,6 +1,6 @@
 /**
  * @file 45_screen_dupes.js
- * @version 1.2
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -606,6 +606,7 @@
 
     D.list = el('div', { class: 'bk-results dupe-list', id: 'dupe-list' });
     root.appendChild(D.list);
+    wireMarquee(D.list);
 
     D.footer = el('div', { class: 'card row', id: 'dupe-footer' });
     root.appendChild(D.footer);
@@ -735,6 +736,110 @@
 
   /* ------------------------------------------------------------ selection */
 
+  /**
+   * Drag a box across the list background to select many photos at once —
+   * checkbox-by-checkbox is no way to take apart a big wrong group. The sweep
+   * feeds the SAME selection the checkboxes do, so split, merge and remove
+   * work on it unchanged. Plain drag replaces the selection; shift adds.
+   *
+   * Cells, buttons and checkboxes never start a sweep (their clicks all mean
+   * something already), and a sweep only becomes real after a few pixels of
+   * travel so a stray background click selects nothing. The list auto-scrolls
+   * when the pointer rides its edge, because the selections worth sweeping
+   * are longer than the screen.
+   */
+  function wireMarquee(list) {
+    var drag = null;
+    var box = null;
+
+    function rectsIntersect(a, b) {
+      return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    }
+
+    function marqueeRect() {
+      return {
+        left: Math.min(drag.x0, drag.x1), right: Math.max(drag.x0, drag.x1),
+        top: Math.min(drag.y0, drag.y1), bottom: Math.max(drag.y0, drag.y1)
+      };
+    }
+
+    /** Preview only — classes and checkboxes, no store traffic until release. */
+    function preview() {
+      var m = marqueeRect();
+      PT.dom.$$('.dupe-cell', list).forEach(function (cell) {
+        var id = cell.dataset.member;
+        var hit = rectsIntersect(m, cell.getBoundingClientRect());
+        var on = drag.add ? (hit || !!drag.base[id]) : hit;
+        cell.classList.toggle('picked', on);
+        var pick = cell.querySelector('.dupe-pick');
+        if (pick) pick.checked = on;
+        drag.now[id] = on;
+      });
+    }
+
+    list.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 || !D || D.busy) return;
+      if (e.target.closest('.dupe-cell, button, input, select, a, img, kbd')) return;
+      drag = {
+        x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY,
+        add: e.shiftKey,
+        base: Object.assign(Object.create(null), D.sel),
+        now: Object.create(null),
+        live: false
+      };
+      try { list.setPointerCapture(e.pointerId); } catch (err) { /* not fatal */ }
+    });
+
+    list.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      drag.x1 = e.clientX; drag.y1 = e.clientY;
+      if (!drag.live) {
+        if (Math.abs(drag.x1 - drag.x0) + Math.abs(drag.y1 - drag.y0) < 5) return;
+        drag.live = true;
+        box = el('div', { id: 'dupe-marquee' });
+        document.body.appendChild(box);
+        // A text selection racing the sweep makes both unusable.
+        list.classList.add('marqueeing');
+      }
+      var m = marqueeRect();
+      box.style.left = m.left + 'px';
+      box.style.top = m.top + 'px';
+      box.style.width = (m.right - m.left) + 'px';
+      box.style.height = (m.bottom - m.top) + 'px';
+
+      // Ride the edge, keep sweeping.
+      var lr = list.getBoundingClientRect();
+      if (e.clientY > lr.bottom - 36) list.scrollTop += 14;
+      else if (e.clientY < lr.top + 36) list.scrollTop -= 14;
+
+      preview();
+    });
+
+    function finish(commit) {
+      if (!drag) return;
+      var wasLive = drag.live;
+      var result = drag.now;
+      var base = drag.base;
+      var additive = drag.add;
+      if (box) { box.remove(); box = null; }
+      list.classList.remove('marqueeing');
+      drag = null;
+      if (!wasLive) return;
+
+      if (!commit) { paintList(); return; }
+
+      D.sel = Object.create(null);
+      if (additive) Object.keys(base).forEach(function (id) { D.sel[id] = 1; });
+      Object.keys(result).forEach(function (id) {
+        if (result[id]) D.sel[id] = 1; else if (!additive) delete D.sel[id];
+      });
+      paintActions();
+    }
+
+    list.addEventListener('pointerup', function () { finish(true); });
+    list.addEventListener('pointercancel', function () { finish(false); });
+  }
+
   function selected() { return Object.keys(D.sel); }
 
   function spannedGroups() {
@@ -752,7 +857,8 @@
 
     if (!sel.length) {
       D.actions.appendChild(el('span', { class: 'small dim', text:
-        'Click a photo to make it the one you keep. Tick photos to split, merge or remove them.' }));
+        'Click a photo to make it the one you keep. Tick photos \u2014 or drag a box across the ' +
+        'background \u2014 to split, merge or remove them; shift-drag adds to the selection.' }));
       return;
     }
 
@@ -1124,4 +1230,8 @@
  * v1.2 (2026-07-28): Expand. Every member cell and the group head open the
  *   lightbox over the whole group, so near-duplicates are judged at preview
  *   size instead of from thumbnails.
+ * v1.3 (2026-07-29): Marquee selection. Drag across the list background to
+ *   sweep many photos into the same selection the checkboxes feed; shift adds,
+ *   the list auto-scrolls at its edges, and a sub-5px drag is a click, not a
+ *   sweep. Split / merge / remove operate on the swept set unchanged.
 */

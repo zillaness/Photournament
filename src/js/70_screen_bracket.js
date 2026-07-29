@@ -1,6 +1,6 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.7
+ * @version 1.8
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-29
@@ -449,10 +449,25 @@
    * so a bracket stopped after two comparisons still hands back a defensible
    * ranked list rather than an empty one.
    */
-  function results(E) {
+  /**
+   * The finalists are CHOSEN, not auto-cut. The engine ranks the whole field;
+   * the standings screen lets the user pick which ranked rows survive, capped
+   * at the folder's target, seeded with the top-N so doing nothing keeps the
+   * suggestion. An empty/absent choice means the seed.
+   */
+  function chosenWinners(E, b) {
+    var full = results(E, true);
+    if (b.chosen) {
+      var pick = full.filter(function (id) { return b.chosen[id]; });
+      if (pick.length) return pick;
+    }
+    return full.slice(0, E.target);
+  }
+
+  function results(E, keepAll) {
     var placed = {}, out = E.placements.slice(), idx = {};
     out.forEach(function (id) { placed[id] = 1; });
-    if (out.length < E.target) {
+    if (keepAll || out.length < E.target) {
       E.order.forEach(function (id, i) { idx[id] = i; });
       var rest = E.order.filter(function (id) { return !placed[id]; });
       rest.sort(function (a, b) {
@@ -464,7 +479,10 @@
       });
       out = out.concat(rest);
     }
-    return out.slice(0, E.target);
+    // keepAll is the user's stopped-early choice: the ranking is the same,
+    // the cut at target just is not applied. Every competitor survives, in
+    // ranked order.
+    return keepAll ? out : out.slice(0, E.target);
   }
 
   /**
@@ -649,7 +667,7 @@
       if (mutate) mutate(u.bracket, u);
       var E = build(u.bracket.pool, u.bracket.target, u.bracket.seed, u.bracket.ops);
       u.bracket.complete = E.done;
-      u.winners = results(E);
+      u.winners = chosenWinners(E, u.bracket);
       u.winnersDecided = E.placements.length;
       u.comparisons = E.comparisons;
       if (S) S.engine = E;
@@ -1210,7 +1228,17 @@
 
     var stopped = !!u.bracket.stopped && !E.done;
     var decided = E.placements.length;
-    var list = u.winners || [];
+    // The WHOLE field, ranked — the target draws a line through it, it does
+    // not amputate it. What survives is chosen row by row below.
+    var list = results(E, true);
+    var cap = u.bracket.uncapped ? Infinity : u.bracket.target;
+    var chosen = u.bracket.chosen || (function () {
+      var seed = Object.create(null);
+      list.slice(0, cap === Infinity ? list.length : cap)
+        .forEach(function (id) { seed[id] = 1; });
+      return seed;
+    })();
+    var chosenCount = list.filter(function (id) { return chosen[id]; }).length;
 
     S.head.appendChild(el('span', {
       class: 'bk-tag' + (stopped ? ' bk-tag-warn' : ''),
@@ -1219,6 +1247,16 @@
     S.head.appendChild(el('span', {
       text: decided + ' of ' + list.length + ' place' + (list.length === 1 ? '' : 's') +
             ' decided head-to-head in ' + E.comparisons + ' comparison' + (E.comparisons === 1 ? '' : 's') + '.'
+    }));
+    S.head.appendChild(el('span', {
+      class: 'small muted nums', id: 'bk-chosen-count',
+      text: cap === Infinity
+        ? chosenCount + ' chosen'
+        : chosenCount + ' of ' + cap + ' chosen'
+    }));
+    S.head.appendChild(el('span', {
+      class: 'small dim',
+      text: 'Click a row to change what stays. The ranking is the suggestion, not the decision.'
     }));
     if (decided < list.length) {
       S.head.appendChild(el('span', {
@@ -1250,10 +1288,36 @@
 
     var box = el('div', { class: 'bk-results', id: 'bk-results' });
     list.forEach(function (id, i) {
+      // The line your target drew: everything renders, this is where the
+      // default suggestion stops.
+      if (cap !== Infinity && i === cap && cap < list.length) {
+        box.appendChild(el('div', { class: 'bk-cutoff', dataset: { t: 'cutoff' }, text:
+          'your cutoff \u2014 the folder asked for ' + cap }));
+      }
+      var isChosen = !!chosen[id];
       var img = el('img', { alt: '' });
       var b = blobFor(id, false);
       if (b) PT.dom.setImg(img, b);
-      var row = el('div', { class: 'bk-row', dataset: { id: id, rank: String(i + 1) } }, [
+      var row = el('div', {
+        class: 'bk-row bk-choosable' + (isChosen ? ' chosen' : ''),
+        dataset: { id: id, rank: String(i + 1) },
+        title: isChosen ? 'Click to let this one go' : 'Click to keep this one',
+        onclick: function () {
+          if (!isChosen && chosenCount >= cap) {
+            PT.bus.emit('toast', 'The folder asked for ' + cap + ' \u2014 unpick one first.');
+            var cnt = document.getElementById('bk-chosen-count');
+            if (cnt) { cnt.classList.remove('bk-over'); void cnt.offsetWidth; cnt.classList.add('bk-over'); }
+            return;
+          }
+          commit(isChosen ? 'bracket:unchoose' : 'bracket:choose', function (bb) {
+            var next = Object.create(null);
+            list.forEach(function (x) { if (chosen[x]) next[x] = 1; });
+            if (isChosen) delete next[id]; else next[id] = 1;
+            bb.chosen = next;
+          });
+        }
+      }, [
+        el('span', { class: 'bk-keepmark', 'aria-hidden': 'true' }),
         el('span', { class: 'bk-rank', text: String(i + 1) }),
         img,
         el('span', { class: 'bk-name', text: nameOf(id) }),
@@ -1275,7 +1339,12 @@
     }
     S.bar.appendChild(el('button', { class: 'btn', id: 'bk-undo', text: 'Undo last comparison', onclick: undo, disabled: !u.bracket.ops.length }));
     S.bar.appendChild(el('span', { class: 'spacer' }));
-    S.bar.appendChild(el('button', { class: 'btn btn-primary', id: 'bk-continue', text: 'Next: check for duplicates', onclick: continueToRunoff }));
+    S.bar.appendChild(el('button', {
+      class: 'btn btn-primary', id: 'bk-continue', text: 'Next: check for duplicates',
+      disabled: chosenCount === 0,
+      title: chosenCount === 0 ? 'Nothing is chosen to keep' : '',
+      onclick: continueToRunoff
+    }));
   }
 
   function unmountBracket(root) {
@@ -1670,4 +1739,10 @@
  *   stage and no panes on screen. It now reclaims the stage whenever the
  *   panes are not already its content, which is a no-op on every ordinary
  *   match repaint (no image flash, no zoom reset).
+ * v1.8 (2026-07-29): The standings become a choice, not a cut. The whole field
+ *   renders ranked with the target drawing a visible cutoff line through it;
+ *   the top-N arrive pre-chosen as the suggestion and every row toggles by
+ *   click, capped hard at the folder's target ("if you said only 5 it should
+ *   only be five" \u2014 which five is yours). Winners follow the choice on every
+ *   rebuild via chosenWinners(); Next is blocked only on an empty choice.
 */

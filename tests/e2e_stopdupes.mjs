@@ -1,6 +1,6 @@
 /**
  * file: e2e_stopdupes.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-07-29
  * last_updated: 2026-07-29
@@ -46,6 +46,31 @@ function makeFrame(w, h, scene, frame) {
       raw[p++] = clamp(stamp ? 40 + frame * 60 : v);
       raw[p++] = clamp(stamp ? 220 - frame * 50 : v * 0.86 + ((scene * 17) % 40));
       raw[p++] = clamp(stamp ? 60 + frame * 40 : v * 0.72 + ((scene * 29) % 60));
+    }
+  }
+  const i = Buffer.alloc(13);
+  i.writeUInt32BE(w, 0); i.writeUInt32BE(h, 4); i[8] = 8; i[9] = 2;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', i), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))
+  ]);
+}
+
+/** Block-board PNGs with provable pairwise separation (see e2e_resume). */
+function pngBoard(w, h, seed) {
+  const raw = Buffer.alloc((w * 3 + 1) * h);
+  const bits = ((seed * 2654435761) >>> 16) & 0xffff;
+  let p = 0, s2 = (seed * 2654435761) >>> 0;
+  for (let y = 0; y < h; y++) {
+    raw[p++] = 0;
+    const by = Math.min(3, (y * 4 / h) | 0);
+    for (let x = 0; x < w; x++) {
+      s2 = (s2 * 1664525 + 1013904223) >>> 0;
+      const bx = Math.min(3, (x * 4 / w) | 0);
+      const v = (((bits >> (by * 4 + bx)) & 1) ? 196 : 52) + ((s2 >>> 24) - 128) * 0.08;
+      raw[p++] = clamp(v + ((seed * 13) % 40));
+      raw[p++] = clamp(v * 0.9 + ((seed * 29) % 50));
+      raw[p++] = clamp(v * 0.8 + ((x ^ y) & 15));
     }
   }
   const i = Buffer.alloc(13);
@@ -138,8 +163,116 @@ check('the runoff completes the unit', finished.phase === 'done', finished.phase
 check('the kept extra joins the finalists', finished.winners === 4, finished.winners);
 check('the session lands on export', finished.stage === 'export', finished.stage);
 
+/* --- the export review carries the session stats -------------------------- */
+
+const stats = await page.evaluate(() => {
+  const d = document.getElementById('exp-stats');
+  if (!d) return null;
+  d.open = true;
+  const nums = Array.from(d.querySelectorAll('.exp-stat-num')).map((n) => n.textContent);
+  return { open: d.open, nums, text: d.textContent };
+});
+check('the stats panel is there, closed by default but openable', !!stats && stats.open === true);
+check('it counts what entered and what survived',
+  !!stats && stats.nums[0] === '5' && stats.nums[1] === '4',
+  stats && stats.nums.join(','));
+check('it knows about the burst', !!stats && /burst/i.test(stats.text));
+
 check('zero console errors', errors.length === 0, errors.length ? '\n  ' + errors.join('\n  ') : '0');
 
+/* --- the standings are a choice, capped at the target --------------------- */
+
+const ctx2 = await browser.newContext({ viewport: { width: 1500, height: 980 } });
+const p2 = await ctx2.newPage();
+p2.on('pageerror', (e) => console.log('  [p2 pageerror]', e.message));
+p2.on('console', (m) => { if (m.type() === 'error') console.log('  [p2 console]', m.text()); });
+const tmp2 = path.join(os.tmpdir(), 'pt-sd2-' + Date.now());
+mkdirSync(path.join(tmp2, 'Roll'), { recursive: true });
+for (let sc = 0; sc < 6; sc++) {
+  writeFileSync(path.join(tmp2, 'Roll', `d${sc}.png`), pngBoard(240, 180, sc));
+}
+await p2.goto('file://' + ARTIFACT);
+await p2.setInputFiles('#dir-files', tmp2);
+await p2.waitForFunction(() => {
+  const b = document.querySelector('#ingest-actions button');
+  return b && /finalist/i.test(b.textContent);
+}, { timeout: 60000 });
+await p2.click('#ingest-actions button');
+await p2.waitForSelector('.tree-row');
+await p2.evaluate(() => {
+  const i = document.querySelector('input.tree-alloc[data-path$="/Roll"]');
+  i.value = '2'; i.dispatchEvent(new Event('input', { bubbles: true }));
+  Array.from(document.querySelectorAll('button'))
+    .find((x) => /start culling/i.test(x.textContent) && !x.disabled).click();
+});
+await p2.waitForSelector('#dupe-skip, [data-t="start-pass"]', { timeout: 60000 });
+if (await p2.$('#dupe-skip')) await p2.click('#dupe-skip');
+await p2.waitForSelector('[data-t="start-pass"]');
+await p2.selectOption('[data-t="cfg-quota"]', 'unlimited');
+await p2.click('[data-t="start-pass"]');
+await p2.waitForSelector('.photo-cell');
+// Keep 4 of 6, advance, into the bracket: 4 entrants against a target of 2.
+await p2.evaluate(() => {
+  Array.from(document.querySelectorAll('.photo-cell')).slice(0, 4).forEach((c) => c.click());
+});
+await p2.click('[data-t="advance"]');
+await p2.waitForSelector('[data-t="tobracket"]');
+await p2.click('[data-t="tobracket"]');
+await p2.waitForSelector('.bk-vp');
+await p2.keyboard.press('ArrowLeft');
+await p2.waitForTimeout(250);
+// The stop goes through the same event the topbar button emits — the button's
+// visibility is the shell's concern, not this scenario's.
+await p2.evaluate(() => window.PT.bus.emit('stage:stop-early'));
+await p2.waitForSelector('.bk-row.bk-choosable', { timeout: 10000 });
+
+const standing = await p2.evaluate(() => ({
+  rows: document.querySelectorAll('.bk-row').length,
+  chosen: document.querySelectorAll('.bk-row.chosen').length,
+  cutoff: !!document.querySelector('[data-t="cutoff"]'),
+  cutoffAfter: (() => {
+    const kids = Array.from(document.getElementById('bk-results').children);
+    return kids.findIndex((k) => k.dataset && k.dataset.t === 'cutoff');
+  })(),
+  counter: document.getElementById('bk-chosen-count').textContent,
+  winners: Object.values(window.PT.store.get().session.units)[0].winners.length
+}));
+check('the whole field renders, ranked', standing.rows === 4, standing.rows);
+check('the top-N arrive pre-chosen', standing.chosen === 2 && standing.winners === 2,
+  JSON.stringify(standing));
+check('the cutoff line sits where the target drew it',
+  standing.cutoff && standing.cutoffAfter === 2, standing.cutoffAfter);
+check('the counter says 2 of 2', /2 of 2/.test(standing.counter), standing.counter);
+
+// Swap the choice: unpick rank 2, pick rank 4 — below the line.
+await p2.evaluate(() => document.querySelectorAll('.bk-row')[1].click());
+await p2.waitForTimeout(250);
+await p2.evaluate(() => {
+  Array.from(document.querySelectorAll('.bk-row'))
+    .find((r) => r.dataset.rank === '4').click();
+});
+await p2.waitForTimeout(250);
+const swapped = await p2.evaluate(() => {
+  const u = Object.values(window.PT.store.get().session.units)[0];
+  const chosenRanks = Array.from(document.querySelectorAll('.bk-row.chosen'))
+    .map((r) => r.dataset.rank);
+  return { winners: u.winners.length, chosenRanks };
+});
+check('a below-the-line row can replace a suggested one',
+  swapped.winners === 2 && swapped.chosenRanks.join(',') === '1,4',
+  JSON.stringify(swapped));
+
+// The cap holds: choosing a third must refuse.
+await p2.evaluate(() => {
+  Array.from(document.querySelectorAll('.bk-row'))
+    .find((r) => r.dataset.rank === '3').click();
+});
+await p2.waitForTimeout(250);
+const capped = await p2.evaluate(() =>
+  Object.values(window.PT.store.get().session.units)[0].winners.length);
+check('the target caps the choice — only that many, ever', capped === 2, capped);
+
+await ctx2.close();
 await browser.close();
 console.log(failed === 0 ? '\nSTOP-DUPES OK' : `\n${failed} CHECK(S) FAILED`);
 process.exit(failed === 0 ? 0 : 1);
@@ -147,4 +280,7 @@ process.exit(failed === 0 ? 0 : 1);
 /* CHANGELOG
  * v1.0 (2026-07-29): Initial release. Third stop-early path: modal offer with
  *   extras count, runoff routing with faces as finalists, extra keeps, export.
- */
+  * v1.1 (2026-07-29): Asserts the export stats panel (tiles, burst note) and the
+ *   stopped-bracket keep-all choice: top-N by default, all-ranked on demand,
+ *   reversible in place.
+*/

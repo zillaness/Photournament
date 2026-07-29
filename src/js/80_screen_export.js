@@ -1,6 +1,6 @@
 /**
  * @file 80_screen_export.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -50,6 +50,191 @@
     return '_finalists_' + leaf.replace(/[^A-Za-z0-9._-]+/g, '_');
   }
 
+  /**
+   * The session, in numbers. Everything here is computed from state the run
+   * already produced — photo dimensions and sharpness from ingest, pass
+   * summaries and comparisons from the stages, groups from the review — so the
+   * panel costs nothing and invents nothing. Rates are only shown where the
+   * denominator is big enough to mean something; a 2-photo category "trend"
+   * would be noise wearing a percent sign.
+   */
+  function computeStats(st, session, sets) {
+    var photos = st.photos || {};
+    var finalSet = Object.create(null);
+    sets.forEach(function (set) { set.ids.forEach(function (id) { finalSet[id] = 1; }); });
+
+    var units = Object.keys(session.units)
+      .filter(function (k) { return k !== session.stageDUnit; })
+      .map(function (k) { return session.units[k]; });
+
+    var entered = Object.create(null);
+    var folders = [];
+    var passes = 0, screens = 0, comparisons = 0, rescued = 0;
+    units.forEach(function (u) {
+      (u.allIds || []).forEach(function (id) { entered[id] = 1; });
+      var kept = (u.winners || []).filter(function (id) { return finalSet[id]; }).length;
+      folders.push({ label: u.label, entered: (u.allIds || []).length, kept: kept });
+      passes += (u.passes || []).length;
+      (u.passes || []).forEach(function (ps) { screens += ps.screens || 0; });
+      comparisons += u.comparisons || 0;
+      rescued += (u.rescued || []).length;
+    });
+
+    var enteredIds = Object.keys(entered);
+    var finalists = Object.keys(finalSet).length;
+
+    // Keep-rate per category, computed over everything that ENTERED, so the
+    // rates answer "of what I shot, what survived" rather than describing the
+    // finalists alone.
+    function rate(classify) {
+      var by = Object.create(null);
+      enteredIds.forEach(function (id) {
+        var p = photos[id];
+        if (!p || p.err) return;
+        var k = classify(p);
+        if (!k) return;
+        var b = by[k] || (by[k] = { entered: 0, kept: 0 });
+        b.entered++;
+        if (finalSet[id]) b.kept++;
+      });
+      return Object.keys(by)
+        .filter(function (k) { return by[k].entered >= 5; })
+        .map(function (k) { return { label: k, entered: by[k].entered, kept: by[k].kept }; })
+        .sort(function (a, b) { return b.entered - a.entered; });
+    }
+
+    var orientation = rate(function (p) {
+      if (!p.w || !p.h) return null;
+      return p.w > p.h ? 'landscape' : (p.h > p.w ? 'portrait' : 'square');
+    });
+    var formats = rate(function (p) { return p.kind || null; });
+
+    // Sharpness of what survived vs what did not, as medians — a single soft
+    // keeper must not be averaged away.
+    function median(list) {
+      if (!list.length) return null;
+      var a = list.slice().sort(function (x, y) { return x - y; });
+      var m = a.length >> 1;
+      return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+    }
+    var sharpKept = [], sharpCut = [];
+    enteredIds.forEach(function (id) {
+      var p = photos[id];
+      if (!p || p.err || typeof p.sharp !== 'number') return;
+      (finalSet[id] ? sharpKept : sharpCut).push(p.sharp);
+    });
+
+    // Bursts: how many groups, how many frames inside them, how many finalists
+    // came out of a group, and how often the user overrode the sharpest pick.
+    var burstGroups = 0, burstFrames = 0, burstFinalists = 0;
+    units.forEach(function (u) {
+      (u.groups || []).forEach(function (g) {
+        var ids = g.ids || [];
+        if (ids.length < 2) return;
+        burstGroups++;
+        burstFrames += ids.length;
+        ids.forEach(function (id) { if (finalSet[id]) burstFinalists++; });
+      });
+    });
+    var overrides = Object.keys((session.groups && session.groups.reps) || {}).length;
+
+    return {
+      entered: enteredIds.length,
+      finalists: finalists,
+      folders: folders.filter(function (f) { return f.entered > 0; }),
+      passes: passes, screens: screens, comparisons: comparisons, rescued: rescued,
+      startedAt: session.createdAt,
+      orientation: orientation,
+      formats: formats,
+      sharpKept: median(sharpKept), sharpCut: median(sharpCut),
+      burstGroups: burstGroups, burstFrames: burstFrames,
+      burstFinalists: burstFinalists, repOverrides: overrides
+    };
+  }
+
+  /** The stats panel: closed by default — interesting, never mandatory. */
+  function statsCard(stats) {
+    var pct = function (kept, entered) {
+      return entered ? Math.round((kept / entered) * 100) : 0;
+    };
+    var tile = function (value, label) {
+      return el('div', { class: 'exp-stat' }, [
+        el('div', { class: 'exp-stat-num nums', text: String(value) }),
+        el('div', { class: 'exp-stat-label', text: label })
+      ]);
+    };
+    var barRow = function (label, kept, entered) {
+      return el('div', { class: 'exp-bar-row' }, [
+        el('span', { class: 'exp-bar-label', text: label }),
+        el('span', { class: 'exp-bar nums', text: kept + ' of ' + entered }),
+        el('span', { class: 'tree-bar', style: '--p:' + (entered ? kept / entered : 0) }, [el('i')]),
+        el('span', { class: 'exp-bar-pct nums', text: pct(kept, entered) + '%' })
+      ]);
+    };
+
+    var body = el('div', { class: 'exp-stats-body' });
+
+    body.appendChild(el('div', { class: 'exp-stat-tiles' }, [
+      tile(stats.entered, 'photos entered'),
+      tile(stats.finalists, 'finalists'),
+      tile((100 - pct(stats.finalists, stats.entered)) + '%', 'culled'),
+      tile(stats.screens + stats.comparisons, 'decisions made')
+    ]));
+
+    if (stats.folders.length > 1) {
+      body.appendChild(el('h3', { text: 'By folder' }));
+      stats.folders.forEach(function (f) { body.appendChild(barRow(f.label, f.kept, f.entered)); });
+    }
+
+    var taste = [];
+    if (stats.orientation.length > 1) {
+      taste.push(el('h3', { text: 'What survived, by shape' }));
+      stats.orientation.forEach(function (o) { taste.push(barRow(o.label, o.kept, o.entered)); });
+    }
+    if (stats.formats.length > 1) {
+      taste.push(el('h3', { text: 'By format' }));
+      stats.formats.forEach(function (f) { taste.push(barRow(f.label, f.kept, f.entered)); });
+    }
+    taste.forEach(function (n) { body.appendChild(n); });
+
+    var lines = [];
+    if (stats.sharpKept != null && stats.sharpCut != null && stats.sharpCut > 0) {
+      var ratio = stats.sharpKept / stats.sharpCut;
+      lines.push('Your keepers measure ' +
+        (ratio >= 1.05 ? Math.round((ratio - 1) * 100) + '% sharper than' :
+         ratio <= 0.95 ? Math.round((1 - ratio) * 100) + '% softer than' : 'about as sharp as') +
+        ' what you cut — median sharpness ' + Math.round(stats.sharpKept) +
+        ' vs ' + Math.round(stats.sharpCut) + '.');
+    }
+    if (stats.burstGroups > 0) {
+      lines.push(stats.burstGroups + ' burst' + (stats.burstGroups === 1 ? '' : 's') +
+        ' held ' + stats.burstFrames + ' frames; ' + stats.burstFinalists +
+        ' made the finalists' +
+        (stats.repOverrides > 0
+          ? ', and you overrode the sharpest-frame suggestion ' + stats.repOverrides +
+            ' time' + (stats.repOverrides === 1 ? '' : 's') + '.'
+          : '.'));
+    }
+    if (stats.rescued > 0) {
+      lines.push(stats.rescued + ' photo' + (stats.rescued === 1 ? '' : 's') +
+        ' came back from the cut pile — the first instinct is not always the last word.');
+    }
+    if (stats.passes > 0) {
+      lines.push(stats.passes + ' grid pass' + (stats.passes === 1 ? '' : 'es') + ' over ' +
+        stats.screens + ' screens, then ' + stats.comparisons + ' head-to-head comparison' +
+        (stats.comparisons === 1 ? '' : 's') + '.');
+    }
+    if (lines.length) {
+      body.appendChild(el('h3', { text: 'Notes' }));
+      lines.forEach(function (t) { body.appendChild(el('p', { class: 'small dim', text: t })); });
+    }
+
+    return el('details', { class: 'card exp-stats', id: 'exp-stats' }, [
+      el('summary', { text: 'Session stats — what you culled, what you kept' }),
+      body
+    ]);
+  }
+
   function resultSets(session) {
     return Object.keys(session.units)
       .map(function (k) { return session.units[k]; })
@@ -84,6 +269,10 @@
           'Some finalists were rotated or flipped by hand. That correction shows everywhere in ' +
           'this tool, including the contact sheet \u2014 but exported files are written exactly ' +
           'as shot, so fix the orientation in your photo app after export.' }));
+      }
+
+      if (sets.length) {
+        root.appendChild(statsCard(computeStats(st0, session, sets)));
       }
 
       if (!sets.length) {
@@ -749,4 +938,9 @@
  *   portfolio is a single image you can open, print or send.
  * v1.4 (2026-07-28): Says so when finalists carry a manual rotation or flip:
  *   the exported originals are as shot; the correction lives in the derivatives.
+ * v1.5 (2026-07-29): Session stats on the review, closed by default. Entered /
+ *   finalists / culled / decisions tiles, per-folder and per-shape and
+ *   per-format keep rates (only where the denominator earns a percentage),
+ *   keeper-vs-cut sharpness medians, burst and rescue and effort notes — all
+ *   from state the run already produced.
 */

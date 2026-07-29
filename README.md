@@ -36,7 +36,7 @@ browser profile.
 ```
 npm install
 npm run build     # -> dist/photournament_v1.0.html  (and a slim, no-HEIC build)
-npm test          # unit tests, artifact smoke, and eleven end-to-end runs
+npm test          # unit tests, artifact smoke, and twelve end-to-end runs
 ```
 
 The build concatenates `src/` into one self-contained HTML file. That is not a
@@ -58,7 +58,9 @@ for the measured constraint table.
    the whole tournament.
 2. **Allocation** — say how many photos you want to keep from each folder. Fixed
    counts, a share of the folder (`5%`), `0` to skip, `*` for no limit, or blank
-   to compete with sibling folders for whatever the parent has left over.
+   to compete with sibling folders for whatever the parent has left over. The
+   broadcast row applies one value to every folder at once — the same count
+   from each, or the same share of each.
 3. **Duplicates** — near-identical shots are grouped so a burst costs one
    decision rather than several: the grid deals one cell per group and the
    bracket seats one competitor per group, each wearing a badge with the member

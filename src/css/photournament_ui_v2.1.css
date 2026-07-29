@@ -903,6 +903,11 @@ kbd {
  * the column header row sets its own 11px font and `ch` would resolve against it,
  * throwing the header out of line with the rows beneath it.
  */
+/* The broadcast row: one value for every folder, above the per-row tree. */
+#app .tree-all { gap: 10px; padding: 10px 14px; align-items: center; }
+#app .tree-all .tree-alloc { width: 88px; flex: none; }
+#app .tree-all .small { white-space: nowrap; }
+
 #app .tree-row {
   --d: 0;
   display: grid;

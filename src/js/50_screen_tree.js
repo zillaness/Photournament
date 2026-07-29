@@ -1,6 +1,6 @@
 /**
  * @file 50_screen_tree.js
- * @version 1.5
+ * @version 1.6
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -50,6 +50,45 @@
           'its parent has left over.' })
       ]);
       root.appendChild(help);
+
+      // The broadcast: one value, every folder that holds photos. "The same 5
+      // from each day" and "10% of everything, folder by folder" are one
+      // gesture here instead of a row-by-row retype. It REPLACES the whole
+      // allocation — photo-holding folders get the value, containers go back
+      // to blank pass-through — because a broadcast layered over leftover
+      // per-row settings would breed the oversubscription errors the resolver
+      // exists to catch.
+      var allInput = el('input', {
+        type: 'text', inputmode: 'numeric', maxlength: '6',
+        class: 'tree-alloc', id: 'tree-all-input', placeholder: '5 or 10%',
+        title: 'A count (5) keeps that many from every folder; a share (10%) keeps that share of ' +
+               'each folder\u2019s own photos. Blank resets every folder to competing.'
+      });
+      var applyAll = function () {
+        var parsed = PT.tree.parseAlloc(allInput.value);
+        if (!parsed) { allInput.classList.add('invalid'); return; }
+        allInput.classList.remove('invalid');
+        PT.store.dispatch('tree:applyAll', function (ss) {
+          ss.session.allocs = {};
+          if (parsed.mode === 'pooled') return;   // blank = clean slate
+          Object.keys(ss.tree.nodes).forEach(function (path) {
+            if (ss.tree.nodes[path].photoIds.length > 0) {
+              ss.session.allocs[path] = { mode: parsed.mode, value: parsed.value };
+            }
+          });
+        });
+        render();
+      };
+      allInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); applyAll(); }
+      });
+      root.appendChild(el('div', { class: 'card row tree-all', id: 'tree-all' }, [
+        el('span', { class: 'small', text: 'Every folder:' }),
+        allInput,
+        el('button', { class: 'btn btn-sm', id: 'tree-all-apply', text: 'Apply to all', onclick: applyAll }),
+        el('span', { class: 'small dim', text:
+          'replaces the settings below \u2014 a count from each folder, or a share of each' })
+      ]));
 
       var treeHost = el('div', { class: 'card', id: 'tree-host' });
       var issuesHost = el('div', { class: 'tree-issues', id: 'tree-issues' });
@@ -412,4 +451,7 @@
  *   toggle flips a row between count and share re-expressing the same resolved
  *   number, and the state column shows what a percentage came to ("= 37").
  *   Split and the state word now read the derived eff alloc.
+ * v1.6 (2026-07-29): The broadcast row. One value applied to every folder that
+ *   holds photos — a count or a share — replacing the whole allocation so no
+ *   stale per-row setting can oversubscribe against it; blank resets to pooled.
 */

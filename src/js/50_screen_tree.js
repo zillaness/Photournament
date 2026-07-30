@@ -1,9 +1,9 @@
 /**
  * @file 50_screen_tree.js
- * @version 1.6
+ * @version 1.7
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-07-30
  * @description PRD 4 allocation tree UI: four states per node, both math directions, live totals, weighted distribution, and the section 4.5 conflict, clamp and dead-state messages.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -226,7 +226,29 @@
           }
         });
 
-        var units = el('span', { class: 'tree-units' }, [pct, inf]);
+        // Rank intent rides beside % and ∞ because all three change what the
+        // number MEANS rather than what it is: "10" + rank is "order the top
+        // 10", not "cut to 10". Recorded per path, applied to whichever unit
+        // this folder ends up owning; a flag on a folder that owns no unit is
+        // inert rather than an error.
+        var rankOn = !!(s.session.rankPaths && s.session.rankPaths[path]);
+        var rank = el('button', {
+          class: 'btn btn-sm tree-unit tree-rank' + (rankOn ? ' on' : ''),
+          text: '⇅',
+          dataset: { t: 'rank-toggle', path: path },
+          title: rankOn
+            ? 'Back to culling: grid passes cut toward the target'
+            : 'Rank this folder head to head instead of culling it — an order, not a cut',
+          onclick: function () {
+            PT.store.dispatch('tree:rank', function (ss) {
+              var r = ss.session.rankPaths || (ss.session.rankPaths = {});
+              if (r[path]) delete r[path]; else r[path] = 1;
+            });
+            render();
+          }
+        });
+
+        var units = el('span', { class: 'tree-units' }, [pct, inf, rank]);
 
         // A percentage is a promise about a number the user cannot see, so the
         // state column spends itself saying what it came to.
@@ -404,8 +426,18 @@
       }
 
       function startUnits(res) {
+        // Rank intent, recorded per path, lands on the unit that path owns. A
+        // pooled unit belongs to its parent, but a flag on any member folder
+        // counts too — the user pointed at the photos, not at the arithmetic.
+        var rankPaths = PT.store.get().session.rankPaths || {};
+        function rankFlag(u) {
+          if (rankPaths[u.ownerPath]) return true;
+          return (u.memberPaths || []).some(function (p) { return !!rankPaths[p]; });
+        }
+
         PT.store.dispatch('units:create', function (s) {
           res.units.forEach(function (u) {
+            u.rank = rankFlag(u);
             if (!s.session.units[u.id]) s.session.units[u.id] = PT.session.newUnit(u);
           });
           s.session.stage = 'unit';
@@ -414,6 +446,18 @@
         });
         var id = PT.store.get().session.activeUnitId;
         if (!id) return;
+        // A session where EVERY unit is marked for ranking skips the duplicate
+        // review gate: the whole job is a few minutes of comparisons, and the
+        // gate was the friction. The grouping still happens — materialise()
+        // bundles bursts from the ingest hashes so they compete as one — and
+        // wrong bundles come apart in the Stage C runoff, which every ranking
+        // passes through anyway. A mixed or unmarked session keeps the gate.
+        var allRank = res.units.length > 0 && res.units.every(rankFlag);
+        if (allRank && PT.dupes && PT.dupes.materialise) {
+          PT.dupes.materialise();
+          PT.router.go('grid', { unitId: id });
+          return;
+        }
         // PRD 7.7: review the near-duplicate grouping before the first grid
         // pass, but only when there is something to review. PT.dupes.route owns
         // that decision and falls through to the grid when there is not.
@@ -454,4 +498,12 @@
  * v1.6 (2026-07-29): The broadcast row. One value applied to every folder that
  *   holds photos — a count or a share — replacing the whole allocation so no
  *   stale per-row setting can oversubscribe against it; blank resets to pooled.
+ * v1.7 (2026-07-30): Rank intent. A third unit toggle (⇅) beside % and ∞ marks
+ *   a folder for ranking rather than culling — all three change what the number
+ *   MEANS, so they share the column. Intent is stored per path in
+ *   session.rankPaths and lands on whichever unit the path ends up owning
+ *   (a pooled unit takes a flag on any member folder). startUnits carries the
+ *   flag onto the units; a session where EVERY unit ranks skips the duplicate
+ *   review gate via PT.dupes.materialise(), because the gate was the friction
+ *   and the runoff can still prise a wrong bundle apart.
 */

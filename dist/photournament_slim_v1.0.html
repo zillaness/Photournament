@@ -53,13 +53,13 @@
 </script>
 
 <style>
-/* ===== photournament_ui_v2.1.css ===== */
+/* ===== photournament_ui_v2.2.css ===== */
 /**
- * file: photournament_ui_v2.1.css
- * version: 2.1a
+ * file: photournament_ui_v2.2.css
+ * version: 2.2
  * author: Samuel Cao
  * created: 2026-07-28
- * last_updated: 2026-07-29
+ * last_updated: 2026-07-30
  * description: Complete replacement stylesheet for Photournament. Consolidates
  *   src/css/00_base.css, src/css/10_screens.css and the four JS-injected style
  *   blocks (pt-tree-style, pt-grid-style, pt-bracket-style, pt-export-style)
@@ -1095,7 +1095,7 @@ kbd {
     252px   /* folder name, truncating */
     86px    /* has */
     66px    /* keep field */
-    64px    /* unit toggles: % and infinity */
+    98px    /* unit toggles: %, infinity and rank */
     64px    /* keep : has proportion */
     86px    /* resolved state */
     minmax(48px, auto);  /* split */
@@ -1491,6 +1491,31 @@ kbd {
 #app .pt-sum b { color: var(--text); }
 #app .pt-sum h2 { margin-bottom: 6px; }
 
+/* ------------------------------------------------------- the ranking offer */
+
+/*
+ * Depth choices as priced statements, not radio noise: each option carries its
+ * own comparison count so the commitment is made against a number the user has
+ * seen. The pressed state borrows the accent exactly as the quota select does —
+ * chrome away from photo content, never a photograph's surround.
+ */
+#app .pt-rank { display: flex; flex-direction: column; gap: 12px; }
+#app .pt-rank p { margin: 0; max-width: 74ch; }
+#app .rank-opts { align-items: stretch; }
+#app .rank-opt {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 14px;
+}
+#app .rank-opt b { font-size: var(--fs-body); font-weight: 600; }
+#app .rank-opt .small { color: var(--text-mute); }
+#app .rank-opt[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+#app .rank-opt[aria-pressed="true"] .small { color: var(--text-dim); }
+
 /* ==========================================================================
    12. SCREEN: BRACKET
    ==========================================================================
@@ -1843,13 +1868,21 @@ kbd {
   .grid-12, .grid-16, .grid-6, .grid-9 { grid-template-columns: repeat(2, 1fr); }
   .screen { padding: 16px 12px; }
   #app .bk-stage { grid-template-columns: 1fr; }
-  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px 32px 0 0 auto; }
+  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px auto 0 0 auto; }
   #app .tree-bar, #app .tree-state { display: none; }
   .counters > span { min-width: 64px; padding: 0 9px; }
   .counters b { font-size: var(--fs-body); }
 }
 
 /** CHANGELOG
+ * v2.2 (2026-07-30): Ranking mode. The tree's unit-toggle column widens 64px to
+ *   98px for the third toggle (rank, ⇅), which inherits .tree-unit styling and
+ *   the accent .on state unchanged; the narrow layout's fixed 32px toggle track
+ *   becomes auto for the same reason. New .pt-rank block for the setup screen's
+ *   ranking offer: depth options as priced statements whose pressed state
+ *   borrows the accent, which stays chrome-side and never nears a photograph.
+ *   First change to this file that is not purely additive (one grid track
+ *   widened), hence the rename from v2.1 per the header's own instruction.
  * v2.1a (2026-07-29): The bracket standings action bar no longer floats over
  *   the ranked list. The completion painter used to force the stage to
  *   display:block, and a block stage cannot hand its 1fr track height down —
@@ -2098,7 +2131,7 @@ kbd {
   .grid-12, .grid-16, .grid-6, .grid-9 { grid-template-columns: repeat(2, 1fr); }
   .screen { padding: 16px 12px; }
   #app .bk-stage { grid-template-columns: 1fr; }
-  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px 32px 0 0 auto; }
+  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px auto 0 0 auto; }
   #app .tree-bar, #app .tree-state { display: none; }
   .counters > span { min-width: 64px; padding: 0 9px; }
   .counters b { font-size: var(--fs-body); }
@@ -6520,10 +6553,10 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 35_session.js ===== */
 /**
  * @file 35_session.js
- * @version 1.1
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-07-30
  * @description Session model and stage flow for Photournament: settings defaults, tournament unit state, quota resolution, pass bookkeeping, and persistence shaping.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -6571,6 +6604,7 @@ v1.0 - 2026-07-28 - Samuel Cao
       sourceKind: sourceKind || 'files',   // 'handle' = can resume and write to disk
       settings: Object.assign({}, DEFAULTS),
       allocs: {},                          // path -> {mode, value}
+      rankPaths: {},                       // path -> 1: rank this folder, don't cull it
       stage: 'ingest',                     // ingest | tree | unit | stageD | export | done
       activeUnitId: null,
       units: {},                           // unitId -> unit state
@@ -6594,6 +6628,8 @@ v1.0 - 2026-07-28 - Samuel Cao
       cut: [],
       rescued: [],
       phase: 'gridA',
+      rank: !!u.rank,              // tree-declared intent: order, don't cull
+      rankDepth: null,             // places to decide head-to-head; set when a ranking starts
       passes: [],                  // completed pass summaries
       currentPass: null,           // live pass, persisted so resume works mid-pass
       groups: null,                // near-duplicate groups once reviewed
@@ -6793,6 +6829,78 @@ v1.0 - 2026-07-28 - Samuel Cao
     return summary.cutPct < settings.cullFloor;
   }
 
+  /* ------------------------------------------------------------- pricing --- */
+
+  /**
+   * The time model from docs/research_faster_culling_v1.0.md, stated once and
+   * shared by every projection: a pairwise comparison ~2.5-3s, a grid screen
+   * ~4s overhead plus ~1.2s per photo shown. Central values, in seconds.
+   */
+  var TIME = { cmp: 2.75, screenBase: 4, perPhoto: 1.2 };
+
+  /**
+   * Comparisons a bracket costs to decide `depth` places over a field of n.
+   * Fitted to the REAL engine at HEAD (perfect simulated judge, 3 seeds per
+   * point) rather than the textbook count, because repechage answer-reuse
+   * undercuts the textbook badly at full depth:
+   *
+   *     partial depth:  (n-1) + (depth-1)*log2(n)   within ~5% of measured
+   *     full order:      n * (log2(n) - 1)          within ~2% of measured
+   *
+   * The two cross as depth approaches n, so take whichever is cheaper. Every
+   * measured point (n 30..742) lands within about 10% of this; callers should
+   * present it with a ~ for exactly that reason.
+   */
+  function rankPrice(n, depth) {
+    n = Math.max(0, Math.floor(n));
+    if (n < 2) return 0;
+    var d = Math.max(1, Math.min(depth == null ? n : Math.floor(depth), n));
+    var lg = Math.log(n) / Math.LN2;
+    var partial = (n - 1) + (d - 1) * lg;
+    var full = n * (lg - 1);
+    return Math.round(Math.max(n - 1, Math.min(partial, full)));
+  }
+
+  function rankSeconds(comparisons) { return comparisons * TIME.cmp; }
+
+  /**
+   * Worst-case Stage A schedule from a field of n to the PRD 7.1 handoff point
+   * (pool at 3x target or below), pass by pass, under the CURRENT settings —
+   * the user keeps the full quota on every screen, which is the honest bound
+   * for "how long could this take". The last partial screen resolves its own,
+   * smaller quota, exactly as resolveQuota does live.
+   *
+   * Stops early when a pass makes no progress (unlimited quota) rather than
+   * projecting an infinite schedule. Returns null for a null target, which has
+   * no handoff point to project toward.
+   */
+  function projectSchedule(n, settings, target) {
+    if (target == null || n < 2) return null;
+    var handoff = target * 3;
+    var pool = n, passes = [], screens = 0;
+    while (pool > handoff && passes.length < 9) {
+      var g = settings.gridSize || 9;
+      var fullScreens = Math.floor(pool / g);
+      var rem = pool - fullScreens * g;
+      var scr = fullScreens + (rem ? 1 : 0);
+      var survivors = fullScreens * Math.min(g, resolveQuota(settings, g)) +
+                      (rem ? Math.min(rem, resolveQuota(settings, rem)) : 0);
+      if (survivors >= pool) break;                 // unlimited quota: no forcing
+      passes.push({ before: pool, after: survivors, screens: scr });
+      screens += scr;
+      pool = survivors;
+    }
+    var bracketCmp = rankPrice(pool, Math.min(target, pool));
+    var perScreen = TIME.screenBase + (settings.gridSize || 9) * TIME.perPhoto;
+    return {
+      passes: passes,
+      screens: screens,
+      handoffField: pool,
+      bracketCmp: bracketCmp,
+      seconds: screens * perScreen + rankSeconds(bracketCmp)
+    };
+  }
+
   /**
    * PRD 7.1 handoff: for a fixed target, suggest moving to the bracket at roughly
    * 2 to 3 times the target. Uncapped units get no suggestion.
@@ -6858,6 +6966,10 @@ v1.0 - 2026-07-28 - Samuel Cao
     screensTotal: screensTotal,
     finishPass: finishPass,
     lowCullRate: lowCullRate,
+    TIME: TIME,
+    rankPrice: rankPrice,
+    rankSeconds: rankSeconds,
+    projectSchedule: projectSchedule,
     bracketSuggestion: bracketSuggestion,
     pendingUnits: pendingUnits,
     allUnitsDone: allUnitsDone,
@@ -6875,6 +6987,12 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   and startPass deals faces with a frozen slot map, so a burst is one
  *   decision. finishPass expands kept and cut faces back to photos, keeping
  *   every summary number in photos.
+ * v1.3 (2026-07-30): Ranking mode groundwork. Units carry rank intent from the
+ *   tree and a rankDepth once a ranking starts. rankPrice() prices a bracket at
+ *   any depth, fitted to the measured engine (repechage reuse makes full-depth
+ *   ~30% cheaper than the textbook count); projectSchedule() prices the culling
+ *   path to the same handoff point, so the two can sit side by side on the
+ *   setup screen and the user commits to a cost they have seen.
 */
 
 </script>
@@ -7655,10 +7773,10 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 45_screen_dupes.js ===== */
 /**
  * @file 45_screen_dupes.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-07-30
  * @description PRD 7.7 near-duplicate grouping review: live sensitivity slider stepping by 2, scrollable review of every group with all members, manual split / merge / remove / confirm, and one-click representative override that leaves the rest of the group attached for Stage C.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -8838,8 +8956,44 @@ v1.0 - 2026-07-28 - Samuel Cao
     PT.router.go('dupes', { unitId: unitId });
   }
 
+  /**
+   * Materialise the grouping WITHOUT the review screen. Ranking-only sessions
+   * skip the gate — the friction was the point of skipping — but bursts must
+   * still compete as one, so the bundles are computed here from the hashes
+   * already on the photo records: ptPhash where a review has run before,
+   * otherwise the ingest hash, admitted as exact:false exactly as prepare()
+   * admits it when the thumbnail cache is gone. No decoding, so this is
+   * synchronous and effectively free.
+   *
+   * Status goes straight to 'done': the gate stays closed on resume, and a
+   * wrong bundle is prised apart in the Stage C runoff, which is the surface
+   * that exists for exactly that.
+   */
+  function materialise() {
+    var s = sess();
+    if (!s || !Object.keys(s.units || {}).length) return;
+    ensureState();
+    unitsList().forEach(function (u) {
+      (u.allIds || []).forEach(function (id) {
+        if (HASH[id]) return;
+        var p = photo(id);
+        if (!p || p.err) return;
+        if (typeof p.ptPhash === 'string' && p.ptPhash.length === HASH_LEN) {
+          HASH[id] = { hash: p.ptPhash, sharp: p.ptSharp, exact: true };
+        } else if (typeof p.phash === 'string' && p.phash.length === HASH_LEN) {
+          HASH[id] = { hash: p.phash, sharp: p.sharp, exact: false };
+        }
+      });
+    });
+    recompute();
+    PT.store.dispatch('dupes:materialise', function (ss) {
+      ss.session.groups.status = 'done';
+    });
+  }
+
   PT.dupes = {
     route: route,
+    materialise: materialise,
     hasCandidates: hasCandidates,
     /** Open the review on demand — useful from the console and for tests. */
     open: function () {
@@ -8889,6 +9043,13 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   sweep many photos into the same selection the checkboxes feed; shift adds,
  *   the list auto-scrolls at its edges, and a sub-5px drag is a click, not a
  *   sweep. Split / merge / remove operate on the swept set unchanged.
+ * v1.4 (2026-07-30): materialise() — the grouping without the gate. Ranking-only
+ *   sessions skip the review screen but bursts must still compete as one, so the
+ *   bundles are computed synchronously from hashes already on the photo records
+ *   (ptPhash where a review has run, else the ingest hash admitted exact:false,
+ *   the same admission prepare() makes for an evicted cache). Status goes
+ *   straight to done so the gate stays closed on resume; wrong bundles come
+ *   apart in the Stage C runoff, which every ranking passes through anyway.
 */
 
 </script>
@@ -8896,10 +9057,10 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 50_screen_tree.js ===== */
 /**
  * @file 50_screen_tree.js
- * @version 1.6
+ * @version 1.7
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-07-30
  * @description PRD 4 allocation tree UI: four states per node, both math directions, live totals, weighted distribution, and the section 4.5 conflict, clamp and dead-state messages.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -9122,7 +9283,29 @@ v1.0 - 2026-07-28 - Samuel Cao
           }
         });
 
-        var units = el('span', { class: 'tree-units' }, [pct, inf]);
+        // Rank intent rides beside % and ∞ because all three change what the
+        // number MEANS rather than what it is: "10" + rank is "order the top
+        // 10", not "cut to 10". Recorded per path, applied to whichever unit
+        // this folder ends up owning; a flag on a folder that owns no unit is
+        // inert rather than an error.
+        var rankOn = !!(s.session.rankPaths && s.session.rankPaths[path]);
+        var rank = el('button', {
+          class: 'btn btn-sm tree-unit tree-rank' + (rankOn ? ' on' : ''),
+          text: '⇅',
+          dataset: { t: 'rank-toggle', path: path },
+          title: rankOn
+            ? 'Back to culling: grid passes cut toward the target'
+            : 'Rank this folder head to head instead of culling it — an order, not a cut',
+          onclick: function () {
+            PT.store.dispatch('tree:rank', function (ss) {
+              var r = ss.session.rankPaths || (ss.session.rankPaths = {});
+              if (r[path]) delete r[path]; else r[path] = 1;
+            });
+            render();
+          }
+        });
+
+        var units = el('span', { class: 'tree-units' }, [pct, inf, rank]);
 
         // A percentage is a promise about a number the user cannot see, so the
         // state column spends itself saying what it came to.
@@ -9300,8 +9483,18 @@ v1.0 - 2026-07-28 - Samuel Cao
       }
 
       function startUnits(res) {
+        // Rank intent, recorded per path, lands on the unit that path owns. A
+        // pooled unit belongs to its parent, but a flag on any member folder
+        // counts too — the user pointed at the photos, not at the arithmetic.
+        var rankPaths = PT.store.get().session.rankPaths || {};
+        function rankFlag(u) {
+          if (rankPaths[u.ownerPath]) return true;
+          return (u.memberPaths || []).some(function (p) { return !!rankPaths[p]; });
+        }
+
         PT.store.dispatch('units:create', function (s) {
           res.units.forEach(function (u) {
+            u.rank = rankFlag(u);
             if (!s.session.units[u.id]) s.session.units[u.id] = PT.session.newUnit(u);
           });
           s.session.stage = 'unit';
@@ -9310,6 +9503,18 @@ v1.0 - 2026-07-28 - Samuel Cao
         });
         var id = PT.store.get().session.activeUnitId;
         if (!id) return;
+        // A session where EVERY unit is marked for ranking skips the duplicate
+        // review gate: the whole job is a few minutes of comparisons, and the
+        // gate was the friction. The grouping still happens — materialise()
+        // bundles bursts from the ingest hashes so they compete as one — and
+        // wrong bundles come apart in the Stage C runoff, which every ranking
+        // passes through anyway. A mixed or unmarked session keeps the gate.
+        var allRank = res.units.length > 0 && res.units.every(rankFlag);
+        if (allRank && PT.dupes && PT.dupes.materialise) {
+          PT.dupes.materialise();
+          PT.router.go('grid', { unitId: id });
+          return;
+        }
         // PRD 7.7: review the near-duplicate grouping before the first grid
         // pass, but only when there is something to review. PT.dupes.route owns
         // that decision and falls through to the grid when there is not.
@@ -9350,6 +9555,14 @@ v1.0 - 2026-07-28 - Samuel Cao
  * v1.6 (2026-07-29): The broadcast row. One value applied to every folder that
  *   holds photos — a count or a share — replacing the whole allocation so no
  *   stale per-row setting can oversubscribe against it; blank resets to pooled.
+ * v1.7 (2026-07-30): Rank intent. A third unit toggle (⇅) beside % and ∞ marks
+ *   a folder for ranking rather than culling — all three change what the number
+ *   MEANS, so they share the column. Intent is stored per path in
+ *   session.rankPaths and lands on whichever unit the path ends up owning
+ *   (a pooled unit takes a flag on any member folder). startUnits carries the
+ *   flag onto the units; a session where EVERY unit ranks skips the duplicate
+ *   review gate via PT.dupes.materialise(), because the gate was the friction
+ *   and the runoff can still prise a wrong bundle apart.
 */
 
 </script>
@@ -9357,10 +9570,10 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 60_screen_grid.js ===== */
 /**
  * @file 60_screen_grid.js
- * @version 1.7
+ * @version 1.8
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-07-30
  * @description Stage A grid pass screen (PRD 7.1), the low cull rate offer (PRD 7.2), and the cut pile rescue screen (PRD 7.5). Registers the 'grid' and 'rescue' screens.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -9834,6 +10047,118 @@ v1.0 - 2026-07-28 - Samuel Cao
 
   /* -------------------------------------------------------- setup / between */
 
+  /**
+   * The ranking offer. Culling subtracts toward a target; this is the other
+   * product the same engine already provides — an ORDERING, where nothing is
+   * thrown away unless the user unpicks it on the standings. Offered at every
+   * field size with its measured price beside the projected price of culling,
+   * so the number does the gatekeeping: top-10 of 60 reads as ~110 comparisons
+   * and a full order of 742 prices itself out honestly.
+   *
+   * Depth is the commitment here, chosen priced and locked when the ranking
+   * starts — the same shape as a pass quota: decide the cost before you see a
+   * single pairing.
+   *
+   * Returns { el, lead } — `lead` when the card should sit above the pass
+   * configuration: the folder was marked for ranking on the tree, or ranking
+   * is projected no slower than culling from here.
+   */
+  function rankCard(unit, s) {
+    var slots = S.slotsFor(unit);
+    var n = slots.length;
+    if (n < 2 || unit.currentPass) return null;
+
+    var target = unit.target == null ? null : Math.min(unit.target, n);
+    var proj = target != null ? S.projectSchedule(n, s.settings, target) : null;
+
+    // Depth choices, deduplicated: a target of 1 makes "top 1" the winner,
+    // and a target at the field size makes it the full order.
+    var opts = [];
+    function addOpt(key, label, depth) {
+      if (depth < 1 || depth > n) return;
+      if (opts.some(function (o) { return o.depth === depth; })) return;
+      opts.push({ key: key, label: label, depth: depth, cmp: S.rankPrice(n, depth) });
+    }
+    addOpt('one', 'Winner only', 1);
+    if (target != null) addOpt('top', 'Top ' + target + ', in order', target);
+    addOpt('full', 'Full order — all ' + n, n);
+
+    var chosen = opts[opts.length - 1];
+    if (target != null) {
+      for (var i = 0; i < opts.length; i++) if (opts[i].key === 'top') chosen = opts[i];
+    }
+
+    var mins = function (cmp) { return PT.fmt.duration(S.rankSeconds(cmp) * 1000); };
+
+    var start = el('button', { class: 'btn btn-primary', dataset: { t: 'rank-start' } });
+    var buttons = opts.map(function (o) {
+      return el('button', {
+        class: 'btn rank-opt', dataset: { t: 'rank-opt-' + o.key }
+      }, [
+        el('b', { text: o.label }),
+        el('span', { class: 'small nums', text: '~' + o.cmp + ' comparisons · ~' + mins(o.cmp) })
+      ]);
+    });
+
+    function paintChoice() {
+      buttons.forEach(function (b, i) {
+        b.setAttribute('aria-pressed', opts[i] === chosen ? 'true' : 'false');
+      });
+      start.textContent = 'Start ranking · ' + chosen.label.toLowerCase();
+    }
+    buttons.forEach(function (b, i) {
+      b.addEventListener('click', function () { chosen = opts[i]; paintChoice(); });
+    });
+    paintChoice();
+
+    start.addEventListener('click', function () {
+      var depth = chosen.depth;
+      editUnit(G.unitId, 'unit:startRank', function (u) {
+        u.rankDepth = depth;
+        u.phase = 'bracket';
+      });
+      if (!goSafe('bracket', { unitId: G.unitId })) {
+        editUnit(G.unitId, 'unit:startRank:revert', function (u) {
+          u.rankDepth = null;
+          u.phase = 'gridA';
+        });
+        render();
+      }
+    });
+
+    // The other side of the price. Same time model, same handoff point, so
+    // the two numbers are honestly comparable.
+    var against;
+    if (proj && proj.passes.length) {
+      against = 'Culling from here: ~' + proj.screens + ' screen' + (proj.screens === 1 ? '' : 's') +
+        ' over ' + proj.passes.length + ' pass' + (proj.passes.length === 1 ? '' : 'es') +
+        ', then a bracket of ~' + proj.bracketCmp + ' — about ' + PT.fmt.duration(proj.seconds * 1000) + '.';
+    } else if (proj) {
+      against = 'The pool is already at bracket size: culling from here is just the bracket, ~' +
+        proj.bracketCmp + ' comparisons.';
+    } else {
+      against = 'This folder is uncapped, so culling has no projected end — ranking is the only path with a price.';
+    }
+
+    var lead = !!unit.rank ||
+      (proj ? S.rankSeconds(chosen.cmp) <= proj.seconds : n <= 40);
+
+    var card = el('div', { class: 'card pt-rank', dataset: { t: 'rank-card' } }, [
+      el('h2', { text: 'Rank head to head instead' }),
+      el('p', { class: 'muted small', text:
+        'Every photo competes and you get an order, not a cut — nothing is dropped unless you unpick it ' +
+        'on the standings at the end. The depth locks when the ranking starts.' +
+        (n < unit.pool.length
+          ? ' ' + n + ' competitors: bursts compete as one and are split apart afterwards.'
+          : '') }),
+      el('div', { class: 'row rank-opts' }, buttons),
+      el('p', { class: 'small dim', dataset: { t: 'rank-projection' }, text: against }),
+      el('div', { class: 'row' }, [start])
+    ]);
+
+    return { el: card, lead: lead };
+  }
+
   function renderSetup(unit) {
     var s = st().session;
     var root = G.root;
@@ -9856,6 +10181,13 @@ v1.0 - 2026-07-28 - Samuel Cao
         text: unit.pool.length + ' in the pool · ' + unit.cut.length + ' cut · ' +
               (unit.target == null ? 'uncapped' : 'target ' + unit.target) })
     ]));
+
+    // The ranking offer leads when the folder asked for it or when ranking is
+    // projected no slower than culling; otherwise it waits below the culling
+    // controls. Either way it is present at every field size — the price is
+    // the gatekeeper, not a threshold.
+    var rankOffer = rankCard(unit, s);
+    if (rankOffer && rankOffer.lead) wrap.appendChild(rankOffer.el);
 
     /* ---- PRD 7.2: report the last pass, and offer the re-run if it was thin */
     if (unit.lastSummary) {
@@ -9969,6 +10301,8 @@ v1.0 - 2026-07-28 - Samuel Cao
       })
     ]);
     wrap.appendChild(actions);
+
+    if (rankOffer && !rankOffer.lead) wrap.appendChild(rankOffer.el);
 
     if (!canPass) {
       wrap.appendChild(el('div', { class: 'notice notice-warn', dataset: { t: 'empty' },
@@ -10735,6 +11069,15 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   instead of silently exporting every frame — and an empty pool closes the
  *   folder out directly with zero finalists rather than marching the user
  *   through an empty bracket and an empty duplicates round.
+ * v1.8 (2026-07-30): The ranking offer. rankCard() prices ordering the folder —
+ *   winner only / top-target / full order, each with its comparison count and
+ *   time from PT.session.rankPrice — beside projectSchedule()'s price for
+ *   culling to the same handoff, so the choice is made against numbers the
+ *   user has seen. Present at every field size; it LEADS when the tree marked
+ *   the folder for ranking or when ranking projects no slower than culling,
+ *   and otherwise waits below the pass controls. Starting a ranking sets
+ *   rankDepth, moves the unit to phase bracket, and reverts both if the
+ *   bracket screen refuses the route, mirroring toBracket.
 */
 
 </script>
@@ -10742,10 +11085,10 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 70_screen_bracket.js ===== */
 /**
  * @file 70_screen_bracket.js
- * @version 1.8
+ * @version 1.9
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-29
+ * @lastUpdated 2026-07-30
  * @description Stage B bracket with the second-chance (repechage) round and Stage C burst runoff. Registers the 'bracket' and 'runoff' screens plus the pure PT.bracket ranking engine.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -11192,6 +11535,17 @@ v1.0 - 2026-07-28 - Samuel Cao
    * ranked list rather than an empty one.
    */
   /**
+   * How many ranked rows may be chosen. Distinct from the engine's target,
+   * which in ranking mode is the DEPTH being decided: a bracket record carries
+   * cap separately, and one persisted before ranking mode existed falls back
+   * to the old identity of cap and target.
+   */
+  function capOf(b) {
+    if (b.cap != null) return b.cap;
+    return b.uncapped ? Infinity : b.target;
+  }
+
+  /**
    * The finalists are CHOSEN, not auto-cut. The engine ranks the whole field;
    * the standings screen lets the user pick which ranked rows survive, capped
    * at the folder's target, seeded with the top-N so doing nothing keeps the
@@ -11203,7 +11557,8 @@ v1.0 - 2026-07-28 - Samuel Cao
       var pick = full.filter(function (id) { return b.chosen[id]; });
       if (pick.length) return pick;
     }
-    return full.slice(0, E.target);
+    var cap = capOf(b);
+    return cap === Infinity ? full.slice() : full.slice(0, cap);
   }
 
   function results(E, keepAll) {
@@ -11375,13 +11730,23 @@ v1.0 - 2026-07-28 - Samuel Cao
         var faces = slots.map(function (sl) { return sl.face; });
         var members = Object.create(null);
         slots.forEach(function (sl) { members[sl.face] = sl.members; });
-        var target = unit.target == null ? faces.length : Math.min(unit.target, faces.length);
+        // In ranking mode DEPTH and CAP come apart: rankDepth is how many
+        // places the engine decides head to head (the cost the user just
+        // priced), while the cap is still the folder's target — how many rows
+        // arrive pre-chosen on the standings. Full-order ranking of a
+        // target-10 folder ranks all 30 and pre-chooses the top 10. Culling
+        // mode keeps them equal, exactly as before.
+        var depth = unit.rankDepth != null
+          ? Math.max(1, Math.min(unit.rankDepth, faces.length))
+          : (unit.target == null ? faces.length : Math.min(unit.target, faces.length));
         var seed = (Date.now() ^ 0x9e3779b9) >>> 0;
         unit.bracket = {
           seed: seed,
           pool: faces,
           slots: members,
-          target: target,
+          target: depth,
+          cap: unit.target == null ? null : Math.min(unit.target, faces.length),
+          rank: unit.rankDepth != null,
           uncapped: unit.target == null,
           order: PT.session.seededShuffle(faces, seed),
           ops: [],
@@ -11725,10 +12090,15 @@ v1.0 - 2026-07-28 - Samuel Cao
     var m = currentMatch(E);
     var finished = E.done || u.bracket.stopped || !m;
 
+    // In ranking mode the first counter says what is being decided — the
+    // depth, not the keep cap — because that is what the remaining count and
+    // the estimate are denominated in.
     setTopbar(
-      (u.label || 'unit') + ' · Stage B bracket',
+      (u.label || 'unit') + (u.bracket.rank ? ' · ranking' : ' · Stage B bracket'),
       [
-        ['target', u.bracket.uncapped ? 'uncapped' : E.target],
+        u.bracket.rank
+          ? ['ranking', E.target >= u.bracket.pool.length ? 'full order' : 'top ' + E.target]
+          : ['target', u.bracket.uncapped ? 'uncapped' : E.target],
         ['remaining', Math.max(0, E.target - E.placements.length)],
         ['comparisons', E.comparisons],
         ['est. left', finished && E.done ? 0 : '~' + estimate(E)]
@@ -11973,7 +12343,7 @@ v1.0 - 2026-07-28 - Samuel Cao
     // The WHOLE field, ranked — the target draws a line through it, it does
     // not amputate it. What survives is chosen row by row below.
     var list = results(E, true);
-    var cap = u.bracket.uncapped ? Infinity : u.bracket.target;
+    var cap = capOf(u.bracket);
     var chosen = u.bracket.chosen || (function () {
       var seed = Object.create(null);
       list.slice(0, cap === Infinity ? list.length : cap)
@@ -11984,7 +12354,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 
     S.head.appendChild(el('span', {
       class: 'bk-tag' + (stopped ? ' bk-tag-warn' : ''),
-      text: stopped ? 'Stopped early' : 'Bracket complete'
+      text: stopped ? 'Stopped early' : (u.bracket.rank ? 'Ranking complete' : 'Bracket complete')
     }));
     S.head.appendChild(el('span', {
       text: decided + ' of ' + list.length + ' place' + (list.length === 1 ? '' : 's') +
@@ -12487,6 +12857,14 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   click, capped hard at the folder's target ("if you said only 5 it should
  *   only be five" \u2014 which five is yours). Winners follow the choice on every
  *   rebuild via chosenWinners(); Next is blocked only on an empty choice.
+ * v1.9 (2026-07-30): Ranking mode: depth and cap come apart. A unit carrying
+ *   rankDepth seats an engine target of that depth (the cost the user priced)
+ *   while the standings keep-cap stays the folder's target — full-order ranking
+ *   of a target-10 folder decides all 30 places and pre-chooses the top 10.
+ *   capOf() reads the new bracket.cap with fallback to the old cap==target
+ *   identity, so sessions persisted before this change resume unchanged. The
+ *   topbar's first counter says what is being decided (top N / full order) in
+ *   ranking mode, and the standings tag reads Ranking complete.
 */
 
 </script>

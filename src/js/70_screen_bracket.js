@@ -1,9 +1,9 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.8
+ * @version 1.9
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-29
+ * @lastUpdated 2026-07-30
  * @description Stage B bracket with the second-chance (repechage) round and Stage C burst runoff. Registers the 'bracket' and 'runoff' screens plus the pure PT.bracket ranking engine.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -450,6 +450,17 @@
    * ranked list rather than an empty one.
    */
   /**
+   * How many ranked rows may be chosen. Distinct from the engine's target,
+   * which in ranking mode is the DEPTH being decided: a bracket record carries
+   * cap separately, and one persisted before ranking mode existed falls back
+   * to the old identity of cap and target.
+   */
+  function capOf(b) {
+    if (b.cap != null) return b.cap;
+    return b.uncapped ? Infinity : b.target;
+  }
+
+  /**
    * The finalists are CHOSEN, not auto-cut. The engine ranks the whole field;
    * the standings screen lets the user pick which ranked rows survive, capped
    * at the folder's target, seeded with the top-N so doing nothing keeps the
@@ -461,7 +472,8 @@
       var pick = full.filter(function (id) { return b.chosen[id]; });
       if (pick.length) return pick;
     }
-    return full.slice(0, E.target);
+    var cap = capOf(b);
+    return cap === Infinity ? full.slice() : full.slice(0, cap);
   }
 
   function results(E, keepAll) {
@@ -633,13 +645,23 @@
         var faces = slots.map(function (sl) { return sl.face; });
         var members = Object.create(null);
         slots.forEach(function (sl) { members[sl.face] = sl.members; });
-        var target = unit.target == null ? faces.length : Math.min(unit.target, faces.length);
+        // In ranking mode DEPTH and CAP come apart: rankDepth is how many
+        // places the engine decides head to head (the cost the user just
+        // priced), while the cap is still the folder's target — how many rows
+        // arrive pre-chosen on the standings. Full-order ranking of a
+        // target-10 folder ranks all 30 and pre-chooses the top 10. Culling
+        // mode keeps them equal, exactly as before.
+        var depth = unit.rankDepth != null
+          ? Math.max(1, Math.min(unit.rankDepth, faces.length))
+          : (unit.target == null ? faces.length : Math.min(unit.target, faces.length));
         var seed = (Date.now() ^ 0x9e3779b9) >>> 0;
         unit.bracket = {
           seed: seed,
           pool: faces,
           slots: members,
-          target: target,
+          target: depth,
+          cap: unit.target == null ? null : Math.min(unit.target, faces.length),
+          rank: unit.rankDepth != null,
           uncapped: unit.target == null,
           order: PT.session.seededShuffle(faces, seed),
           ops: [],
@@ -983,10 +1005,15 @@
     var m = currentMatch(E);
     var finished = E.done || u.bracket.stopped || !m;
 
+    // In ranking mode the first counter says what is being decided — the
+    // depth, not the keep cap — because that is what the remaining count and
+    // the estimate are denominated in.
     setTopbar(
-      (u.label || 'unit') + ' · Stage B bracket',
+      (u.label || 'unit') + (u.bracket.rank ? ' · ranking' : ' · Stage B bracket'),
       [
-        ['target', u.bracket.uncapped ? 'uncapped' : E.target],
+        u.bracket.rank
+          ? ['ranking', E.target >= u.bracket.pool.length ? 'full order' : 'top ' + E.target]
+          : ['target', u.bracket.uncapped ? 'uncapped' : E.target],
         ['remaining', Math.max(0, E.target - E.placements.length)],
         ['comparisons', E.comparisons],
         ['est. left', finished && E.done ? 0 : '~' + estimate(E)]
@@ -1231,7 +1258,7 @@
     // The WHOLE field, ranked — the target draws a line through it, it does
     // not amputate it. What survives is chosen row by row below.
     var list = results(E, true);
-    var cap = u.bracket.uncapped ? Infinity : u.bracket.target;
+    var cap = capOf(u.bracket);
     var chosen = u.bracket.chosen || (function () {
       var seed = Object.create(null);
       list.slice(0, cap === Infinity ? list.length : cap)
@@ -1242,7 +1269,7 @@
 
     S.head.appendChild(el('span', {
       class: 'bk-tag' + (stopped ? ' bk-tag-warn' : ''),
-      text: stopped ? 'Stopped early' : 'Bracket complete'
+      text: stopped ? 'Stopped early' : (u.bracket.rank ? 'Ranking complete' : 'Bracket complete')
     }));
     S.head.appendChild(el('span', {
       text: decided + ' of ' + list.length + ' place' + (list.length === 1 ? '' : 's') +
@@ -1745,4 +1772,12 @@
  *   click, capped hard at the folder's target ("if you said only 5 it should
  *   only be five" \u2014 which five is yours). Winners follow the choice on every
  *   rebuild via chosenWinners(); Next is blocked only on an empty choice.
+ * v1.9 (2026-07-30): Ranking mode: depth and cap come apart. A unit carrying
+ *   rankDepth seats an engine target of that depth (the cost the user priced)
+ *   while the standings keep-cap stays the folder's target — full-order ranking
+ *   of a target-10 folder decides all 30 places and pre-chooses the top 10.
+ *   capOf() reads the new bracket.cap with fallback to the old cap==target
+ *   identity, so sessions persisted before this change resume unchanged. The
+ *   topbar's first counter says what is being decided (top N / full order) in
+ *   ranking mode, and the standings tag reads Ranking complete.
 */

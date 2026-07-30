@@ -1,9 +1,9 @@
 /**
  * @file 60_screen_grid.js
- * @version 1.7
+ * @version 1.8
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-07-30
  * @description Stage A grid pass screen (PRD 7.1), the low cull rate offer (PRD 7.2), and the cut pile rescue screen (PRD 7.5). Registers the 'grid' and 'rescue' screens.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -477,6 +477,118 @@
 
   /* -------------------------------------------------------- setup / between */
 
+  /**
+   * The ranking offer. Culling subtracts toward a target; this is the other
+   * product the same engine already provides — an ORDERING, where nothing is
+   * thrown away unless the user unpicks it on the standings. Offered at every
+   * field size with its measured price beside the projected price of culling,
+   * so the number does the gatekeeping: top-10 of 60 reads as ~110 comparisons
+   * and a full order of 742 prices itself out honestly.
+   *
+   * Depth is the commitment here, chosen priced and locked when the ranking
+   * starts — the same shape as a pass quota: decide the cost before you see a
+   * single pairing.
+   *
+   * Returns { el, lead } — `lead` when the card should sit above the pass
+   * configuration: the folder was marked for ranking on the tree, or ranking
+   * is projected no slower than culling from here.
+   */
+  function rankCard(unit, s) {
+    var slots = S.slotsFor(unit);
+    var n = slots.length;
+    if (n < 2 || unit.currentPass) return null;
+
+    var target = unit.target == null ? null : Math.min(unit.target, n);
+    var proj = target != null ? S.projectSchedule(n, s.settings, target) : null;
+
+    // Depth choices, deduplicated: a target of 1 makes "top 1" the winner,
+    // and a target at the field size makes it the full order.
+    var opts = [];
+    function addOpt(key, label, depth) {
+      if (depth < 1 || depth > n) return;
+      if (opts.some(function (o) { return o.depth === depth; })) return;
+      opts.push({ key: key, label: label, depth: depth, cmp: S.rankPrice(n, depth) });
+    }
+    addOpt('one', 'Winner only', 1);
+    if (target != null) addOpt('top', 'Top ' + target + ', in order', target);
+    addOpt('full', 'Full order — all ' + n, n);
+
+    var chosen = opts[opts.length - 1];
+    if (target != null) {
+      for (var i = 0; i < opts.length; i++) if (opts[i].key === 'top') chosen = opts[i];
+    }
+
+    var mins = function (cmp) { return PT.fmt.duration(S.rankSeconds(cmp) * 1000); };
+
+    var start = el('button', { class: 'btn btn-primary', dataset: { t: 'rank-start' } });
+    var buttons = opts.map(function (o) {
+      return el('button', {
+        class: 'btn rank-opt', dataset: { t: 'rank-opt-' + o.key }
+      }, [
+        el('b', { text: o.label }),
+        el('span', { class: 'small nums', text: '~' + o.cmp + ' comparisons · ~' + mins(o.cmp) })
+      ]);
+    });
+
+    function paintChoice() {
+      buttons.forEach(function (b, i) {
+        b.setAttribute('aria-pressed', opts[i] === chosen ? 'true' : 'false');
+      });
+      start.textContent = 'Start ranking · ' + chosen.label.toLowerCase();
+    }
+    buttons.forEach(function (b, i) {
+      b.addEventListener('click', function () { chosen = opts[i]; paintChoice(); });
+    });
+    paintChoice();
+
+    start.addEventListener('click', function () {
+      var depth = chosen.depth;
+      editUnit(G.unitId, 'unit:startRank', function (u) {
+        u.rankDepth = depth;
+        u.phase = 'bracket';
+      });
+      if (!goSafe('bracket', { unitId: G.unitId })) {
+        editUnit(G.unitId, 'unit:startRank:revert', function (u) {
+          u.rankDepth = null;
+          u.phase = 'gridA';
+        });
+        render();
+      }
+    });
+
+    // The other side of the price. Same time model, same handoff point, so
+    // the two numbers are honestly comparable.
+    var against;
+    if (proj && proj.passes.length) {
+      against = 'Culling from here: ~' + proj.screens + ' screen' + (proj.screens === 1 ? '' : 's') +
+        ' over ' + proj.passes.length + ' pass' + (proj.passes.length === 1 ? '' : 'es') +
+        ', then a bracket of ~' + proj.bracketCmp + ' — about ' + PT.fmt.duration(proj.seconds * 1000) + '.';
+    } else if (proj) {
+      against = 'The pool is already at bracket size: culling from here is just the bracket, ~' +
+        proj.bracketCmp + ' comparisons.';
+    } else {
+      against = 'This folder is uncapped, so culling has no projected end — ranking is the only path with a price.';
+    }
+
+    var lead = !!unit.rank ||
+      (proj ? S.rankSeconds(chosen.cmp) <= proj.seconds : n <= 40);
+
+    var card = el('div', { class: 'card pt-rank', dataset: { t: 'rank-card' } }, [
+      el('h2', { text: 'Rank head to head instead' }),
+      el('p', { class: 'muted small', text:
+        'Every photo competes and you get an order, not a cut — nothing is dropped unless you unpick it ' +
+        'on the standings at the end. The depth locks when the ranking starts.' +
+        (n < unit.pool.length
+          ? ' ' + n + ' competitors: bursts compete as one and are split apart afterwards.'
+          : '') }),
+      el('div', { class: 'row rank-opts' }, buttons),
+      el('p', { class: 'small dim', dataset: { t: 'rank-projection' }, text: against }),
+      el('div', { class: 'row' }, [start])
+    ]);
+
+    return { el: card, lead: lead };
+  }
+
   function renderSetup(unit) {
     var s = st().session;
     var root = G.root;
@@ -499,6 +611,13 @@
         text: unit.pool.length + ' in the pool · ' + unit.cut.length + ' cut · ' +
               (unit.target == null ? 'uncapped' : 'target ' + unit.target) })
     ]));
+
+    // The ranking offer leads when the folder asked for it or when ranking is
+    // projected no slower than culling; otherwise it waits below the culling
+    // controls. Either way it is present at every field size — the price is
+    // the gatekeeper, not a threshold.
+    var rankOffer = rankCard(unit, s);
+    if (rankOffer && rankOffer.lead) wrap.appendChild(rankOffer.el);
 
     /* ---- PRD 7.2: report the last pass, and offer the re-run if it was thin */
     if (unit.lastSummary) {
@@ -612,6 +731,8 @@
       })
     ]);
     wrap.appendChild(actions);
+
+    if (rankOffer && !rankOffer.lead) wrap.appendChild(rankOffer.el);
 
     if (!canPass) {
       wrap.appendChild(el('div', { class: 'notice notice-warn', dataset: { t: 'empty' },
@@ -1378,4 +1499,13 @@
  *   instead of silently exporting every frame — and an empty pool closes the
  *   folder out directly with zero finalists rather than marching the user
  *   through an empty bracket and an empty duplicates round.
+ * v1.8 (2026-07-30): The ranking offer. rankCard() prices ordering the folder —
+ *   winner only / top-target / full order, each with its comparison count and
+ *   time from PT.session.rankPrice — beside projectSchedule()'s price for
+ *   culling to the same handoff, so the choice is made against numbers the
+ *   user has seen. Present at every field size; it LEADS when the tree marked
+ *   the folder for ranking or when ranking projects no slower than culling,
+ *   and otherwise waits below the pass controls. Starting a ranking sets
+ *   rankDepth, moves the unit to phase bracket, and reverts both if the
+ *   bracket screen refuses the route, mirroring toBracket.
 */

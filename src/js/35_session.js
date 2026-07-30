@@ -1,9 +1,9 @@
 /**
  * @file 35_session.js
- * @version 1.1
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-07-30
  * @description Session model and stage flow for Photournament: settings defaults, tournament unit state, quota resolution, pass bookkeeping, and persistence shaping.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -51,6 +51,7 @@
       sourceKind: sourceKind || 'files',   // 'handle' = can resume and write to disk
       settings: Object.assign({}, DEFAULTS),
       allocs: {},                          // path -> {mode, value}
+      rankPaths: {},                       // path -> 1: rank this folder, don't cull it
       stage: 'ingest',                     // ingest | tree | unit | stageD | export | done
       activeUnitId: null,
       units: {},                           // unitId -> unit state
@@ -74,6 +75,8 @@
       cut: [],
       rescued: [],
       phase: 'gridA',
+      rank: !!u.rank,              // tree-declared intent: order, don't cull
+      rankDepth: null,             // places to decide head-to-head; set when a ranking starts
       passes: [],                  // completed pass summaries
       currentPass: null,           // live pass, persisted so resume works mid-pass
       groups: null,                // near-duplicate groups once reviewed
@@ -273,6 +276,78 @@
     return summary.cutPct < settings.cullFloor;
   }
 
+  /* ------------------------------------------------------------- pricing --- */
+
+  /**
+   * The time model from docs/research_faster_culling_v1.0.md, stated once and
+   * shared by every projection: a pairwise comparison ~2.5-3s, a grid screen
+   * ~4s overhead plus ~1.2s per photo shown. Central values, in seconds.
+   */
+  var TIME = { cmp: 2.75, screenBase: 4, perPhoto: 1.2 };
+
+  /**
+   * Comparisons a bracket costs to decide `depth` places over a field of n.
+   * Fitted to the REAL engine at HEAD (perfect simulated judge, 3 seeds per
+   * point) rather than the textbook count, because repechage answer-reuse
+   * undercuts the textbook badly at full depth:
+   *
+   *     partial depth:  (n-1) + (depth-1)*log2(n)   within ~5% of measured
+   *     full order:      n * (log2(n) - 1)          within ~2% of measured
+   *
+   * The two cross as depth approaches n, so take whichever is cheaper. Every
+   * measured point (n 30..742) lands within about 10% of this; callers should
+   * present it with a ~ for exactly that reason.
+   */
+  function rankPrice(n, depth) {
+    n = Math.max(0, Math.floor(n));
+    if (n < 2) return 0;
+    var d = Math.max(1, Math.min(depth == null ? n : Math.floor(depth), n));
+    var lg = Math.log(n) / Math.LN2;
+    var partial = (n - 1) + (d - 1) * lg;
+    var full = n * (lg - 1);
+    return Math.round(Math.max(n - 1, Math.min(partial, full)));
+  }
+
+  function rankSeconds(comparisons) { return comparisons * TIME.cmp; }
+
+  /**
+   * Worst-case Stage A schedule from a field of n to the PRD 7.1 handoff point
+   * (pool at 3x target or below), pass by pass, under the CURRENT settings —
+   * the user keeps the full quota on every screen, which is the honest bound
+   * for "how long could this take". The last partial screen resolves its own,
+   * smaller quota, exactly as resolveQuota does live.
+   *
+   * Stops early when a pass makes no progress (unlimited quota) rather than
+   * projecting an infinite schedule. Returns null for a null target, which has
+   * no handoff point to project toward.
+   */
+  function projectSchedule(n, settings, target) {
+    if (target == null || n < 2) return null;
+    var handoff = target * 3;
+    var pool = n, passes = [], screens = 0;
+    while (pool > handoff && passes.length < 9) {
+      var g = settings.gridSize || 9;
+      var fullScreens = Math.floor(pool / g);
+      var rem = pool - fullScreens * g;
+      var scr = fullScreens + (rem ? 1 : 0);
+      var survivors = fullScreens * Math.min(g, resolveQuota(settings, g)) +
+                      (rem ? Math.min(rem, resolveQuota(settings, rem)) : 0);
+      if (survivors >= pool) break;                 // unlimited quota: no forcing
+      passes.push({ before: pool, after: survivors, screens: scr });
+      screens += scr;
+      pool = survivors;
+    }
+    var bracketCmp = rankPrice(pool, Math.min(target, pool));
+    var perScreen = TIME.screenBase + (settings.gridSize || 9) * TIME.perPhoto;
+    return {
+      passes: passes,
+      screens: screens,
+      handoffField: pool,
+      bracketCmp: bracketCmp,
+      seconds: screens * perScreen + rankSeconds(bracketCmp)
+    };
+  }
+
   /**
    * PRD 7.1 handoff: for a fixed target, suggest moving to the bracket at roughly
    * 2 to 3 times the target. Uncapped units get no suggestion.
@@ -338,6 +413,10 @@
     screensTotal: screensTotal,
     finishPass: finishPass,
     lowCullRate: lowCullRate,
+    TIME: TIME,
+    rankPrice: rankPrice,
+    rankSeconds: rankSeconds,
+    projectSchedule: projectSchedule,
     bracketSuggestion: bracketSuggestion,
     pendingUnits: pendingUnits,
     allUnitsDone: allUnitsDone,
@@ -355,4 +434,10 @@
  *   and startPass deals faces with a frozen slot map, so a burst is one
  *   decision. finishPass expands kept and cut faces back to photos, keeping
  *   every summary number in photos.
+ * v1.3 (2026-07-30): Ranking mode groundwork. Units carry rank intent from the
+ *   tree and a rankDepth once a ranking starts. rankPrice() prices a bracket at
+ *   any depth, fitted to the measured engine (repechage reuse makes full-depth
+ *   ~30% cheaper than the textbook count); projectSchedule() prices the culling
+ *   path to the same handoff point, so the two can sit side by side on the
+ *   setup screen and the user commits to a cost they have seen.
 */

@@ -1,9 +1,9 @@
 /**
  * @file 45_screen_dupes.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-07-30
  * @description PRD 7.7 near-duplicate grouping review: live sensitivity slider stepping by 2, scrollable review of every group with all members, manual split / merge / remove / confirm, and one-click representative override that leaves the rest of the group attached for Stage C.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -1183,8 +1183,44 @@
     PT.router.go('dupes', { unitId: unitId });
   }
 
+  /**
+   * Materialise the grouping WITHOUT the review screen. Ranking-only sessions
+   * skip the gate — the friction was the point of skipping — but bursts must
+   * still compete as one, so the bundles are computed here from the hashes
+   * already on the photo records: ptPhash where a review has run before,
+   * otherwise the ingest hash, admitted as exact:false exactly as prepare()
+   * admits it when the thumbnail cache is gone. No decoding, so this is
+   * synchronous and effectively free.
+   *
+   * Status goes straight to 'done': the gate stays closed on resume, and a
+   * wrong bundle is prised apart in the Stage C runoff, which is the surface
+   * that exists for exactly that.
+   */
+  function materialise() {
+    var s = sess();
+    if (!s || !Object.keys(s.units || {}).length) return;
+    ensureState();
+    unitsList().forEach(function (u) {
+      (u.allIds || []).forEach(function (id) {
+        if (HASH[id]) return;
+        var p = photo(id);
+        if (!p || p.err) return;
+        if (typeof p.ptPhash === 'string' && p.ptPhash.length === HASH_LEN) {
+          HASH[id] = { hash: p.ptPhash, sharp: p.ptSharp, exact: true };
+        } else if (typeof p.phash === 'string' && p.phash.length === HASH_LEN) {
+          HASH[id] = { hash: p.phash, sharp: p.sharp, exact: false };
+        }
+      });
+    });
+    recompute();
+    PT.store.dispatch('dupes:materialise', function (ss) {
+      ss.session.groups.status = 'done';
+    });
+  }
+
   PT.dupes = {
     route: route,
+    materialise: materialise,
     hasCandidates: hasCandidates,
     /** Open the review on demand — useful from the console and for tests. */
     open: function () {
@@ -1234,4 +1270,11 @@
  *   sweep many photos into the same selection the checkboxes feed; shift adds,
  *   the list auto-scrolls at its edges, and a sub-5px drag is a click, not a
  *   sweep. Split / merge / remove operate on the swept set unchanged.
+ * v1.4 (2026-07-30): materialise() — the grouping without the gate. Ranking-only
+ *   sessions skip the review screen but bursts must still compete as one, so the
+ *   bundles are computed synchronously from hashes already on the photo records
+ *   (ptPhash where a review has run, else the ingest hash admitted exact:false,
+ *   the same admission prepare() makes for an evicted cache). Status goes
+ *   straight to done so the gate stays closed on resume; wrong bundles come
+ *   apart in the Stage C runoff, which every ranking passes through anyway.
 */

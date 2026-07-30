@@ -3,7 +3,7 @@
 Narrows a folder of photos down to a small set of keepers: quota-enforced grid
 passes to cut the field, then head-to-head comparison to rank what survives.
 
-Spec: [`photournament_prd_v1.9.md`](photournament_prd_v1.9.md).
+Spec: [`photournament_prd_v1.10.md`](photournament_prd_v1.10.md).
 
 ## Running it
 

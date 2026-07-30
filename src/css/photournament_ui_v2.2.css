@@ -1,9 +1,9 @@
 /**
- * file: photournament_ui_v2.1.css
- * version: 2.1a
+ * file: photournament_ui_v2.2.css
+ * version: 2.2
  * author: Samuel Cao
  * created: 2026-07-28
- * last_updated: 2026-07-29
+ * last_updated: 2026-07-30
  * description: Complete replacement stylesheet for Photournament. Consolidates
  *   src/css/00_base.css, src/css/10_screens.css and the four JS-injected style
  *   blocks (pt-tree-style, pt-grid-style, pt-bracket-style, pt-export-style)
@@ -1039,7 +1039,7 @@ kbd {
     252px   /* folder name, truncating */
     86px    /* has */
     66px    /* keep field */
-    64px    /* unit toggles: % and infinity */
+    98px    /* unit toggles: %, infinity and rank */
     64px    /* keep : has proportion */
     86px    /* resolved state */
     minmax(48px, auto);  /* split */
@@ -1435,6 +1435,31 @@ kbd {
 #app .pt-sum b { color: var(--text); }
 #app .pt-sum h2 { margin-bottom: 6px; }
 
+/* ------------------------------------------------------- the ranking offer */
+
+/*
+ * Depth choices as priced statements, not radio noise: each option carries its
+ * own comparison count so the commitment is made against a number the user has
+ * seen. The pressed state borrows the accent exactly as the quota select does —
+ * chrome away from photo content, never a photograph's surround.
+ */
+#app .pt-rank { display: flex; flex-direction: column; gap: 12px; }
+#app .pt-rank p { margin: 0; max-width: 74ch; }
+#app .rank-opts { align-items: stretch; }
+#app .rank-opt {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 14px;
+}
+#app .rank-opt b { font-size: var(--fs-body); font-weight: 600; }
+#app .rank-opt .small { color: var(--text-mute); }
+#app .rank-opt[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+#app .rank-opt[aria-pressed="true"] .small { color: var(--text-dim); }
+
 /* ==========================================================================
    12. SCREEN: BRACKET
    ==========================================================================
@@ -1787,13 +1812,21 @@ kbd {
   .grid-12, .grid-16, .grid-6, .grid-9 { grid-template-columns: repeat(2, 1fr); }
   .screen { padding: 16px 12px; }
   #app .bk-stage { grid-template-columns: 1fr; }
-  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px 32px 0 0 auto; }
+  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px auto 0 0 auto; }
   #app .tree-bar, #app .tree-state { display: none; }
   .counters > span { min-width: 64px; padding: 0 9px; }
   .counters b { font-size: var(--fs-body); }
 }
 
 /** CHANGELOG
+ * v2.2 (2026-07-30): Ranking mode. The tree's unit-toggle column widens 64px to
+ *   98px for the third toggle (rank, ⇅), which inherits .tree-unit styling and
+ *   the accent .on state unchanged; the narrow layout's fixed 32px toggle track
+ *   becomes auto for the same reason. New .pt-rank block for the setup screen's
+ *   ranking offer: depth options as priced statements whose pressed state
+ *   borrows the accent, which stays chrome-side and never nears a photograph.
+ *   First change to this file that is not purely additive (one grid track
+ *   widened), hence the rename from v2.1 per the header's own instruction.
  * v2.1a (2026-07-29): The bracket standings action bar no longer floats over
  *   the ranked list. The completion painter used to force the stage to
  *   display:block, and a block stage cannot hand its 1fr track height down —
@@ -2042,7 +2075,7 @@ kbd {
   .grid-12, .grid-16, .grid-6, .grid-9 { grid-template-columns: repeat(2, 1fr); }
   .screen { padding: 16px 12px; }
   #app .bk-stage { grid-template-columns: 1fr; }
-  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px 32px 0 0 auto; }
+  #app .tree-row { grid-template-columns: minmax(120px, 1fr) 80px 62px auto 0 0 auto; }
   #app .tree-bar, #app .tree-state { display: none; }
   .counters > span { min-width: 64px; padding: 0 9px; }
   .counters b { font-size: var(--fs-body); }

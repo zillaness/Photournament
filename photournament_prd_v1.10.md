@@ -1,9 +1,9 @@
 ---
-file: photournament_prd_v1.9.md
-version: 1.9
+file: photournament_prd_v1.10.md
+version: 1.10
 author: Samuel Cao
 created: 2026-07-27
-last_updated: 2026-07-28
+last_updated: 2026-07-30
 description: Product requirements for Photournament, a local browser-based tool that narrows photo sets to a top-N through quota-enforced grid passes and pairwise tournament ranking, with per-folder allocation, an optional cross-category final, and annotated export.
 ai_update: Update last_updated and version. Rename file to match. Append changelog at bottom.
 ---
@@ -160,6 +160,8 @@ Ingest → [Tree setup] → per unit: [Stage A: Grid passes] → [Cut pile rescu
 
 Stages A through C run per tournament unit: a fixed-count folder, an uncapped folder, or a pooled group of blank siblings. Stage D runs once, across the winners of all units.
 
+A unit marked for **ranking** (§7.11) skips Stage A entirely: Ingest → Tree → Stage B at a chosen, priced depth → Stage C → Export. The choice is per unit, so a 30-photo album can rank while a 700-photo folder culls in the same session.
+
 ---
 
 ## 7. Stage detail
@@ -290,6 +292,41 @@ Trip/
 - Tree allocation and export labels persist with the session.
 - New photos detected on resume, with a prompt to fold them in or start fresh.
 
+### 7.11 Ranking mode
+
+Culling subtracts toward a target; ranking **orders**. For a folder that needs
+nothing thrown away — a 30-photo album, a 60-photo shortlist — the right product
+is the ordering the bracket already computes, without the mandatory Stage A in
+front of it.
+
+- **Entry, two ways.** A per-folder toggle (⇅) on the allocation tree beside %
+  and ∞ — all three change what the number *means*, so they share a column
+  ("10" + rank is *order the top 10*, not *cut to 10*). And an offer on every
+  unit's pass-setup screen, present at **every field size**: the price is the
+  gatekeeper, not a size threshold. Ranking the top 10 of 60 reads as ~110
+  comparisons; a full order of 742 prices itself out honestly.
+- **Depth is the commitment.** The offer asks how deep, priced per option —
+  winner only (exactly N−1), top-target in order, or the full order — with the
+  projected cost of culling from the same point beside it, in the same time
+  model. The depth locks when the ranking starts, the same shape as a pass
+  quota: the cost is chosen before the first pairing is seen.
+- **Depth and cap are distinct.** The engine decides `depth` places head to
+  head; the standings still pre-choose the folder's **target** and draw the
+  cutoff line there. Full-order ranking of a target-10 folder ranks all 30 and
+  pre-chooses the top 10; an uncapped folder ranked in full arrives with
+  everything chosen — an ordering with nothing cut unless rows are unpicked.
+- **Cost, measured not modelled.** The engine's repechage reuses answers, so a
+  full order costs ≈ N·(log₂N − 1) — ~116 comparisons for 30, ~290 for 60 —
+  about 30% under the textbook count. Partial depth follows
+  (N−1) + (depth−1)·log₂N. Both are asserted against the real engine in tests.
+- **The duplicate gate is skipped, the grouping is not.** A session where every
+  unit ranks goes straight to the offer; bursts are still bundled from ingest
+  hashes so they compete as one, and a wrong bundle comes apart in the Stage C
+  runoff, which every ranking passes through anyway. A mixed session keeps the
+  review gate for everyone.
+- Everything downstream is unchanged: standings, runoff, export. Rank prefixes
+  in filenames make a ranked album's order durable on disk.
+
 ---
 
 ## 8. Architecture and constraints
@@ -413,6 +450,7 @@ Every option below is user-configurable; defaults shown.
 | Sidecar location | `_sidecars` subfolder |
 | Export format for HEIC finalists | Chosen per export |
 | Uncapped entry | `*` typed or ∞ toggle, both always available |
+| Ranking mode (§7.11) | Off; per-folder ⇅ toggle or the priced offer on pass setup |
 
 ---
 
@@ -431,3 +469,10 @@ Every option below is user-configurable; defaults shown.
 v1.9a (2026-07-28): §4.2 grows the Percent state — a share of the folder's own
   count, resolved to Fixed once counts are known. Shipped in v1.0 of the app;
   recorded here so the spec and the tool agree on how many states there are.
+v1.10 (2026-07-30): Ranking mode (new §7.11). Culling subtracts, ranking
+  orders: a per-folder ⇅ toggle on the tree and a priced offer on every pass
+  setup screen let a unit skip Stage A and go straight to the bracket at a
+  chosen depth. Depth is the pre-committed cost (winner only / top-target /
+  full order, each priced against the measured engine); the standings cap
+  stays the folder's target. Rank-only sessions skip the §7.7 review gate
+  while keeping the bundling. §6 gains the ranking path, §12 the setting row.

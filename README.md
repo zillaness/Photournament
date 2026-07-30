@@ -36,7 +36,7 @@ browser profile.
 ```
 npm install
 npm run build     # -> dist/photournament_v1.0.html  (and a slim, no-HEIC build)
-npm test          # unit tests, artifact smoke, and fourteen end-to-end runs
+npm test          # unit tests, artifact smoke, and fifteen end-to-end runs
 ```
 
 The build concatenates `src/` into one self-contained HTML file. That is not a
@@ -89,7 +89,12 @@ which is the interference the whole tool exists to avoid.
   or write results back to disk; the app says so plainly when it detects that.
 - **The folder-picker to disk-write path is untested in CI.** A native folder
   dialog cannot be driven headlessly, so the automated tests use the
-  `webkitdirectory` input instead. Downloading a zip is fully covered.
+  `webkitdirectory` input instead. The zip download is fully covered, down to
+  parsing the archive it produces.
+- **A reloaded session must reconnect its folder before exporting originals.**
+  The browser hands files to a page, and they die with it. The export review
+  says so and re-attaches everything in one pick; renaming, labels and the
+  contact sheet never needed the originals in the first place.
 - **Perceptual-hash thresholds were tuned on procedurally generated images**, not
   photographs. The defaults measure well, but real bursts are the real test.
 - **Manual rotations and flips are visual.** They correct what you judge and the

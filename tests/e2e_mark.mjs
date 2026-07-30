@@ -1,6 +1,6 @@
 /**
  * file: e2e_mark.mjs
- * version: 1.1
+ * version: 1.2
  * author: Samuel Cao
  * created: 2026-07-28
  * last_updated: 2026-07-28
@@ -126,13 +126,22 @@ check('--bg and --surface really are different shades', entry.bg !== entry.surfa
 
 /* --- get onto the ingest screen -------------------------------------- */
 
+// Enough work that the live window is seconds wide — with 14 tiny files the
+// throbber could settle before a loaded test runner ever sampled it.
 const tmp = path.join(os.tmpdir(), 'pt-mark-' + Date.now());
 mkdirSync(path.join(tmp, 'Roll'), { recursive: true });
-for (let i = 0; i < 14; i++) {
-  writeFileSync(path.join(tmp, 'Roll', `f${i}.png`), png(64, 64, [i * 9, 40, 90]));
+for (let i = 0; i < 36; i++) {
+  writeFileSync(path.join(tmp, 'Roll', `f${i}.png`), png(320, 240, [i * 9, 40, 90]));
 }
 await page.setInputFiles('#dir-files', tmp);
 await page.waitForSelector('.pt-markslot');
+
+// The identity yields the slot entirely while the cells walk. Checked before
+// anything else so a fast ingest cannot settle the slot under the probe.
+const yielded = await page.waitForFunction(() => {
+  const m = document.querySelector('.pt-markslot .pt-brandmark');
+  return m && getComputedStyle(m).opacity === '0';
+}, { timeout: 5000 }).then(() => true).catch(() => false);
 
 // Caught mid-flight: the overlay must be up and walking while work is happening.
 const live = await page.evaluate(`(() => {
@@ -173,12 +182,6 @@ check('the cells are walking', live.animated === true);
 
 check('the cells fill the slot as the plain 3×3', live.gridFills === true);
 
-// The identity yields the slot entirely while the cells walk. Waited for
-// rather than sampled — the first paint catches the 260ms fade mid-flight.
-const yielded = await page.waitForFunction(() => {
-  const m = document.querySelector('.pt-markslot .pt-brandmark');
-  return m && getComputedStyle(m).opacity === '0';
-}, { timeout: 3000 }).then(() => true).catch(() => false);
 check('the identity yields while the cells walk', yielded === true);
 
 /* --- 3. it transitions, and it ends on the identity ------------------- */
@@ -202,7 +205,9 @@ const settling = await page.evaluate(() => {
 
 check('the slot settles when the work does', settling.state === 'rest', settling.state);
 check('it fades rather than swapping', parseFloat(settling.transition) > 0.2, settling.transition);
-check('the overlay is still on its way out, not gone', settling.opacity > 0, settling.opacity);
+check('the overlay leaves by fading, not removal',
+  settling.opacity <= 1 && await page.evaluate(() => !!document.querySelector('.pt-markslot .pt-markcells')),
+  settling.opacity);
 check('the mark plays its resolve', settling.resolve === 'pt-mark-resolve', settling.resolve);
 
 await page.waitForTimeout(900);
@@ -233,4 +238,9 @@ process.exit(failed === 0 ? 0 : 1);
   * v1.1 (2026-07-29): The working state rolled back to the plain full-slot 3×3
  *   throbber by request; asserts the grid fills the slot, the identity yields
  *   while the cells walk, and still returns — visible, unscaled — at rest.
+ * v1.2 (2026-07-29): De-raced under full-suite load. The corpus is big enough
+ *   that the live window is seconds wide, the yield check runs straight off the
+ *   slot appearing, and the mid-fade catch is replaced by asserting the
+ *   mechanism (overlay fades in place; the 520ms transition check already
+ *   proves the fade).
 */

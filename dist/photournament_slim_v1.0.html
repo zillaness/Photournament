@@ -1,5 +1,5 @@
 <!--
-  Photournament v1.0 — built 2026-07-29
+  Photournament v1.0 — built 2026-07-30
   GENERATED FILE. Do not edit; edit src/ and re-run: node tools/build.mjs
   12 script(s), 1 stylesheet(s). omitted (--no-heic): HEIC files will be flagged as unsupported.
   Open by double-clicking. Chromium only: resume and disk-write need the
@@ -12494,7 +12494,7 @@ v1.0 - 2026-07-28 - Samuel Cao
 /* ===== 80_screen_export.js ===== */
 /**
  * @file 80_screen_export.js
- * @version 1.5
+ * @version 1.6
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-07-28
@@ -12769,6 +12769,48 @@ v1.0 - 2026-07-28 - Samuel Cao
         root.appendChild(statsCard(computeStats(st0, session, sets)));
       }
 
+      // Sources are runtime-only: the browser hands files to a PAGE, and they
+      // die with it. A reloaded session can rename, label and take the contact
+      // sheet, but writing originals — zip or folder — needs the folder handed
+      // over again. Matching is by relative path, which is the photo record's
+      // identity, and re-picking the same folder reproduces it exactly.
+      var missing = plan(sets).filter(function (it) { return !PT.sources[it.id]; });
+      if (missing.length) {
+        var reconnectInput = el('input', {
+          type: 'file', id: 'exp-reconnect-files', multiple: true, style: 'display:none'
+        });
+        reconnectInput.setAttribute('webkitdirectory', '');
+        reconnectInput.addEventListener('change', function () {
+          var byPath = Object.create(null);
+          Object.keys(st0.photos).forEach(function (id) {
+            byPath[st0.photos[id].path] = id;
+          });
+          var hits = 0;
+          Array.prototype.forEach.call(reconnectInput.files, function (f) {
+            var id = byPath[f.webkitRelativePath || f.name];
+            if (id) { PT.sources[id] = f; hits++; }
+          });
+          var still = plan(sets).filter(function (it) { return !PT.sources[it.id]; }).length;
+          PT.toast(hits
+            ? 'Reconnected ' + hits + ' original' + (hits === 1 ? '' : 's') +
+              (still ? ' \u2014 ' + still + ' finalist' + (still === 1 ? '' : 's') + ' still unmatched.' : '.')
+            : 'Nothing matched \u2014 is that the same folder this session was read from?');
+          PT.router.go('export');
+        });
+        root.appendChild(el('div', { class: 'notice notice-warn', dataset: { t: 'reconnect' } }, [
+          el('span', { text:
+            missing.length + ' of ' + plan(sets).length + ' finalists\u2019 original files are not ' +
+            'reachable in this session \u2014 the page was reloaded since the folder was read. ' +
+            'Renaming, labels and the contact sheet still work; the zip and folder export need the ' +
+            'originals back. Nothing is re-processed.' }),
+          reconnectInput,
+          el('button', {
+            class: 'btn btn-sm', id: 'exp-reconnect', text: 'Reconnect the folder\u2026',
+            onclick: function () { reconnectInput.click(); }
+          })
+        ]));
+      }
+
       if (!sets.length) {
         root.appendChild(el('div', { class: 'card' }, [
           el('p', { text: 'No finalists yet. Finish at least one tournament first.' }),
@@ -12958,7 +13000,8 @@ v1.0 - 2026-07-28 - Samuel Cao
           id: id,
           photo: photo,
           folder: flat ? '_finalists' : set.folder,
-          name: destName(photo, i + 1, set.ids.length, s.session.settings, s.session.labels[id]),
+          // plan() now also runs at mount, before the label store initialises.
+          name: destName(photo, i + 1, set.ids.length, s.session.settings, (s.session.labels || {})[id]),
           rank: i + 1,
           unit: set.unit.label
         });
@@ -13133,6 +13176,7 @@ v1.0 - 2026-07-28 - Samuel Cao
   function buildZip(items, onProgress) {
     var parts = [];
     var central = [];
+    var skipped = [];
     var offset = 0;
     var enc = new TextEncoder();
     var done = 0;
@@ -13161,6 +13205,7 @@ v1.0 - 2026-07-28 - Samuel Cao
           if (onProgress) onProgress(done, items.length);
         }).catch(function (e) {
           PT.warn('export', 'skipping ' + it.name + ': ' + e.message);
+          skipped.push(it.name);
         });
       });
     });
@@ -13184,7 +13229,11 @@ v1.0 - 2026-07-28 - Samuel Cao
         u16(central.length), u16(central.length),
         u32(dirSize), u32(dirStart), u16(0)
       )));
-      return new Blob(parts, { type: 'application/zip' });
+      return {
+        blob: new Blob(parts, { type: 'application/zip' }),
+        packed: central.length,
+        skipped: skipped
+      };
     });
   }
 
@@ -13193,11 +13242,29 @@ v1.0 - 2026-07-28 - Samuel Cao
     if (!items.length) return;
     status('Building the zip…');
     buildZip(items, function (n, total) { status('Packing ' + n + ' / ' + total + '…'); })
-      .then(function (blob) {
+      .then(function (out) {
+        // A zip that silently packed nothing is worse than an error: it used
+        // to download as a valid, EMPTY archive announcing the planned count.
+        // Sources die with the page, so this is exactly what every reloaded
+        // session got.
+        if (out.packed === 0) {
+          status('');
+          PT.toast('No originals are reachable in this session \u2014 reconnect the folder above, then try again.');
+          return;
+        }
         var s = PT.store.get();
         var stamp = new Date().toISOString().slice(0, 10);
-        saveBlob(blob, slugLabel(s.session.rootName || 'photournament') + '_finalists_' + stamp + '.zip');
-        status(items.length + ' files in one zip, ' + PT.fmt.bytes(blob.size) + '.');
+        saveBlob(out.blob, slugLabel(s.session.rootName || 'photournament') + '_finalists_' + stamp + '.zip');
+        status(out.packed === items.length
+          ? items.length + ' files in one zip, ' + PT.fmt.bytes(out.blob.size) + '.'
+          : out.packed + ' of ' + items.length + ' files in the zip (' + PT.fmt.bytes(out.blob.size) +
+            ') \u2014 ' + out.skipped.length + ' original' + (out.skipped.length === 1 ? '' : 's') +
+            ' could not be read: ' + out.skipped.slice(0, 3).join(', ') +
+            (out.skipped.length > 3 ? '\u2026' : ''));
+        if (out.packed !== items.length) {
+          PT.toast('The zip is missing ' + out.skipped.length + ' file' +
+            (out.skipped.length === 1 ? '' : 's') + ' \u2014 reconnect the folder above and rebuild it.');
+        }
       })
       .catch(function (e) {
         PT.warn('export', e);
@@ -13437,6 +13504,12 @@ v1.0 - 2026-07-28 - Samuel Cao
  *   per-format keep rates (only where the denominator earns a percentage),
  *   keeper-vs-cut sharpness medians, burst and rescue and effort notes — all
  *   from state the run already produced.
+ * v1.6 (2026-07-29): The zip stops lying. buildZip counts what actually packed
+ *   and names what did not; an all-skipped build refuses to download instead of
+ *   shipping a valid empty archive announcing the planned count \u2014 which is
+ *   what every reloaded session got, because file sources die with the page.
+ *   And the export screen now says so up front: a reconnect notice re-attaches
+ *   the originals by relative path when any finalist's file is unreachable.
 */
 
 </script>

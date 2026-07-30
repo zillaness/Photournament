@@ -92,6 +92,10 @@ a `file://` URL.
 
 Ordered by value. Items 1 and 2 are the real gaps; the rest are smaller.
 
+> **SUPERSEDED (2026-07-29): read `docs/handoff_v2.0.md` instead.** This file
+> describes a v0.2-era queue that has almost entirely shipped. It is kept for
+> the measured probe context in its constraints section.
+>
 > **Status note (2026-07-28):** item 1 shipped (45_screen_dupes.js and the
 > burst bundling that followed it), as did much of what sat below it. The
 > queue is kept for its measured context; check the changelogs before

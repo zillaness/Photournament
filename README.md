@@ -5,6 +5,12 @@ passes to cut the field, then head-to-head comparison to rank what survives.
 
 Spec: [`photournament_prd_v1.9.md`](photournament_prd_v1.9.md).
 
+| Grid pass — pick keepers under a quota | Bracket — head-to-head ranking |
+| --- | --- |
+| ![Grid pass with the keep quota enforced](docs/screens/06_grid_pass.png) | ![Bracket matchup comparing two survivors side by side](docs/screens/08_bracket_matchup.png) |
+| **Duplicate detection — near-identical shots grouped** | **Export — the ranked keeper set written back** |
+| ![Duplicate groups flagged for review before the tournament](docs/screens/09_duplicates.png) | ![Export review of the final ranked keepers](docs/screens/11_export.png) |
+
 ## Running it
 
 Two ways, and they behave identically apart from one thing.

@@ -5,6 +5,12 @@ passes to cut the field, then head-to-head comparison to rank what survives.
 
 Spec: [`photournament_prd_v1.10.md`](photournament_prd_v1.10.md).
 
+| 1 — Ingest | 2 — Allocation | 3 — Duplicates |
+| --- | --- | --- |
+| ![Ingest — thumbnails building off the main thread](docs/screens/02_ingest_live.png) | ![Allocation — per-folder keep quotas on the folder tree](docs/screens/04_tree.png) | ![Duplicate review — near-identical shots grouped, split and merged by hand](docs/screens/12_duplicate_review.png) |
+| **4 — Grid passes** | **5 — Bracket** | **6 — Export** |
+| ![A grid pass — keep at most the quota you committed to](docs/screens/06_grid_pass.png) | ![Bracket — two survivors head to head](docs/screens/08_bracket_matchup.png) | ![Export review — label finalists and write the results back](docs/screens/11_export.png) |
+
 ## Running it
 
 Two ways, and they behave identically apart from one thing.

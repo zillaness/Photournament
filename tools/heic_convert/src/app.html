@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<!--
+  file: heic_convert_v1.0.html
+  version: 1.0
+  author: Samuel Cao
+  created: 2026-08-02
+  last_updated: 2026-08-02
+  description: Standalone single-file HEIC/HEIF to JPEG or PNG converter with a GUI. Extracted from Photournament's ingest worker, which is where every decode lesson in here was measured.
+  ai_update: Update last_updated and version. Append changelog comment at bottom.
+
+  WHAT THIS IS
+
+  Photournament decodes HEIC with libheif-js — the Emscripten/WASM build of
+  libheif — inside a blob-URL worker. There is no separate converter GUI and no
+  native tool anywhere in that project; the decoder is a library it calls. This
+  file is that decoder lifted out and given a front end, so the same pipeline
+  can be used on its own.
+
+  Everything is inlined. Open it by double-clicking; it runs from file:// with
+  no network, no install, and no server. Files never leave the machine.
+
+  THE FOUR THINGS MEASURED IN PHOTOURNAMENT'S PROBE 02, PRESERVED HERE
+
+  1. ONE HeifDecoder PER WORKER, FOR ITS WHOLE LIFETIME. A decoder per image
+     strands a heif_context in the Emscripten heap forever — 6.35 MB per image,
+     ~3.2 GB at 500 photos. The context is only released by the NEXT decode()
+     on the same instance, so the instance must be shared.
+
+  2. A NULL FROM display() IS THE ERROR SIGNAL. A truncated HEIC parses its
+     metadata and hands back a handle reporting full, valid dimensions; the
+     failure only surfaces as a null in the display callback. Checking the
+     return of decode() is not enough.
+
+  3. FREE EVERY HANDLE, NOT JUST [0]. A multi-image HEIC — thumbnail pair, Live
+     Photo, burst — returns several handles and each one holds wasm memory.
+
+  4. libheif APPLIES irot/imir ITSELF during decode, so the rotation is already
+     baked into the pixels that come back. Nothing here re-rotates them.
+
+  The display() callback also fires from inside a setTimeout, so a throw in
+  there lands as an uncaught worker error rather than a rejection — hence the
+  parked rejector and the decode timeout.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HEIC → JPEG · converter</title>
+<style>
+/*
+ * Photournament's design tokens, achromatic by construction: every grey is
+ * oklch(L 0 0) so no surface next to an image has a hue to cast, and there is
+ * exactly one desaturated accent, kept to chrome.
+ */
+:root {
+  --bg:        oklch(0.160 0 0);
+  --surface:   oklch(0.205 0 0);
+  --surface-2: oklch(0.248 0 0);
+  --surface-3: oklch(0.300 0 0);
+  --line:      oklch(0.300 0 0);
+  --line-2:    oklch(0.390 0 0);
+  --text:      oklch(0.950 0 0);
+  --text-dim:  oklch(0.730 0 0);
+  --text-mute: oklch(0.565 0 0);
+  --well:      #000;
+  --accent:     oklch(0.680 0.072 248);
+  --accent-hi:  oklch(0.780 0.072 248);
+  --on-accent:  oklch(0.150 0 0);
+  --good: oklch(0.680 0.080 150);
+  --warn: oklch(0.760 0.090 85);
+  --bad:  oklch(0.640 0.110 25);
+  --r: 5px; --r-lg: 9px; --r-sm: 3px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --t: 90ms;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0; min-height: 100%;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 16px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+* { scrollbar-color: var(--surface-3) transparent; scrollbar-width: thin; }
+
+header {
+  display: flex; align-items: center; gap: 14px;
+  height: 56px; padding: 0 20px;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 20;
+}
+#title { font-size: 14px; font-weight: 650; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); }
+#env { font-family: var(--mono); font-size: 12px; color: var(--text-mute); }
+.spacer { flex: 1; }
+
+main { max-width: 940px; margin: 0 auto; padding: 26px 20px 60px; display: flex; flex-direction: column; gap: 18px; }
+h1 { font-size: 28px; margin: 0; font-weight: 600; letter-spacing: -0.015em; }
+p { margin: 0; max-width: 70ch; text-wrap: pretty; }
+.muted { color: var(--text-dim); }
+.dim { color: var(--text-mute); }
+.small { font-size: 14px; }
+.mono { font-family: var(--mono); font-size: 0.92em; }
+.nums { font-variant-numeric: tabular-nums; }
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; }
+
+.btn {
+  font: inherit; font-size: 14px; font-weight: 500;
+  color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--line-2); border-radius: var(--r);
+  padding: 9px 16px; cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: background var(--t), border-color var(--t), color var(--t);
+}
+.btn:hover:not(:disabled) { background: var(--surface-3); border-color: oklch(0.46 0 0); }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 650; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hi); border-color: var(--accent-hi); }
+.btn-quiet { background: transparent; border-color: transparent; color: var(--text-dim); }
+.btn-quiet:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+input[type="number"], select {
+  font: inherit; font-size: 14px; color: var(--text);
+  background: oklch(0.130 0 0); border: 1px solid var(--line-2);
+  border-radius: var(--r); padding: 7px 9px;
+}
+input:focus, select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent);
+}
+input[type="range"] { accent-color: var(--accent); width: 150px; }
+label.f { display: flex; align-items: center; gap: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-mute); }
+input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+
+/* The dropzone is the page, not a debug box on it. */
+#drop {
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: linear-gradient(oklch(0.185 0 0), oklch(0.170 0 0));
+  padding: 42px 28px; text-align: center; position: relative;
+  transition: border-color var(--t), background var(--t);
+}
+#drop::after {
+  content: ""; position: absolute; inset: 7px;
+  border: 1px dashed var(--line); border-radius: var(--r);
+  pointer-events: none; transition: border-color var(--t);
+}
+#drop.over { border-color: var(--accent); background: oklch(0.205 0 0); }
+#drop.over::after { border-color: var(--accent); }
+.drop-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.drop-title { font-size: 16px; font-weight: 600; }
+.drop-or { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-mute); }
+
+.bar { height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 140ms linear; }
+
+/* One row per file. Grid rather than flex so the columns line up down the list
+   and the eye can scan status without reading names. */
+.frow {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 128px 96px 92px;
+  gap: 14px; align-items: center;
+  padding: 8px 10px; border-radius: var(--r);
+  border-bottom: 1px solid var(--line);
+}
+.frow:hover { background: var(--surface-2); }
+.thumb {
+  width: 64px; height: 44px; object-fit: contain;
+  background: var(--well); border-radius: var(--r-sm); display: block;
+}
+.thumb.empty { background: var(--surface-2); }
+.fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.fmeta { font-family: var(--mono); font-size: 11px; color: var(--text-mute); }
+.fsize { font-family: var(--mono); font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; text-align: right; }
+.fstat { font-size: 12px; letter-spacing: 0.03em; }
+.fstat.waiting { color: var(--text-mute); }
+.fstat.working { color: var(--accent); }
+.fstat.done    { color: var(--good); }
+.fstat.failed  { color: var(--bad); }
+.ferr { grid-column: 2 / -1; font-size: 12px; color: var(--bad); font-family: var(--mono); }
+
+#list { display: flex; flex-direction: column; }
+#list:empty { display: none; }
+
+.notice {
+  border-radius: var(--r); padding: 12px 14px; font-size: 14px;
+  border: 1px solid var(--line-2); background: var(--surface-2);
+  border-left: 3px solid var(--line-2); text-wrap: pretty;
+}
+.notice-warn { border-color: color-mix(in oklch, var(--warn) 35%, var(--line)); border-left-color: var(--warn); background: color-mix(in oklch, var(--warn) 7%, var(--surface)); color: oklch(0.90 0.03 85); }
+.notice-note { color: var(--text-dim); }
+
+#toasts { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 60; pointer-events: none; }
+.toast { background: var(--surface-2); border: 1px solid var(--line-2); border-radius: var(--r); padding: 11px 16px; font-size: 14px; box-shadow: 0 10px 34px oklch(0 0 0 / 0.6); }
+
+.totals { display: flex; gap: 14px; align-items: baseline; font-variant-numeric: tabular-nums; }
+.totals b { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+.totals .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-mute); }
+
+@media (max-width: 720px) {
+  .frow { grid-template-columns: 48px minmax(0, 1fr) 84px; }
+  .fsize { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <span id="title">HEIC → JPEG</span>
+  <span id="env" class="dim"></span>
+  <span class="spacer"></span>
+  <span id="workers" class="small dim"></span>
+</header>
+
+<main>
+  <div>
+    <h1>Convert HEIC photos</h1>
+    <p class="muted small" style="margin-top:6px">
+      Drop HEIC or HEIF files here and they come out as JPEG or PNG. Everything runs
+      in this page — nothing is uploaded, nothing is installed, and the originals are
+      never modified.
+    </p>
+  </div>
+
+  <div id="drop">
+    <div class="drop-inner">
+      <div class="drop-title">Drop HEIC files or a folder here</div>
+      <div class="drop-or">or</div>
+      <div class="row">
+        <button class="btn btn-primary" id="pick-files">Choose files</button>
+        <button class="btn" id="pick-folder">Choose a folder</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card row" id="opts">
+    <label class="f">Format
+      <select id="fmt">
+        <option value="image/jpeg">JPEG</option>
+        <option value="image/png">PNG</option>
+      </select>
+    </label>
+    <label class="f" id="q-wrap">Quality
+      <input type="range" id="quality" min="50" max="100" step="1" value="90">
+      <span class="nums mono" id="q-val" style="color:var(--text-dim)">90</span>
+    </label>
+    <label class="f">Max edge
+      <input type="number" id="maxdim" min="0" step="100" value="0" style="width:96px">
+      <span class="small dim" style="text-transform:none;letter-spacing:0">px · 0 keeps full size</span>
+    </label>
+    <span class="spacer"></span>
+    <button class="btn btn-primary" id="convert" disabled>Convert</button>
+  </div>
+
+  <!--
+    The batch-size ceiling, and how it is removed. Holding every result in
+    memory until the user saves is fine for a handful and is a gigabyte at four
+    hundred 12 MP photos. Naming an output folder first makes each file get
+    written the moment it is encoded and its blob dropped, so peak memory is
+    one image regardless of how many are queued.
+  -->
+  <div class="card row" id="stream-row">
+    <div style="flex:1;min-width:0">
+      <div class="small"><b id="stream-title">Converting a big batch?</b></div>
+      <div class="small dim" id="stream-note">
+        Results are kept in memory until you save them, which is fine for a few dozen.
+        Name an output folder first and each file is written as it finishes instead —
+        no batch limit, and memory stays flat.
+      </div>
+    </div>
+    <button class="btn" id="pick-out">Write straight to a folder…</button>
+    <button class="btn btn-quiet" id="clear-out" hidden>Stop writing there</button>
+  </div>
+
+  <div class="bar" id="bar"><i></i></div>
+
+  <div class="row" id="summary" hidden>
+    <div class="totals">
+      <span class="lbl">Converted</span>
+      <b id="t-done">0</b>
+      <span class="small dim" id="t-of"></span>
+    </div>
+    <span class="spacer"></span>
+    <button class="btn btn-primary" id="save-folder" hidden>Save all to a folder…</button>
+    <button class="btn" id="save-zip" hidden>Download as one .zip</button>
+    <button class="btn btn-quiet" id="clear" hidden>Clear</button>
+  </div>
+
+  <div id="issues"></div>
+  <div id="list"></div>
+</main>
+
+<div id="toasts" aria-live="polite"></div>
+
+<!--
+  libheif is parked as inert text rather than a script, exactly as Photournament
+  parks it: a folder that never gets converted should not pay its parse cost.
+  It is turned into a worker only when the first file is actually decoded.
+-->
+<script type="text/plain" id="libheif-src"><!--BUILD:LIBHEIF--></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================== */
+  /* 1. Small helpers                                                     */
+  /* ==================================================================== */
+
+  var $ = function (s) { return document.querySelector(s); };
+
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v == null || v === false) return;
+      if (k === 'class') n.className = v;
+      else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (v === true) n.setAttribute(k, '');
+      else n.setAttribute(k, v);
+    });
+    if (kids != null) [].concat(kids).forEach(function (k) {
+      if (k == null || k === false) return;
+      n.appendChild(k.nodeType ? k : document.createTextNode(String(k)));
+    });
+    return n;
+  }
+
+  function toast(msg) {
+    var t = el('div', { class: 'toast' }, msg);
+    $('#toasts').appendChild(t);
+    setTimeout(function () { t.remove(); }, 3000);
+  }
+
+  function human(n) {
+    var u = ['B', 'KB', 'MB', 'GB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i === 0 ? n : n.toFixed(n < 10 ? 1 : 0)) + ' ' + u[i];
+  }
+
+  /* HEIF brand sniff, same table as Photournament's ingest worker. Extensions
+     lie; the ftyp box does not. */
+  var HEIF_BRANDS = {
+    heic: 1, heix: 1, heim: 1, heis: 1, hevc: 1, hevx: 1, hevm: 1, hevs: 1,
+    mif1: 1, msf1: 1, avif: 1, avis: 1
+  };
+
+  function sniffHeif(buf) {
+    var b = new Uint8Array(buf, 0, Math.min(buf.byteLength, 32));
+    if (b.length < 12) return null;
+    if (!(b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70)) return null; // 'ftyp'
+    var brand = String.fromCharCode(b[8], b[9], b[10], b[11]);
+    return HEIF_BRANDS[brand] ? brand : null;
+  }
+
+  /* ==================================================================== */
+  /* 2. The worker                                                        */
+  /* ==================================================================== */
+
+  /*
+   * Written as a function and stringified, so it is real code the editor can
+   * check rather than a string literal full of escapes. libheif's source is
+   * prepended to the same blob, which puts its top-level `var libheif` on the
+   * worker global — one blob, shared by every worker in the pool.
+   */
+  function workerMain() {
+    var MAX_PIXELS = 80e6;         // an 80 MP ceiling; above it the RGBA buffer is the problem
+    var decoder = null;            // ONE per worker, for its lifetime. See the header.
+    var loading = null;
+    var activeReject = null;       // display() throws land in onerror, not in a rejection
+
+    function fail(code, message) {
+      var e = new Error(message);
+      e.ptCode = code;
+      return e;
+    }
+
+    self.onerror = function (msg) {
+      if (activeReject) activeReject(fail('decode', String(msg)));
+    };
+
+    function load() {
+      if (loading) return loading;
+      loading = Promise.resolve().then(function () {
+        var factory = self.libheif;
+        if (typeof factory !== 'function') {
+          throw fail('init', 'libheif global is not the Emscripten factory (got ' + typeof factory + ')');
+        }
+        // MODULARIZE: call the factory and await it. `new libheif.HeifDecoder()`
+        // as the README shows throws "not a constructor".
+        return factory();
+      }).then(function (mod) {
+        if (!mod || typeof mod.HeifDecoder !== 'function') throw fail('init', 'libheif exposes no HeifDecoder');
+        decoder = new mod.HeifDecoder();
+        return mod;
+      });
+      return loading;
+    }
+
+    function freeAll(images) {
+      if (!images) return;
+      for (var i = 0; i < images.length; i++) {
+        try { images[i].free(); } catch (e) { /* already freed */ }
+      }
+    }
+
+    function decode(u8, timeoutMs) {
+      return load().then(function () {
+        var images = decoder.decode(u8);      // never throws; empty means undecodable
+        return Promise.resolve().then(function () {
+          if (!images || !images.length) throw fail('unsupported', 'no images in container (unsupported codec or corrupt)');
+          var img = images[0];
+          var w = img.get_width(), h = img.get_height();
+          if (!(w > 0 && h > 0)) throw fail('corrupt', 'invalid dimensions ' + w + 'x' + h);
+          if (w * h > MAX_PIXELS) throw fail('too-large', w + 'x' + h + ' is over the ' + (MAX_PIXELS / 1e6) + ' MP ceiling');
+
+          var imageData;
+          try { imageData = new ImageData(w, h); }
+          catch (e) { throw fail('too-large', 'cannot allocate ' + w + 'x' + h + ' RGBA buffer'); }
+
+          return new Promise(function (resolve, reject) {
+            var settled = false;
+            var timer = setTimeout(function () {
+              if (settled) return;
+              settled = true; activeReject = null;
+              reject(fail('timeout', 'decode did not finish within ' + timeoutMs + 'ms'));
+            }, timeoutMs);
+            activeReject = function (e) {
+              if (settled) return;
+              settled = true; clearTimeout(timer); activeReject = null; reject(e);
+            };
+            try {
+              img.display(imageData, function (out) {
+                if (settled) return;
+                settled = true; clearTimeout(timer); activeReject = null;
+                // THE error signal: a truncated file reports full dimensions
+                // above and only fails here, as a null.
+                if (!out) reject(fail('corrupt', 'pixel decode failed — file is truncated or corrupt'));
+                else resolve(out);
+              });
+            } catch (e) {
+              if (settled) return;
+              settled = true; clearTimeout(timer); activeReject = null; reject(e);
+            }
+          });
+        }).then(
+          function (v) { freeAll(images); return v; },
+          function (e) { freeAll(images); throw e; }
+        );
+      });
+    }
+
+    /* Encode through OffscreenCanvas so the main thread never sees pixels.
+       Resizing goes via createImageBitmap + drawImage rather than putImageData
+       into a smaller canvas, which would crop rather than scale. */
+    function encode(imageData, type, quality, maxDim) {
+      var w = imageData.width, h = imageData.height;
+      var tw = w, th = h;
+      if (maxDim > 0 && (w > maxDim || h > maxDim)) {
+        var s = Math.min(maxDim / w, maxDim / h);
+        tw = Math.max(1, Math.round(w * s));
+        th = Math.max(1, Math.round(h * s));
+      }
+      var opts = { type: type };
+      if (type === 'image/jpeg') opts.quality = quality;
+
+      if (tw === w && th === h) {
+        var c = new OffscreenCanvas(w, h);
+        c.getContext('2d', { alpha: false }).putImageData(imageData, 0, 0);
+        return c.convertToBlob(opts).then(function (b) { return { blob: b, w: w, h: h }; });
+      }
+      return createImageBitmap(imageData).then(function (bm) {
+        var c = new OffscreenCanvas(tw, th);
+        var ctx = c.getContext('2d', { alpha: false });
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(bm, 0, 0, tw, th);
+        bm.close();
+        return c.convertToBlob(opts).then(function (b) { return { blob: b, w: tw, h: th }; });
+      });
+    }
+
+    self.onmessage = function (e) {
+      var job = e.data;
+      if (job.cmd === 'warm') { load().then(function () { self.postMessage({ id: 'warm', ok: true }); },
+                                           function (err) { self.postMessage({ id: 'warm', ok: false, error: String(err && err.message || err) }); }); return; }
+      decode(new Uint8Array(job.buffer), job.timeoutMs)
+        .then(function (imageData) {
+          var srcW = imageData.width, srcH = imageData.height;
+          return encode(imageData, job.type, job.quality, job.maxDim).then(function (r) {
+            self.postMessage({ id: job.id, ok: true, blob: r.blob, w: r.w, h: r.h, srcW: srcW, srcH: srcH });
+          });
+        })
+        .catch(function (err) {
+          self.postMessage({
+            id: job.id, ok: false,
+            code: (err && err.ptCode) || 'error',
+            error: String((err && err.message) || err)
+          });
+        });
+    };
+  }
+
+  /* ==================================================================== */
+  /* 3. Worker pool                                                       */
+  /* ==================================================================== */
+
+  var POOL_SIZE = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
+  var pool = null;
+
+  function buildPool() {
+    if (pool) return pool;
+    var src = document.getElementById('libheif-src').textContent;
+    if (!src || src.length < 1000) {
+      throw new Error('libheif source is missing from this file — it was not built correctly');
+    }
+    // ONE blob for the whole pool: the 1.4 MB source is held once, and each
+    // worker parses from the same URL.
+    var blob = new Blob([src, ';\n(', workerMain.toString(), ')();'], { type: 'text/javascript' });
+    var url = URL.createObjectURL(blob);
+    var workers = [];
+    for (var i = 0; i < POOL_SIZE; i++) workers.push(new Worker(url));
+    URL.revokeObjectURL(url);
+    pool = { workers: workers, idle: workers.slice(), queue: [], jobs: Object.create(null), seq: 0 };
+    workers.forEach(function (w) {
+      w.onmessage = function (e) {
+        var msg = e.data;
+        var done = pool.jobs[msg.id];
+        if (!done) return;
+        delete pool.jobs[msg.id];
+        pool.idle.push(w);
+        done(msg);
+        pump();
+      };
+      w.onerror = function (err) {
+        // A worker that dies takes its in-flight job with it; fail that job
+        // rather than hanging the queue forever.
+        Object.keys(pool.jobs).forEach(function (id) {
+          var d = pool.jobs[id];
+          delete pool.jobs[id];
+          d({ id: id, ok: false, code: 'worker', error: String(err && err.message || 'worker crashed') });
+        });
+        pool.idle.push(w);
+        pump();
+      };
+    });
+    return pool;
+  }
+
+  function pump() {
+    if (!pool) return;
+    while (pool.idle.length && pool.queue.length) {
+      var w = pool.idle.pop();
+      var item = pool.queue.shift();
+      pool.jobs[item.job.id] = item.done;
+      w.postMessage(item.job, [item.job.buffer]);
+    }
+  }
+
+  function run(job) {
+    buildPool();
+    return new Promise(function (resolve) {
+      pool.queue.push({ job: job, done: resolve });
+      pump();
+    });
+  }
+
+  /* ==================================================================== */
+  /* 4. State and the file list                                           */
+  /* ==================================================================== */
+
+  var files = [];        // {file, status, code, error, blob, w, h, url, outType}
+  var converting = false;
+  var outDir = null;     // a FileSystemDirectoryHandle streams results straight to disk
+
+  function extFor(type) { return type === 'image/png' ? '.png' : '.jpg'; }
+
+  function outName(name, type) {
+    return name.replace(/\.(heic|heif|hif)$/i, '') + extFor(type);
+  }
+
+  function addFiles(list) {
+    var added = 0, skipped = 0;
+    [].slice.call(list).forEach(function (f) {
+      if (!/\.(heic|heif|hif)$/i.test(f.name)) { skipped++; return; }
+      if (files.some(function (x) { return x.file.name === f.name && x.file.size === f.size; })) return;
+      files.push({ file: f, status: 'waiting' });
+      added++;
+    });
+    render();
+    if (added) toast(added + ' file' + (added === 1 ? '' : 's') + ' added');
+    if (skipped) toast(skipped + ' non-HEIC file' + (skipped === 1 ? '' : 's') + ' ignored');
+  }
+
+  function render() {
+    var host = $('#list');
+    host.replaceChildren();
+    var type = $('#fmt').value;
+
+    files.forEach(function (f, i) {
+      var img = el('img', { class: 'thumb empty', alt: '' });
+      if (f.url) img.src = f.url;
+
+      var statusText = f.status === 'waiting' ? 'waiting'
+        : f.status === 'working' ? 'converting…'
+        : f.status === 'written' ? 'written'
+        : f.status === 'done' ? 'done'
+        : f.code || 'failed';
+
+      var row = el('div', { class: 'frow' }, [
+        img,
+        el('div', {}, [
+          el('div', { class: 'fname' }, f.file.name),
+          el('div', { class: 'fmeta' },
+            (f.status === 'done' || f.status === 'written')
+              ? outName(f.file.name, f.outType) + '  ·  ' + f.w + '×' + f.h
+              : (f.srcW ? f.srcW + '×' + f.srcH : ''))
+        ]),
+        el('div', { class: 'fsize' },
+          (f.status === 'done' || f.status === 'written')
+            ? human(f.file.size) + ' → ' + human(f.outSize)
+            : human(f.file.size)),
+        el('div', { class: 'fstat ' + f.status }, statusText),
+        el('div', { class: 'row', style: 'justify-content:flex-end' },
+          f.status === 'done'
+            ? el('button', { class: 'btn btn-sm', onClick: function () { saveOne(f); } }, 'Save')
+            : f.status === 'written'
+              ? el('span', { class: 'small dim' }, 'on disk')
+              : el('button', { class: 'btn btn-sm btn-quiet', onClick: function () { drop(i); } }, 'Remove'))
+      ]);
+      host.appendChild(row);
+
+      if (f.status === 'failed' && f.error) {
+        host.appendChild(el('div', { class: 'frow' }, el('div', { class: 'ferr' }, f.error)));
+      }
+    });
+
+    var pending = files.filter(function (f) { return f.status !== 'done' && f.status !== 'written'; });
+    $('#convert').disabled = converting || pending.length === 0;
+
+    // Held results can still be saved; written ones are already on disk, so the
+    // save controls must not imply there is anything left to do for them.
+    var held = files.filter(function (f) { return f.status === 'done'; });
+    var written = files.filter(function (f) { return f.status === 'written'; });
+    $('#summary').hidden = files.length === 0;
+    $('#t-done').textContent = String(held.length + written.length);
+    $('#t-of').textContent = 'of ' + files.length + (files.length === 1 ? ' file' : ' files') +
+      (written.length ? '  ·  ' + written.length + ' written to disk' : '');
+    $('#save-zip').hidden = held.length === 0;
+    $('#save-folder').hidden = held.length === 0 || !window.showDirectoryPicker;
+    $('#clear').hidden = files.length === 0;
+  }
+
+  function drop(i) {
+    if (files[i] && files[i].url) URL.revokeObjectURL(files[i].url);
+    files.splice(i, 1);
+    render();
+  }
+
+  /* ==================================================================== */
+  /* 5. Converting                                                        */
+  /* ==================================================================== */
+
+  /**
+   * Write one result and release it. This is what makes the batch size
+   * unbounded: the blob and its preview URL are dropped as soon as the bytes
+   * are on disk, so a thousand-file run holds no more than a handful at once.
+   * A write failure keeps the blob rather than losing the work.
+   */
+  function writeThrough(f) {
+    return outDir.getFileHandle(outName(f.file.name, f.outType), { create: true })
+      .then(function (h) { return h.createWritable(); })
+      .then(function (w) { return Promise.resolve(w.write(f.blob)).then(function () { return w.close(); }); })
+      .then(function () {
+        if (f.url) { URL.revokeObjectURL(f.url); f.url = null; }
+        f.blob = null;
+        f.status = 'written';
+      })
+      .catch(function (e) {
+        // Keep it in memory and let the user save it by hand rather than
+        // reporting a success that did not happen.
+        f.status = 'done';
+        toast('Could not write ' + f.file.name + ': ' + (e && e.message));
+      });
+  }
+
+  function convertAll() {
+    if (converting) return;
+    var todo = files.filter(function (f) { return f.status !== 'done' && f.status !== 'written'; });
+    if (!todo.length) return;
+
+    converting = true;
+    $('#convert').disabled = true;
+    $('#issues').replaceChildren();
+
+    var type = $('#fmt').value;
+    var quality = parseInt($('#quality').value, 10) / 100;
+    var maxDim = Math.max(0, parseInt($('#maxdim').value, 10) || 0);
+    var finished = 0;
+
+    todo.forEach(function (f) { f.status = 'waiting'; f.error = null; f.code = null; });
+    render();
+
+    var chain = todo.map(function (f) {
+      return f.file.arrayBuffer().then(function (buf) {
+        var brand = sniffHeif(buf);
+        if (!brand) {
+          f.status = 'failed';
+          f.code = 'not-heif';
+          f.error = 'Not a HEIF container — the ftyp brand does not match, whatever the extension says.';
+          finished++; progress(finished, todo.length); render();
+          return;
+        }
+        f.status = 'working';
+        render();
+        return run({
+          id: 'j' + (pool ? ++pool.seq : (buildPool(), ++pool.seq)),
+          buffer: buf, type: type, quality: quality, maxDim: maxDim,
+          timeoutMs: 180000
+        }).then(function (msg) {
+          if (msg.ok) {
+            f.status = 'done';
+            f.blob = msg.blob; f.w = msg.w; f.h = msg.h;
+            f.srcW = msg.srcW; f.srcH = msg.srcH;
+            f.outType = type;
+            f.outSize = msg.blob.size;
+            if (f.url) URL.revokeObjectURL(f.url);
+            f.url = URL.createObjectURL(msg.blob);
+            if (outDir) {
+              return writeThrough(f).then(function () {
+                finished++; progress(finished, todo.length); render();
+              });
+            }
+          } else {
+            f.status = 'failed';
+            f.code = msg.code;
+            f.error = msg.error;
+          }
+          finished++; progress(finished, todo.length); render();
+        });
+      }).catch(function (e) {
+        f.status = 'failed';
+        f.code = 'read';
+        f.error = 'Could not read the file: ' + (e && e.message);
+        finished++; progress(finished, todo.length); render();
+      });
+    });
+
+    Promise.all(chain).then(function () {
+      converting = false;
+      var failed = files.filter(function (f) { return f.status === 'failed'; });
+      var ok = files.filter(function (f) { return f.status === 'done'; });
+      if (failed.length) {
+        $('#issues').appendChild(el('div', { class: 'notice notice-warn' },
+          failed.length + ' file' + (failed.length === 1 ? '' : 's') + ' could not be converted. ' +
+          'Each one says why on its own row; a truncated or partially-synced file is the usual cause.'));
+      }
+      progress(1, 1);
+      render();
+      toast(ok.length + ' converted' + (failed.length ? ', ' + failed.length + ' failed' : ''));
+    });
+  }
+
+  function progress(done, total) {
+    $('#bar').firstElementChild.style.width = Math.round((done / Math.max(1, total)) * 100) + '%';
+  }
+
+  /* ==================================================================== */
+  /* 6. Output                                                            */
+  /* ==================================================================== */
+
+  function download(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: name });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function saveOne(f) { download(f.blob, outName(f.file.name, f.outType)); }
+
+  function saveFolder() {
+    var done = files.filter(function (f) { return f.status === 'done'; });
+    if (!done.length || !window.showDirectoryPicker) return;
+    window.showDirectoryPicker({ mode: 'readwrite' }).then(function (dir) {
+      var chain = Promise.resolve();
+      var written = 0;
+      done.forEach(function (f) {
+        chain = chain.then(function () {
+          return dir.getFileHandle(outName(f.file.name, f.outType), { create: true })
+            .then(function (h) { return h.createWritable(); })
+            .then(function (w) { return w.write(f.blob).then(function () { return w.close(); }); })
+            .then(function () { written++; });
+        });
+      });
+      return chain.then(function () { toast(written + ' file' + (written === 1 ? '' : 's') + ' written'); });
+    }).catch(function (e) {
+      if (e && e.name === 'AbortError') return;
+      toast('Could not write: ' + (e && e.message));
+    });
+  }
+
+  /* A STORED zip. JPEG and PNG are already compressed, so deflating them would
+     cost CPU and save almost nothing — which is what makes a dependency-free
+     writer worth having. Same construction as Photournament's export. */
+  var CRC_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(bytes) {
+    var c = 0xffffffff;
+    for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+  function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+  function u16(v) { return [v & 255, (v >>> 8) & 255]; }
+
+  function saveZip() {
+    var done = files.filter(function (f) { return f.status === 'done'; });
+    if (!done.length) return;
+    var parts = [], central = [], offset = 0;
+    var enc = new TextEncoder();
+    var chain = Promise.resolve();
+
+    done.forEach(function (f) {
+      chain = chain.then(function () {
+        return f.blob.arrayBuffer().then(function (ab) {
+          var bytes = new Uint8Array(ab);
+          var name = enc.encode(outName(f.file.name, f.outType));
+          var crc = crc32(bytes);
+          var local = new Uint8Array([].concat(
+            u32(0x04034b50), u16(20), u16(0), u16(0),
+            u16(0), u16(0),                        // fixed timestamp: deterministic output
+            u32(crc), u32(bytes.length), u32(bytes.length),
+            u16(name.length), u16(0)
+          ));
+          parts.push(local, name, bytes);
+          central.push({ name: name, crc: crc, size: bytes.length, offset: offset });
+          offset += local.length + name.length + bytes.length;
+        });
+      });
+    });
+
+    chain.then(function () {
+      var dirStart = offset, dirSize = 0;
+      central.forEach(function (c) {
+        var head = new Uint8Array([].concat(
+          u32(0x02014b50), u16(20), u16(20), u16(0), u16(0),
+          u16(0), u16(0),
+          u32(c.crc), u32(c.size), u32(c.size),
+          u16(c.name.length), u16(0), u16(0), u16(0), u16(0),
+          u32(0), u32(c.offset)
+        ));
+        parts.push(head, c.name);
+        dirSize += head.length + c.name.length;
+      });
+      parts.push(new Uint8Array([].concat(
+        u32(0x06054b50), u16(0), u16(0),
+        u16(central.length), u16(central.length),
+        u32(dirSize), u32(dirStart), u16(0)
+      )));
+      download(new Blob(parts, { type: 'application/zip' }), 'converted.zip');
+      toast(central.length + ' file' + (central.length === 1 ? '' : 's') + ' zipped');
+    });
+  }
+
+  /* ==================================================================== */
+  /* 7. Wiring                                                            */
+  /* ==================================================================== */
+
+  var fileInput = el('input', { type: 'file', multiple: true, accept: '.heic,.heif,.hif,image/heic,image/heif', style: 'display:none' });
+  var dirInput = el('input', { type: 'file', multiple: true, webkitdirectory: true, style: 'display:none' });
+  document.body.appendChild(fileInput);
+  document.body.appendChild(dirInput);
+
+  fileInput.addEventListener('change', function () { addFiles(fileInput.files); fileInput.value = ''; });
+  dirInput.addEventListener('change', function () { addFiles(dirInput.files); dirInput.value = ''; });
+
+  $('#pick-files').addEventListener('click', function () { fileInput.click(); });
+  $('#pick-folder').addEventListener('click', function () { dirInput.click(); });
+  $('#convert').addEventListener('click', convertAll);
+  $('#save-zip').addEventListener('click', saveZip);
+  $('#save-folder').addEventListener('click', saveFolder);
+  $('#clear').addEventListener('click', function () {
+    files.forEach(function (f) { if (f.url) URL.revokeObjectURL(f.url); });
+    files = [];
+    progress(0, 1);
+    $('#issues').replaceChildren();
+    render();
+  });
+
+  $('#pick-out').addEventListener('click', function () {
+    if (!window.showDirectoryPicker) { toast('This browser cannot write folders — use the zip instead.'); return; }
+    window.showDirectoryPicker({ mode: 'readwrite' }).then(function (dir) {
+      outDir = dir;
+      $('#stream-title').textContent = 'Writing to ' + (dir.name || 'the chosen folder');
+      $('#stream-note').textContent =
+        'Each file is written as soon as it is encoded and then released, so the batch size ' +
+        'is bounded by disk rather than memory, and a crash part way through keeps what was already done.';
+      $('#pick-out').textContent = 'Change folder…';
+      $('#clear-out').hidden = false;
+    }).catch(function (e) {
+      if (e && e.name === 'AbortError') return;
+      toast('Could not open that folder: ' + (e && e.message));
+    });
+  });
+
+  $('#clear-out').addEventListener('click', function () {
+    outDir = null;
+    $('#stream-title').textContent = 'Converting a big batch?';
+    $('#stream-note').textContent =
+      'Results are kept in memory until you save them, which is fine for a few dozen. ' +
+      'Name an output folder first and each file is written as it finishes instead — ' +
+      'no batch limit, and memory stays flat.';
+    $('#pick-out').textContent = 'Write straight to a folder…';
+    $('#clear-out').hidden = true;
+  });
+
+  if (!window.showDirectoryPicker) $('#stream-row').hidden = true;
+
+  $('#fmt').addEventListener('change', function () {
+    $('#q-wrap').hidden = $('#fmt').value !== 'image/jpeg';
+    render();
+  });
+  $('#quality').addEventListener('input', function () { $('#q-val').textContent = $('#quality').value; });
+
+  var drop = $('#drop');
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave', 'dragend'].forEach(function (ev) {
+    drop.addEventListener(ev, function () { drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop', function (e) {
+    e.preventDefault();
+    drop.classList.remove('over');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  });
+
+  $('#env').textContent = (location.protocol === 'file:' ? 'opened from file' : location.protocol.replace(':', '')) +
+    '  ·  ' + (window.showDirectoryPicker ? 'folder writing available' : 'zip download only');
+  $('#workers').textContent = POOL_SIZE + ' decode worker' + (POOL_SIZE === 1 ? '' : 's');
+
+  render();
+})();
+</script>
+</body>
+</html>
+
+<!-- CHANGELOG
+  v1.0 (2026-08-02): Initial release. libheif-js 1.19.8 (WASM) lifted out of
+    Photournament's ingest worker into a standalone single-file GUI: drop or
+    pick HEIC/HEIF, convert to JPEG or PNG with a quality and max-edge control,
+    save individually, to a folder via the File System Access API, or as one
+    STORED zip. Keeps the four measured decode facts from probe 02 — one
+    shared HeifDecoder per worker, a null from display() as the corruption
+    signal, freeing every handle, and letting libheif apply irot/imir.
+-->

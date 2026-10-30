@@ -1,9 +1,9 @@
 /**
  * @file 50_screen_tree.js
- * @version 1.7
+ * @version 1.8
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-30
+ * @lastUpdated 2026-10-30
  * @description PRD 4 allocation tree UI: four states per node, both math directions, live totals, weighted distribution, and the section 4.5 conflict, clamp and dead-state messages.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -33,7 +33,8 @@
       }
 
       root.appendChild(el('div', { class: 'row' }, [
-        el('h1', { text: 'How many photos do you want to KEEP from each folder?' })
+        el('h1', { text: 'How many photos do you want to KEEP from each ' +
+          (PT.organize.isFolders(st.session.organize) ? 'folder' : 'group') + '?' })
       ]));
 
       root.classList.add('screen-tree');
@@ -50,6 +51,57 @@
           'its parent has left over.' })
       ]);
       root.appendChild(help);
+
+      // PRD 7.12: the tree does not have to be the folders on disk. The same
+      // Organize-by control as Sort mode re-derives it from capture metadata
+      // ("Day > Camera" gives a quota per camera per day), and everything
+      // below — counts, percent, ranking, the broadcast row — works unchanged
+      // because it only ever saw paths. Locked once tournaments exist: a
+      // unit's identity IS its path.
+      var started = Object.keys(st.session.units || {}).length > 0;
+      var livePhotos = function () {
+        var ph = PT.store.get().photos || {};
+        return Object.keys(ph).map(function (k) { return ph[k]; }).filter(function (p) { return !p.err; });
+      };
+      var orgBar = PT.organizeBar({
+        spec: function () { return PT.store.get().session.organize || { cats: ['folder'] }; },
+        photos: livePhotos,
+        locked: started ? 'Locked: the tournaments have started, and each one is one of these groups.' : '',
+        onChange: function (next) {
+          var s0 = PT.store.get().session;
+          var set = Object.keys(s0.allocs || {}).length + Object.keys(s0.rankPaths || {}).length;
+          var apply = function () {
+            PT.store.dispatch('tree:organize', function (ss) {
+              ss.session.organize = PT.organize.isFolders(next) ? null : next;
+              // (An emptied row is kept as [] = one group; only Folders alone is null.)
+              ss.session.allocs = {};
+              ss.session.rankPaths = {};
+              ss.tree = PT.organize.tree(livePhotos(), ss.session.organize);
+            });
+            PT.router.go('tree');
+          };
+          if (!set) { apply(); return; }
+          var body = PT.dom.$('#modal-body'), dlg = PT.dom.$('#modal');
+          PT.dom.clear(body);
+          body.appendChild(el('h2', { text: 'Regroup and start the counts again?' }));
+          body.appendChild(el('p', { class: 'muted small', text:
+            'The counts you have typed belong to the current groups. Regrouping makes new groups, so ' +
+            'those ' + set + ' setting' + (set === 1 ? '' : 's') + ' would be cleared.' }));
+          body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+            el('span', { class: 'spacer' }),
+            el('button', { class: 'btn', type: 'button', text: 'Keep my counts', onclick: function () { dlg.close(); orgBar.refresh(); } }),
+            el('button', { class: 'btn btn-primary', type: 'button', text: 'Regroup', dataset: { t: 'org-confirm' },
+              onclick: function () { dlg.close(); apply(); } })
+          ]));
+          dlg.showModal();
+        }
+      });
+      root.appendChild(el('div', { class: 'card tree-org', dataset: { t: 'tree-org' } }, [
+        el('div', { class: 'small dim', text:
+          'Not sorted into folders? Group by when, where or what the photos were shot with instead, ' +
+          'and set a count per group.' }),
+        orgBar.el
+      ]));
 
       // The broadcast: one value, every folder that holds photos. "The same 5
       // from each day" and "10% of everything, folder by folder" are one
@@ -83,7 +135,7 @@
         if (e.key === 'Enter') { e.preventDefault(); applyAll(); }
       });
       root.appendChild(el('div', { class: 'card row tree-all', id: 'tree-all' }, [
-        el('span', { class: 'small', text: 'Every folder:' }),
+        el('span', { class: 'small', text: 'Every ' + (PT.organize.isFolders(st.session.organize) ? 'folder' : 'group') + ':' }),
         allInput,
         el('button', { class: 'btn btn-sm', id: 'tree-all-apply', text: 'Apply to all', onclick: applyAll }),
         el('span', { class: 'small dim', text:
@@ -142,7 +194,7 @@
       function headerRow() {
         // Must mirror rowFor()'s child order exactly or the columns drift.
         return el('div', { class: 'tree-row tree-head' }, [
-          el('span', { class: 'tree-name', text: 'Folder' }),
+          el('span', { class: 'tree-name', text: PT.organize.isFolders(PT.store.get().session.organize) ? 'Folder' : 'Group' }),
           el('span', { class: 'tree-count', text: 'has' }),
           el('span', { class: 'tree-alloc', text: 'keep' }),
           el('span', {}), el('span', {}), el('span', {}), el('span', {})
@@ -506,4 +558,8 @@
  *   flag onto the units; a session where EVERY unit ranks skips the duplicate
  *   review gate via PT.dupes.materialise(), because the gate was the friction
  *   and the runoff can still prise a wrong bundle apart.
+ * v1.8 (2026-10-30): PRD 7.12 Organize-by card above the tree, the same
+ *   control as Sort mode. Regrouping rebuilds the tree from capture metadata,
+ *   warns before clearing typed counts and rank flags, and locks once
+ *   tournaments exist. Wording follows: folder or group.
 */

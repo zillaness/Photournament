@@ -256,7 +256,9 @@
         session: session,
         photos: photos,
         derivatives: derivatives,
-        tree: live.length ? PT.tree.build(live) : null,
+        // PRD 7.12: an organized session's tree is its synthetic one, rebuilt
+        // from the same spec; folders-only is the plain build, as before.
+        tree: PT.organize.tree(live, session.organize),
         resolution: null
       });
 
@@ -412,4 +414,5 @@
  *   meta[theme-color] does not accept it.
  * v1.4 (2026-10-30): A sort session resumes onto the Sort screen, and the
  *   resume card describes it as sorting rather than counting tournaments.
+ *   An organized culling session's tree is rebuilt from its spec on resume.
 */

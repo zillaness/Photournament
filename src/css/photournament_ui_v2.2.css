@@ -2848,6 +2848,8 @@ kbd {
 #modal .so-exp-opt > span { display: flex; flex-direction: column; gap: 3px; }
 #modal .so-exp-opt.on { border-color: var(--accent); }
 #modal .so-exp-opt.off { opacity: 0.55; cursor: not-allowed; }
+#app .tree-org { margin: 10px 0 12px; }
+#app .tree-org .org-bar { margin-top: 8px; }
 #modal .so-exp-check { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; cursor: pointer; }
 
 /* CHANGELOG (appended block)

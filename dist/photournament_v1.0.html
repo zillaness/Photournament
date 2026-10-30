@@ -2904,6 +2904,8 @@ kbd {
 #modal .so-exp-opt > span { display: flex; flex-direction: column; gap: 3px; }
 #modal .so-exp-opt.on { border-color: var(--accent); }
 #modal .so-exp-opt.off { opacity: 0.55; cursor: not-allowed; }
+#app .tree-org { margin: 10px 0 12px; }
+#app .tree-org .org-bar { margin-top: 8px; }
 #modal .so-exp-check { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; cursor: pointer; }
 
 /* CHANGELOG (appended block)
@@ -7197,7 +7199,7 @@ v1.1 (2026-10-30): Whitelist capture-metadata reader for PRD 7.12 (time,
 /* ===== 32_organize.js ===== */
 /**
  * @file 32_organize.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-10-30
  * @lastUpdated 2026-10-30
@@ -7501,10 +7503,15 @@ v1.1 (2026-10-30): Whitelist capture-metadata reader for PRD 7.12 (time,
     };
   }
 
-  /** Is this spec today's behaviour (organize by disk folders only)? */
+  /**
+   * Is this spec today's behaviour (organize by disk folders only)? No spec at
+   * all is; an explicit EMPTY list is not — it is the deliberate choice to put
+   * every photo in one group, regardless of folders.
+   */
   function isFolders(spec) {
+    if (!spec) return true;
     var s = normSpec(spec);
-    return !s.cats.length || (s.cats.length === 1 && s.cats[0] === 'folder');
+    return s.cats.length === 1 && s.cats[0] === 'folder';
   }
 
   /**
@@ -7578,6 +7585,12 @@ v1.1 (2026-10-30): Whitelist capture-metadata reader for PRD 7.12 (time,
       o.dir = pl.dir[p.id];
       return o;
     });
+  }
+
+  /** The allocation tree for a spec: PT.tree.build over the organized records. */
+  function tree(photos, spec) {
+    var live = photos.filter(function (p) { return !p.err; });
+    return live.length ? PT.tree.build(apply(live, spec)) : null;
   }
 
   /* ---------------------------------------------------- display formatting */
@@ -7676,6 +7689,7 @@ v1.1 (2026-10-30): Whitelist capture-metadata reader for PRD 7.12 (time,
     RADIUS_CHOICES: RADIUS_CHOICES,
     plan: plan,
     apply: apply,
+    tree: tree,
     isFolders: isFolders,
     normSpec: normSpec,
     cameraLabel: cameraLabel,
@@ -7701,6 +7715,10 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Eleven categories, time-
 v1.1 (2026-10-30): manifestRow and toCsv, shared by both exports. The CSV
   defuses spreadsheet formulas in user-controlled text and keeps numbers
   numeric.
+v1.2 (2026-10-30): tree() helper. An explicit empty category list now
+  means one group, not folders: emptying the row on the allocation screen
+  used to snap back to Folders and nest the next choice under the disk
+  folders.
 */
 
 </script>
@@ -10763,10 +10781,10 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Chosen chips with
 /* ===== 50_screen_tree.js ===== */
 /**
  * @file 50_screen_tree.js
- * @version 1.7
+ * @version 1.8
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-30
+ * @lastUpdated 2026-10-30
  * @description PRD 4 allocation tree UI: four states per node, both math directions, live totals, weighted distribution, and the section 4.5 conflict, clamp and dead-state messages.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -10796,7 +10814,8 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Chosen chips with
       }
 
       root.appendChild(el('div', { class: 'row' }, [
-        el('h1', { text: 'How many photos do you want to KEEP from each folder?' })
+        el('h1', { text: 'How many photos do you want to KEEP from each ' +
+          (PT.organize.isFolders(st.session.organize) ? 'folder' : 'group') + '?' })
       ]));
 
       root.classList.add('screen-tree');
@@ -10813,6 +10832,57 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Chosen chips with
           'its parent has left over.' })
       ]);
       root.appendChild(help);
+
+      // PRD 7.12: the tree does not have to be the folders on disk. The same
+      // Organize-by control as Sort mode re-derives it from capture metadata
+      // ("Day > Camera" gives a quota per camera per day), and everything
+      // below — counts, percent, ranking, the broadcast row — works unchanged
+      // because it only ever saw paths. Locked once tournaments exist: a
+      // unit's identity IS its path.
+      var started = Object.keys(st.session.units || {}).length > 0;
+      var livePhotos = function () {
+        var ph = PT.store.get().photos || {};
+        return Object.keys(ph).map(function (k) { return ph[k]; }).filter(function (p) { return !p.err; });
+      };
+      var orgBar = PT.organizeBar({
+        spec: function () { return PT.store.get().session.organize || { cats: ['folder'] }; },
+        photos: livePhotos,
+        locked: started ? 'Locked: the tournaments have started, and each one is one of these groups.' : '',
+        onChange: function (next) {
+          var s0 = PT.store.get().session;
+          var set = Object.keys(s0.allocs || {}).length + Object.keys(s0.rankPaths || {}).length;
+          var apply = function () {
+            PT.store.dispatch('tree:organize', function (ss) {
+              ss.session.organize = PT.organize.isFolders(next) ? null : next;
+              // (An emptied row is kept as [] = one group; only Folders alone is null.)
+              ss.session.allocs = {};
+              ss.session.rankPaths = {};
+              ss.tree = PT.organize.tree(livePhotos(), ss.session.organize);
+            });
+            PT.router.go('tree');
+          };
+          if (!set) { apply(); return; }
+          var body = PT.dom.$('#modal-body'), dlg = PT.dom.$('#modal');
+          PT.dom.clear(body);
+          body.appendChild(el('h2', { text: 'Regroup and start the counts again?' }));
+          body.appendChild(el('p', { class: 'muted small', text:
+            'The counts you have typed belong to the current groups. Regrouping makes new groups, so ' +
+            'those ' + set + ' setting' + (set === 1 ? '' : 's') + ' would be cleared.' }));
+          body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+            el('span', { class: 'spacer' }),
+            el('button', { class: 'btn', type: 'button', text: 'Keep my counts', onclick: function () { dlg.close(); orgBar.refresh(); } }),
+            el('button', { class: 'btn btn-primary', type: 'button', text: 'Regroup', dataset: { t: 'org-confirm' },
+              onclick: function () { dlg.close(); apply(); } })
+          ]));
+          dlg.showModal();
+        }
+      });
+      root.appendChild(el('div', { class: 'card tree-org', dataset: { t: 'tree-org' } }, [
+        el('div', { class: 'small dim', text:
+          'Not sorted into folders? Group by when, where or what the photos were shot with instead, ' +
+          'and set a count per group.' }),
+        orgBar.el
+      ]));
 
       // The broadcast: one value, every folder that holds photos. "The same 5
       // from each day" and "10% of everything, folder by folder" are one
@@ -10846,7 +10916,7 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Chosen chips with
         if (e.key === 'Enter') { e.preventDefault(); applyAll(); }
       });
       root.appendChild(el('div', { class: 'card row tree-all', id: 'tree-all' }, [
-        el('span', { class: 'small', text: 'Every folder:' }),
+        el('span', { class: 'small', text: 'Every ' + (PT.organize.isFolders(st.session.organize) ? 'folder' : 'group') + ':' }),
         allInput,
         el('button', { class: 'btn btn-sm', id: 'tree-all-apply', text: 'Apply to all', onclick: applyAll }),
         el('span', { class: 'small dim', text:
@@ -10905,7 +10975,7 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Chosen chips with
       function headerRow() {
         // Must mirror rowFor()'s child order exactly or the columns drift.
         return el('div', { class: 'tree-row tree-head' }, [
-          el('span', { class: 'tree-name', text: 'Folder' }),
+          el('span', { class: 'tree-name', text: PT.organize.isFolders(PT.store.get().session.organize) ? 'Folder' : 'Group' }),
           el('span', { class: 'tree-count', text: 'has' }),
           el('span', { class: 'tree-alloc', text: 'keep' }),
           el('span', {}), el('span', {}), el('span', {}), el('span', {})
@@ -11269,6 +11339,10 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Chosen chips with
  *   flag onto the units; a session where EVERY unit ranks skips the duplicate
  *   review gate via PT.dupes.materialise(), because the gate was the friction
  *   and the runoff can still prise a wrong bundle apart.
+ * v1.8 (2026-10-30): PRD 7.12 Organize-by card above the tree, the same
+ *   control as Sort mode. Regrouping rebuilds the tree from capture metadata,
+ *   warns before clearing typed counts and rank flags, and locks once
+ *   tournaments exist. Wording follows: folder or group.
 */
 
 </script>
@@ -16431,7 +16505,9 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
         session: session,
         photos: photos,
         derivatives: derivatives,
-        tree: live.length ? PT.tree.build(live) : null,
+        // PRD 7.12: an organized session's tree is its synthetic one, rebuilt
+        // from the same spec; folders-only is the plain build, as before.
+        tree: PT.organize.tree(live, session.organize),
         resolution: null
       });
 
@@ -16587,6 +16663,7 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
  *   meta[theme-color] does not accept it.
  * v1.4 (2026-10-30): A sort session resumes onto the Sort screen, and the
  *   resume card describes it as sorting rather than counting tournaments.
+ *   An organized culling session's tree is rebuilt from its spec on resume.
 */
 
 </script>

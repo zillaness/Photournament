@@ -35,8 +35,14 @@ const OSAKA = { lat: 34.6937, lon: 135.5023 };        // ~43 km away
 test('Folders alone is today\'s behaviour: apply() returns the very same records', () => {
   const ps = [photo({}, { dir: 'Trip/Day1' }), photo({}, { dir: 'Trip/Day2' })];
   assert.equal(O.apply(ps, { cats: ['folder'] }), ps);
-  assert.equal(O.apply(ps, { cats: [] }), ps);
-  assert.ok(O.isFolders({ cats: [] }) && O.isFolders({ cats: ['folder'] }) && !O.isFolders({ cats: ['day'] }));
+  assert.equal(O.apply(ps, null), ps);
+  assert.ok(O.isFolders(null) && O.isFolders({ cats: ['folder'] }) && !O.isFolders({ cats: ['day'] }));
+});
+
+test('an explicit empty organization is one group, not a silent return to folders', () => {
+  const ps = [photo({}, { dir: 'Trip/Day1' }), photo({}, { dir: 'Trip/Day2' })];
+  assert.ok(!O.isFolders({ cats: [] }));
+  assert.deepEqual(O.apply(ps, { cats: [] }).map((p) => p.dir), ['', '']);
 });
 
 test('categories nest in the order chosen', () => {

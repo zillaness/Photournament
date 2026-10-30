@@ -37,7 +37,8 @@ his "proceed". Phase 0 usage experiment skipped (no meter readings tonight).
 - 11:25 ✅ unit 4: `PT.tags` (36_tags.js) + lightbox metadata row and tag bar, Shift+1..9; browser-verified (two focus bugs found and fixed)
 - 11:55 ✅ unit 5: entry mode choice; shared Organize-by control (38_organize_ui.js); Sort screen (55_screen_sort.js) with grouping, selection, tagging; browser-verified
 - 12:30 ✅ unit 6: Sort export (priced copy / list, per-tag sets, manifest CSV+JSON, never-overwrite, reconnect); CSV formula-injection guard; verified copy path on OPFS over localhost
-- ▶ NEXT: unit 7, culling: Organize-by on the allocation screen + tree rebuild on resume
+- 12:55 ✅ unit 7: Organize-by on the allocation screen (reset warning, lock once started), organized tree on resume; found+fixed: emptying the row snapped back to Folders
+- ▶ NEXT: unit 8, culling export: nested category folders, same-leaf collision fix, per-tag sets, CSV
 
 ## Handoff
 (filled at stop)

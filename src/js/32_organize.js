@@ -1,6 +1,6 @@
 /**
  * @file 32_organize.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-10-30
  * @lastUpdated 2026-10-30
@@ -304,10 +304,15 @@
     };
   }
 
-  /** Is this spec today's behaviour (organize by disk folders only)? */
+  /**
+   * Is this spec today's behaviour (organize by disk folders only)? No spec at
+   * all is; an explicit EMPTY list is not — it is the deliberate choice to put
+   * every photo in one group, regardless of folders.
+   */
   function isFolders(spec) {
+    if (!spec) return true;
     var s = normSpec(spec);
-    return !s.cats.length || (s.cats.length === 1 && s.cats[0] === 'folder');
+    return s.cats.length === 1 && s.cats[0] === 'folder';
   }
 
   /**
@@ -381,6 +386,12 @@
       o.dir = pl.dir[p.id];
       return o;
     });
+  }
+
+  /** The allocation tree for a spec: PT.tree.build over the organized records. */
+  function tree(photos, spec) {
+    var live = photos.filter(function (p) { return !p.err; });
+    return live.length ? PT.tree.build(apply(live, spec)) : null;
   }
 
   /* ---------------------------------------------------- display formatting */
@@ -479,6 +490,7 @@
     RADIUS_CHOICES: RADIUS_CHOICES,
     plan: plan,
     apply: apply,
+    tree: tree,
     isFolders: isFolders,
     normSpec: normSpec,
     cameraLabel: cameraLabel,
@@ -504,4 +516,8 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Eleven categories, time-
 v1.1 (2026-10-30): manifestRow and toCsv, shared by both exports. The CSV
   defuses spreadsheet formulas in user-controlled text and keeps numbers
   numeric.
+v1.2 (2026-10-30): tree() helper. An explicit empty category list now
+  means one group, not folders: emptying the row on the allocation screen
+  used to snap back to Folders and nest the next choice under the disk
+  folders.
 */

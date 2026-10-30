@@ -34,7 +34,8 @@ his "proceed". Phase 0 usage experiment skipped (no meter readings tonight).
 ## Ledger
 - 10:20 ✅ units 1+2: whitelist capture reader (EXIF/GPS, XMP/IPTC places; JPEG/PNG/WebP/HEIC) + 14 unit tests; `photo.capture` on fresh and cached ingests — committed (see git log)
 - 10:45 ✅ unit 3: `PT.organize` (32_organize.js): 11 categories, events, offline location clusters, named missing buckets; 16 unit tests
-- ▶ NEXT: unit 4, tag store + lightbox tag bar and metadata panel
+- 11:25 ✅ unit 4: `PT.tags` (36_tags.js) + lightbox metadata row and tag bar, Shift+1..9; browser-verified (two focus bugs found and fixed)
+- ▶ NEXT: unit 5, Sort mode: entry choice + Sort screen (src/js/55_screen_sort.js)
 
 ## Handoff
 (filled at stop)

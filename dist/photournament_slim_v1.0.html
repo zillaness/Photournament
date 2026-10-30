@@ -1,7 +1,7 @@
 <!--
   Photournament v1.0 — built 2026-10-30
   GENERATED FILE. Do not edit; edit src/ and re-run: node tools/build.mjs
-  13 script(s), 1 stylesheet(s). omitted (--no-heic): HEIC files will be flagged as unsupported.
+  14 script(s), 1 stylesheet(s). omitted (--no-heic): HEIC files will be flagged as unsupported.
   Open by double-clicking. Chromium only: resume and disk-write need the
   File System Access API, which Chromium alone implements.
 -->
@@ -2651,6 +2651,95 @@ kbd {
   #app .pt-markslot .pt-brandmark { width: 100%; height: 100%; }
 }
 
+/* --------------------------------------------------------------------------
+   ORGANIZE AND TAG (PRD 7.12)
+   --------------------------------------------------------------------------
+   Tags are controls, not marks on a photograph, so they wear the --accent
+   family on the surface around photos and never sit on the pixels. The
+   kept/chosen language (--mark) stays reserved for keeping.
+   -------------------------------------------------------------------------- */
+
+#lightbox .lb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 0 14px 12px;
+  background: var(--surface);
+}
+#lightbox .lb-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: var(--fs-micro);
+  color: var(--text-dim);
+  min-width: 0;
+  flex: 1 1 420px;
+}
+#lightbox .lb-fact { white-space: nowrap; }
+#lightbox .lb-k,
+#app .lb-k { color: var(--text-mute); }
+
+.pt-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.pt-tags-label { font-size: var(--fs-micro); color: var(--text-mute); margin-right: 2px; }
+.pt-tag {
+  font: inherit;
+  font-size: var(--fs-micro);
+  line-height: 1;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.pt-tag:hover:not(:disabled) { border-color: var(--hover-line); color: var(--text); }
+.pt-tag:disabled { opacity: 0.38; cursor: not-allowed; }
+.pt-tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pt-tag.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pt-tag.on:hover:not(:disabled) { background: var(--accent-hi); color: var(--on-accent); }
+.pt-tag.some { border-color: var(--accent); border-style: dashed; color: var(--text); }
+.pt-tag kbd { padding: 1px 4px 2px; font-size: 10px; }
+.pt-tag.on kbd { background: transparent; color: var(--on-accent); border-color: var(--on-accent); }
+.pt-tag-add { border-style: dashed; color: var(--text-mute); }
+.pt-tag-input {
+  font: inherit;
+  font-size: var(--fs-micro);
+  width: 120px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--field);
+  color: var(--text);
+}
+.pt-tag-input:focus { outline: none; background: var(--field-focus); }
+.pt-tag-manage .row { gap: 10px; margin: 6px 0; align-items: center; }
+.pt-tag-manage input,
+#modal input[data-t="tag-manage-new"] {
+  font: inherit;
+  font-size: var(--fs-small);
+  padding: 6px 10px;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--field);
+  color: var(--text);
+}
+
+/* CHANGELOG (appended block)
+ * v2.2a (2026-10-30): PRD 7.12 organize-and-tag block, tokens only: lightbox
+ *   metadata row, the tag chip in its off / mixed / on states, the inline
+ *   new-tag field and the tag manager.
+ */
+
 </style>
 
 
@@ -3421,10 +3510,10 @@ kbd {
 /* ===== 00_core.js ===== */
 /**
  * @file 00_core.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-10-30
  * @description Core runtime for Photournament: global namespace, event bus, observable store, IndexedDB wrapper, file fingerprinting, DOM helpers, and the screen router.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -4065,6 +4154,7 @@ kbd {
       L.els.next.disabled = L.ids.length < 2;
       L.els.wrap.classList.remove('zoomed');
       L.els.zoom.textContent = 'Zoom 1:1';
+      renderMeta(id);
 
       PT.dom.releaseImg(L.els.img);
       var b = blobFor(id);
@@ -4075,6 +4165,29 @@ kbd {
         var b2 = rec.preview || rec.thumb;
         if (b2) PT.dom.setImg(L.els.img, b2);
       }).catch(function () { /* the empty frame says it plainly enough */ });
+    }
+
+    // PRD 7.12: what the camera recorded, and the photo's tags. Both modules
+    // load after this one, so they are looked up at call time.
+    function renderMeta(id) {
+      var els = L.els;
+      var s = PT.store.get();
+      var p = s && s.photos && s.photos[id];
+      PT.dom.clear(els.info);
+      if (p && PT.organize) {
+        PT.organize.infoRows(p).forEach(function (r) {
+          els.info.appendChild(PT.dom.el('span', { class: 'lb-fact', title: r[0] }, [
+            PT.dom.el('span', { class: 'lb-k', text: r[0] }), ' ', r[1]]));
+        });
+      }
+      if (PT.tags && s && s.session) {
+        if (!els.tagBar) {
+          els.tagBar = PT.tags.bar({ ids: function () { return L ? [L.ids[L.idx]] : []; }, keys: true });
+          els.meta.appendChild(els.tagBar.el);
+        } else {
+          els.tagBar.refresh();
+        }
+      }
     }
 
     function step(d) {
@@ -4114,10 +4227,15 @@ kbd {
         onclick: function () { dlg.close(); } });
       var bar = PT.dom.el('div', { class: 'lb-bar' }, [prev, next, name, count,
         PT.dom.el('span', { class: 'spacer' }), zoom, close]);
+      var info = PT.dom.el('div', { class: 'lb-info', dataset: { t: 'lb-info' } });
+      var meta = PT.dom.el('div', { class: 'lb-meta' }, [info]);
       dlg.appendChild(wrap);
       dlg.appendChild(bar);
+      dlg.appendChild(meta);
 
       dlg.addEventListener('keydown', function (e) {
+        if (e.target && e.target.tagName === 'INPUT') return; // typing a new tag
+        if (L && PT.tags && PT.tags.handleKey(e, [L.ids[L.idx]])) return;
         if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
         else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); toggleZoom(); }
@@ -4126,7 +4244,7 @@ kbd {
         if (L) PT.dom.releaseImg(L.els.img);
         L = null;
       });
-      return { img: img, wrap: wrap, name: name, count: count, prev: prev, next: next, zoom: zoom };
+      return { img: img, wrap: wrap, name: name, count: count, prev: prev, next: next, zoom: zoom, info: info, meta: meta, tagBar: null };
     }
 
     return {
@@ -4170,6 +4288,9 @@ kbd {
  * v1.4 (2026-07-28): PT.lightbox — the expand view for every screen that judges
  *   photos from thumbnails, with arrow navigation and 1:1 preview zoom, in its
  *   own dialog so it stacks over the burst pickers.
+ * v1.5 (2026-10-30): The lightbox shows what the camera recorded (PT.organize
+ *   infoRows) and carries the tag bar with Shift+1..9, for PRD 7.12. Both
+ *   are looked up at call time because their modules load after this one.
 */
 
 </script>
@@ -4177,10 +4298,10 @@ kbd {
 /* ===== 10_ingest_worker.js ===== */
 /**
  * @file 10_ingest_worker.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-10-30
  * @description PRD 7.9 ingest: a blob-URL worker pool that decodes JPEG/PNG/WebP/HEIC off the main thread and emits thumbnails, previews, perceptual hashes, sharpness scores and stable fingerprints.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  */
@@ -5709,6 +5830,11 @@ v1.0 - 2026-07-28 - Samuel Cao
     createPool({extraSrc}) and the result validates; otherwise the inlined dhash
     and variance-of-Laplacian are used. No load-order dependency either way.
   Measurements: tools/probes/03_pipeline/FINDINGS.md
+v1.1 (2026-10-30): Whitelist capture-metadata reader for PRD 7.12 (time,
+  camera, lens, exposure, GPS; XMP/IPTC written place names) over JPEG, PNG,
+  WebP and HEIC, run before the cache gate so cached photos get it too; the
+  result rides on the record as photo.capture. heifMeta now also reports where
+  its Exif TIFF block starts. The orientation reader is unchanged.
 */
 
 </script>
@@ -7274,7 +7400,8 @@ v1.0 - 2026-07-28 - Samuel Cao
   function exposureText(cap) {
     if (!cap) return '';
     var bits = [];
-    if (cap.fl35 || cap.fl) bits.push(Math.round(cap.fl35 || cap.fl) + 'mm' + (cap.fl35 ? '' : '*'));
+    if (cap.fl35) bits.push(Math.round(cap.fl35) + 'mm equiv.');
+    else if (cap.fl) bits.push(Math.round(cap.fl * 10) / 10 + 'mm');
     if (cap.f) bits.push('f/' + cap.f);
     if (cap.exp) bits.push(cap.exp >= 1 ? cap.exp + 's' : '1/' + Math.round(1 / cap.exp) + 's');
     if (cap.iso) bits.push('ISO ' + cap.iso);
@@ -7772,6 +7899,308 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Eleven categories, time-
  *   ~30% cheaper than the textbook count); projectSchedule() prices the culling
  *   path to the same handoff point, so the two can sit side by side on the
  *   setup screen and the user commits to a cost they have seen.
+*/
+
+</script>
+<script>
+/* ===== 36_tags.js ===== */
+/**
+ * @file 36_tags.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-10-30
+ * @lastUpdated 2026-10-30
+ * @description PRD 7.12 user tags: a session's short tag list, which photos carry which, and the one tag-bar control every screen that shows photos reuses.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * TAGS NEVER KEEP OR CUT (PRD 2). Nothing in this file touches a pool, a cut
+ * pile, a quota or a bracket. A "maybe" tag must not be able to become a
+ * second keep pile, so tags are deliberately inert to every stage: they only
+ * ride along to the export, where they name extra result sets and fill the
+ * manifest columns.
+ *
+ * TAGS ORGANIZE OUTPUT, NOT ALLOCATION. Allocation is fixed before judging
+ * starts, when most tags do not exist yet, and a photo can carry several tags
+ * but must sit in exactly one tournament unit. So "Tag" is deliberately not
+ * one of PT.organize's categories.
+ *
+ * State lives in session.tags = { defs: [{id, name}], on: {photoId: [tagId]} },
+ * persisted with the session like export labels are. Nine at most, because
+ * Shift+1..9 is the keyboard and a tag list longer than that has stopped
+ * being a quick mark.
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+  var el = function () { return PT.dom.el.apply(null, arguments); };
+
+  var MAX = 9;
+
+  function state(s) {
+    s = s || PT.store.get();
+    var sess = s && s.session;
+    if (!sess) return { defs: [], on: {} };
+    return sess.tags || { defs: [], on: {} };
+  }
+  function ensure(s) {
+    if (!s.session.tags) s.session.tags = { defs: [], on: {} };
+    if (!s.session.tags.on) s.session.tags.on = {};
+    if (!s.session.tags.defs) s.session.tags.defs = [];
+    return s.session.tags;
+  }
+
+  function cleanName(name) {
+    return String(name == null ? '' : name).replace(/[\u0000-\u001f\/\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 32);
+  }
+
+  function defs() { return state().defs.slice(); }
+
+  function of(id) { return (state().on[id] || []).slice(); }
+
+  function has(id, tid) { return (state().on[id] || []).indexOf(tid) >= 0; }
+
+  /** Tag names on a photo, in the tag list's order. */
+  function names(id) {
+    var on = state().on[id] || [];
+    return state().defs.filter(function (d) { return on.indexOf(d.id) >= 0; }).map(function (d) { return d.name; });
+  }
+
+  /** 'all' | 'some' | 'none' for a tag across a set of photos. */
+  function coverage(ids, tid) {
+    var n = 0;
+    ids.forEach(function (id) { if (has(id, tid)) n++; });
+    return !n ? 'none' : n === ids.length ? 'all' : 'some';
+  }
+
+  /** Apply (on=true) or remove (on=false) a tag on every id; on omitted toggles as a set. */
+  function set(ids, tid, on) {
+    if (!ids || !ids.length) return;
+    if (on === undefined) on = coverage(ids, tid) !== 'all';
+    PT.store.dispatch('tags:set', function (s) {
+      var t = ensure(s);
+      ids.forEach(function (id) {
+        var cur = t.on[id] || [];
+        var i = cur.indexOf(tid);
+        if (on && i < 0) cur = cur.concat([tid]);
+        else if (!on && i >= 0) cur = cur.slice(0, i).concat(cur.slice(i + 1));
+        if (cur.length) t.on[id] = cur; else delete t.on[id];
+      });
+    });
+  }
+
+  /** @returns {string|null} the new tag's id, or the existing one of that name. */
+  function add(name) {
+    name = cleanName(name);
+    if (!name) return null;
+    var existing = state().defs.filter(function (d) { return d.name.toLowerCase() === name.toLowerCase(); })[0];
+    if (existing) return existing.id;
+    if (state().defs.length >= MAX) return null;
+    var id = null;
+    PT.store.dispatch('tags:add', function (s) {
+      var t = ensure(s);
+      var k = 1;
+      while (t.defs.some(function (d) { return d.id === 't' + k; })) k++;
+      id = 't' + k;
+      t.defs.push({ id: id, name: name });
+    });
+    return id;
+  }
+
+  function rename(tid, name) {
+    name = cleanName(name);
+    if (!name) return false;
+    PT.store.dispatch('tags:rename', function (s) {
+      ensure(s).defs.forEach(function (d) { if (d.id === tid) d.name = name; });
+    });
+    return true;
+  }
+
+  function remove(tid) {
+    PT.store.dispatch('tags:remove', function (s) {
+      var t = ensure(s);
+      t.defs = t.defs.filter(function (d) { return d.id !== tid; });
+      Object.keys(t.on).forEach(function (id) {
+        var cur = t.on[id].filter(function (x) { return x !== tid; });
+        if (cur.length) t.on[id] = cur; else delete t.on[id];
+      });
+    });
+  }
+
+  /** Photo ids carrying a tag, from a candidate list (order kept). */
+  function photosWith(tid, ids) {
+    return (ids || Object.keys(state().on)).filter(function (id) { return has(id, tid); });
+  }
+
+  /**
+   * Shift+1..9 toggles the nth tag on `ids`. Matched on e.code, because
+   * Shift+1 is '!' on a US layout and something else elsewhere.
+   * @returns {boolean} whether the key was a tag key
+   */
+  function handleKey(e, ids) {
+    if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return false;
+    var m = /^Digit([1-9])$/.exec(e.code || '');
+    if (!m) return false;
+    var d = state().defs[+m[1] - 1];
+    if (!d || !ids || !ids.length) return false;
+    e.preventDefault();
+    set(ids, d.id);
+    return true;
+  }
+
+  /**
+   * The tag bar: one toggle chip per tag over whichever photos `getIds()`
+   * returns, plus an inline "+ tag" that creates a tag AND applies it, since
+   * the moment you think of a tag is the moment you are looking at a photo
+   * that needs it. Re-renders itself on every tags:* action while attached;
+   * detaches its subscription the first time it finds itself off the page,
+   * so screens can throw bars away without bookkeeping.
+   *
+   * @param {{ids:function():string[], keys?:boolean, label?:string}} opts
+   */
+  function bar(opts) {
+    var root = el('div', { class: 'pt-tags', dataset: { t: 'tag-bar' } });
+    var adding = false;
+
+    // Re-rendering replaces the chips, and a removed focused element drops
+    // focus to <body> — outside the lightbox dialog whose keydown carries the
+    // arrow and Shift+digit keys. So focus is carried across a render.
+    var focusTag = null;
+    function render() {
+      var act = document.activeElement;
+      if (act && root.contains(act) && act.dataset && act.dataset.tag) focusTag = act.dataset.tag;
+      var hadFocus = !!(act && root.contains(act));
+      PT.dom.clear(root);
+      var ids = opts.ids() || [];
+      if (opts.label) root.appendChild(el('span', { class: 'pt-tags-label', text: opts.label }));
+      state().defs.forEach(function (d, i) {
+        var cov = ids.length ? coverage(ids, d.id) : 'none';
+        root.appendChild(el('button', {
+          type: 'button',
+          class: 'pt-tag' + (cov === 'all' ? ' on' : cov === 'some' ? ' some' : ''),
+          'aria-pressed': cov === 'all' ? 'true' : cov === 'some' ? 'mixed' : 'false',
+          dataset: { t: 'tag', tag: d.name },
+          disabled: !ids.length,
+          title: (cov === 'all' ? 'Remove "' : 'Tag with "') + d.name + '"' + (opts.keys ? ' (Shift+' + (i + 1) + ')' : ''),
+          onclick: function () { set(opts.ids() || [], d.id); }
+        }, [opts.keys ? el('kbd', { text: String(i + 1) }) : null, d.name]));
+      });
+      if (adding) {
+        var input = el('input', { class: 'pt-tag-input', type: 'text', maxlength: '32', placeholder: 'new tag', dataset: { t: 'tag-new' } });
+        input.addEventListener('keydown', function (e) {
+          e.stopPropagation(); // arrows and digits here are typing, not navigation
+          if (e.key === 'Enter') {
+            // Leave adding mode BEFORE dispatching: add() re-renders this bar
+            // synchronously, and that render must already show the new chip.
+            // preventDefault, or this same Enter goes on to "click" the chip
+            // that focus just moved to, and toggles the new tag straight off.
+            e.preventDefault();
+            var v = input.value;
+            adding = false;
+            focusTag = cleanName(v);
+            var tid = add(v);
+            if (tid && (opts.ids() || []).length) set(opts.ids(), tid, true);
+            else render();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            adding = false;
+            render();
+          }
+        });
+        input.addEventListener('blur', function () { if (adding) { adding = false; render(); } });
+        root.appendChild(input);
+        setTimeout(function () { input.focus(); }, 0);
+      } else if (state().defs.length < MAX) {
+        root.appendChild(el('button', {
+          type: 'button', class: 'pt-tag pt-tag-add', text: '+ tag', dataset: { t: 'tag-add' },
+          title: 'Make a tag and apply it here',
+          onclick: function () { adding = true; render(); }
+        }));
+      }
+      if (hadFocus && !adding) {
+        var back = focusTag && root.querySelector('[data-tag="' + focusTag.replace(/"/g, '\\"') + '"]');
+        (back || root.querySelector('button') || root).focus();
+        focusTag = null;
+      }
+    }
+
+    // A bar off the page a second after it was made has been thrown away by a
+    // re-render (or never used), so it stops listening.
+    var born = Date.now();
+    var off = PT.store.subscribe(function (s, name) {
+      if (!root.isConnected) { if (Date.now() - born > 1000) off(); return; }
+      if (/^tags:/.test(name)) render();
+    });
+    render();
+    return { el: root, refresh: render };
+  }
+
+  /** The rename/delete list, in the shared #modal. */
+  function manage() {
+    var body = PT.dom.$('#modal-body');
+    var dlg = PT.dom.$('#modal');
+    if (!body || !dlg) return;
+    function draw() {
+      PT.dom.clear(body);
+      body.appendChild(el('h2', { text: 'Tags' }));
+      body.appendChild(el('p', { class: 'muted small', text:
+        'Tags never keep or cut a photo. They ride along to the export, where each one can become its own result set.' }));
+      var list = el('div', { class: 'pt-tag-manage' });
+      var counts = {};
+      Object.keys(state().on).forEach(function (id) { state().on[id].forEach(function (t) { counts[t] = (counts[t] || 0) + 1; }); });
+      state().defs.forEach(function (d, i) {
+        var input = el('input', { type: 'text', value: d.name, maxlength: '32', dataset: { t: 'tag-rename' } });
+        input.addEventListener('change', function () { if (!rename(d.id, input.value)) input.value = d.name; });
+        list.appendChild(el('div', { class: 'row' }, [
+          el('kbd', { text: 'Shift+' + (i + 1) }),
+          input,
+          el('span', { class: 'small dim nums', text: (counts[d.id] || 0) + ' photo' + (counts[d.id] === 1 ? '' : 's') }),
+          el('button', { class: 'btn btn-sm btn-quiet', type: 'button', text: 'Delete', dataset: { t: 'tag-delete' },
+            onclick: function () { remove(d.id); draw(); } })
+        ]));
+      });
+      if (!state().defs.length) list.appendChild(el('p', { class: 'small dim', text: 'No tags yet. Use "+ tag" under any photo.' }));
+      body.appendChild(list);
+      if (state().defs.length < MAX) {
+        var fresh = el('input', { type: 'text', maxlength: '32', placeholder: 'Add a tag', dataset: { t: 'tag-manage-new' } });
+        fresh.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { if (add(fresh.value)) draw(); }
+        });
+        body.appendChild(el('div', { class: 'row', style: 'margin-top:10px' }, [fresh]));
+      }
+      body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+        el('span', { class: 'spacer' }),
+        el('button', { class: 'btn btn-primary', type: 'button', text: 'Done', onclick: function () { dlg.close(); } })
+      ]));
+    }
+    draw();
+    if (!dlg.open) dlg.showModal();
+  }
+
+  PT.tags = {
+    MAX: MAX,
+    defs: defs,
+    of: of,
+    has: has,
+    names: names,
+    coverage: coverage,
+    set: set,
+    add: add,
+    rename: rename,
+    remove: remove,
+    photosWith: photosWith,
+    handleKey: handleKey,
+    bar: bar,
+    manage: manage
+  };
+})();
+
+/*
+CHANGELOG
+v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
+  nine), per-photo membership, set-wise toggling with mixed state, Shift+1..9,
+  the self-detaching tag bar, and the rename/delete manager.
 */
 
 </script>

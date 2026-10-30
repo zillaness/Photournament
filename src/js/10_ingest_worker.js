@@ -1,9 +1,9 @@
 /**
  * @file 10_ingest_worker.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-10-30
  * @description PRD 7.9 ingest: a blob-URL worker pool that decodes JPEG/PNG/WebP/HEIC off the main thread and emits thumbnails, previews, perceptual hashes, sharpness scores and stable fingerprints.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  */
@@ -1532,4 +1532,9 @@ v1.0 - 2026-07-28 - Samuel Cao
     createPool({extraSrc}) and the result validates; otherwise the inlined dhash
     and variance-of-Laplacian are used. No load-order dependency either way.
   Measurements: tools/probes/03_pipeline/FINDINGS.md
+v1.1 (2026-10-30): Whitelist capture-metadata reader for PRD 7.12 (time,
+  camera, lens, exposure, GPS; XMP/IPTC written place names) over JPEG, PNG,
+  WebP and HEIC, run before the cache gate so cached photos get it too; the
+  result rides on the record as photo.capture. heifMeta now also reports where
+  its Exif TIFF block starts. The orientation reader is unchanged.
 */

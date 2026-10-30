@@ -2594,3 +2594,92 @@ kbd {
   #app .pt-markslot { width: 38px; height: 38px; }
   #app .pt-markslot .pt-brandmark { width: 100%; height: 100%; }
 }
+
+/* --------------------------------------------------------------------------
+   ORGANIZE AND TAG (PRD 7.12)
+   --------------------------------------------------------------------------
+   Tags are controls, not marks on a photograph, so they wear the --accent
+   family on the surface around photos and never sit on the pixels. The
+   kept/chosen language (--mark) stays reserved for keeping.
+   -------------------------------------------------------------------------- */
+
+#lightbox .lb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 0 14px 12px;
+  background: var(--surface);
+}
+#lightbox .lb-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: var(--fs-micro);
+  color: var(--text-dim);
+  min-width: 0;
+  flex: 1 1 420px;
+}
+#lightbox .lb-fact { white-space: nowrap; }
+#lightbox .lb-k,
+#app .lb-k { color: var(--text-mute); }
+
+.pt-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.pt-tags-label { font-size: var(--fs-micro); color: var(--text-mute); margin-right: 2px; }
+.pt-tag {
+  font: inherit;
+  font-size: var(--fs-micro);
+  line-height: 1;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.pt-tag:hover:not(:disabled) { border-color: var(--hover-line); color: var(--text); }
+.pt-tag:disabled { opacity: 0.38; cursor: not-allowed; }
+.pt-tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pt-tag.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pt-tag.on:hover:not(:disabled) { background: var(--accent-hi); color: var(--on-accent); }
+.pt-tag.some { border-color: var(--accent); border-style: dashed; color: var(--text); }
+.pt-tag kbd { padding: 1px 4px 2px; font-size: 10px; }
+.pt-tag.on kbd { background: transparent; color: var(--on-accent); border-color: var(--on-accent); }
+.pt-tag-add { border-style: dashed; color: var(--text-mute); }
+.pt-tag-input {
+  font: inherit;
+  font-size: var(--fs-micro);
+  width: 120px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--field);
+  color: var(--text);
+}
+.pt-tag-input:focus { outline: none; background: var(--field-focus); }
+.pt-tag-manage .row { gap: 10px; margin: 6px 0; align-items: center; }
+.pt-tag-manage input,
+#modal input[data-t="tag-manage-new"] {
+  font: inherit;
+  font-size: var(--fs-small);
+  padding: 6px 10px;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--field);
+  color: var(--text);
+}
+
+/* CHANGELOG (appended block)
+ * v2.2a (2026-10-30): PRD 7.12 organize-and-tag block, tokens only: lightbox
+ *   metadata row, the tag chip in its off / mixed / on states, the inline
+ *   new-tag field and the tag manager.
+ */

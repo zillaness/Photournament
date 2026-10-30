@@ -388,7 +388,8 @@
   function exposureText(cap) {
     if (!cap) return '';
     var bits = [];
-    if (cap.fl35 || cap.fl) bits.push(Math.round(cap.fl35 || cap.fl) + 'mm' + (cap.fl35 ? '' : '*'));
+    if (cap.fl35) bits.push(Math.round(cap.fl35) + 'mm equiv.');
+    else if (cap.fl) bits.push(Math.round(cap.fl * 10) / 10 + 'mm');
     if (cap.f) bits.push('f/' + cap.f);
     if (cap.exp) bits.push(cap.exp >= 1 ? cap.exp + 's' : '1/' + Math.round(1 / cap.exp) + 's');
     if (cap.iso) bits.push('ISO ' + cap.iso);

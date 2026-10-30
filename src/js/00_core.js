@@ -1,9 +1,9 @@
 /**
  * @file 00_core.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-10-30
  * @description Core runtime for Photournament: global namespace, event bus, observable store, IndexedDB wrapper, file fingerprinting, DOM helpers, and the screen router.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -644,6 +644,7 @@
       L.els.next.disabled = L.ids.length < 2;
       L.els.wrap.classList.remove('zoomed');
       L.els.zoom.textContent = 'Zoom 1:1';
+      renderMeta(id);
 
       PT.dom.releaseImg(L.els.img);
       var b = blobFor(id);
@@ -654,6 +655,29 @@
         var b2 = rec.preview || rec.thumb;
         if (b2) PT.dom.setImg(L.els.img, b2);
       }).catch(function () { /* the empty frame says it plainly enough */ });
+    }
+
+    // PRD 7.12: what the camera recorded, and the photo's tags. Both modules
+    // load after this one, so they are looked up at call time.
+    function renderMeta(id) {
+      var els = L.els;
+      var s = PT.store.get();
+      var p = s && s.photos && s.photos[id];
+      PT.dom.clear(els.info);
+      if (p && PT.organize) {
+        PT.organize.infoRows(p).forEach(function (r) {
+          els.info.appendChild(PT.dom.el('span', { class: 'lb-fact', title: r[0] }, [
+            PT.dom.el('span', { class: 'lb-k', text: r[0] }), ' ', r[1]]));
+        });
+      }
+      if (PT.tags && s && s.session) {
+        if (!els.tagBar) {
+          els.tagBar = PT.tags.bar({ ids: function () { return L ? [L.ids[L.idx]] : []; }, keys: true });
+          els.meta.appendChild(els.tagBar.el);
+        } else {
+          els.tagBar.refresh();
+        }
+      }
     }
 
     function step(d) {
@@ -693,10 +717,15 @@
         onclick: function () { dlg.close(); } });
       var bar = PT.dom.el('div', { class: 'lb-bar' }, [prev, next, name, count,
         PT.dom.el('span', { class: 'spacer' }), zoom, close]);
+      var info = PT.dom.el('div', { class: 'lb-info', dataset: { t: 'lb-info' } });
+      var meta = PT.dom.el('div', { class: 'lb-meta' }, [info]);
       dlg.appendChild(wrap);
       dlg.appendChild(bar);
+      dlg.appendChild(meta);
 
       dlg.addEventListener('keydown', function (e) {
+        if (e.target && e.target.tagName === 'INPUT') return; // typing a new tag
+        if (L && PT.tags && PT.tags.handleKey(e, [L.ids[L.idx]])) return;
         if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
         else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); toggleZoom(); }
@@ -705,7 +734,7 @@
         if (L) PT.dom.releaseImg(L.els.img);
         L = null;
       });
-      return { img: img, wrap: wrap, name: name, count: count, prev: prev, next: next, zoom: zoom };
+      return { img: img, wrap: wrap, name: name, count: count, prev: prev, next: next, zoom: zoom, info: info, meta: meta, tagBar: null };
     }
 
     return {
@@ -749,4 +778,7 @@
  * v1.4 (2026-07-28): PT.lightbox — the expand view for every screen that judges
  *   photos from thumbnails, with arrow navigation and 1:1 preview zoom, in its
  *   own dialog so it stacks over the burst pickers.
+ * v1.5 (2026-10-30): The lightbox shows what the camera recorded (PT.organize
+ *   infoRows) and carries the tag bar with Shift+1..9, for PRD 7.12. Both
+ *   are looked up at call time because their modules load after this one.
 */

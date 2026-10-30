@@ -1,6 +1,6 @@
 /**
  * @file 80_screen_export.js
- * @version 1.8
+ * @version 1.9
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-10-30
@@ -42,7 +42,12 @@
     return parts.join('_');
   }
 
-  function safeName(s) { return String(s).replace(/[^A-Za-z0-9._-]+/g, '_'); }
+  // Folder-name-safe without being ASCII-only: an ASCII whitelist turned
+  // 東京 and 京都 into the same '_', so two sets shared one folder.
+  function safeName(s) {
+    var t = String(s).replace(/[\/\\:*?"<>|\u0000-\u001f\s]+/g, '_').replace(/[. ]+$/, '');
+    return t || '_';
+  }
 
   /** A unit's tree path, from its id ('fixed:Trip/Day1' -> 'Trip/Day1'). */
   function ownerPathOf(unit) {
@@ -289,7 +294,17 @@
       }
     });
 
-    return base.concat(tagSets(session, base));
+    // Whatever still clashes (names that differ only in characters a folder
+    // cannot hold, or a tag named like a group) is numbered, never merged.
+    var all = base.concat(tagSets(session, base));
+    var used = {};
+    all.forEach(function (set) {
+      var f = set.folder, k = 1;
+      while (used[f.toLowerCase()]) f = set.folder + '_' + (++k);
+      used[f.toLowerCase()] = 1;
+      set.folder = f;
+    });
+    return all;
   }
 
   /**
@@ -459,7 +474,7 @@
           card.appendChild(el('div', { class: 'row' }, [
             el('h2', { text: set.title || set.unit.label }),
             el('span', { class: 'muted small mono', text:
-              (s.session.settings.outputStructure === 'flat' ? '_finalists' : set.folder) + '/' }),
+              (s.session.settings.outputStructure === 'flat' && !set.tag ? '_finalists' : set.folder) + '/' }),
             el('span', { class: 'spacer' }),
             el('span', { class: 'muted small', text: set.ids.length + ' finalists' })
           ]));
@@ -603,7 +618,10 @@
         out.push({
           id: id,
           photo: photo,
-          folder: flat ? '_finalists' : set.folder,
+          // Flattening merges the result sets, not the per-tag copies: a tag
+          // set's files already exist under _finalists, so merging would
+          // duplicate (zip) or overwrite (disk) them.
+          folder: flat && !set.tag ? '_finalists' : set.folder,
           // plan() now also runs at mount, before the label store initialises.
           name: destName(photo, i + 1, set.ids.length, s.session.settings, (s.session.labels || {})[id]),
           rank: i + 1,
@@ -1100,7 +1118,7 @@
       r.label = (s.session.labels || {})[it.id] || '';
       return r;
     });
-    saveBlob(new Blob([PT.organize.toCsv(rows, cols)], { type: 'text/csv' }), 'photournament_finalists_v1.0.csv');
+    saveBlob(new Blob(['\ufeff' + PT.organize.toCsv(rows, cols)], { type: 'text/csv' }), 'photournament_finalists_v1.0.csv');
     PT.toast('Manifest CSV downloaded.');
   }
 })();
@@ -1147,4 +1165,8 @@
  *   the decision JSON.
  * v1.8 (2026-10-30): The per-tag option now appears the moment a first tag
  *   exists, including one made in this review; it used to wait for a reload.
+ * v1.9 (2026-10-30): From review. Folder names are Unicode-safe (an ASCII
+ *   whitelist made 東京 and 京都 both '_' and merged their sets), every clash
+ *   left after that is numbered, flattening keeps per-tag copies in their own
+ *   folders, and the CSV carries a BOM.
 */

@@ -1,6 +1,6 @@
 /**
  * @file 10_ingest_worker.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-10-30
@@ -122,6 +122,7 @@
       while (p + 4 <= limit) {
         if (u8[p] !== 0xff) { p++; continue; }
         var marker = u8[p + 1];
+        if (marker === 0xff) { p++; continue; } // fill byte before a marker (JPEG B.1.1.2)
         if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { p += 2; continue; }
         if (marker === 0xda || marker === 0xd9) break; // start of scan / end
         var len = (u8[p + 2] << 8) | u8[p + 3];
@@ -246,6 +247,10 @@
           lp += baseOffsetSize;
           var extents = dv.getUint16(lp);
           lp += 2;
+          // Fields of zero size advance nothing, so a crafted count of 65535
+          // extents per item would spin for seconds; one pass says it all.
+          if (indexSize + offsetSize + lengthSize === 0) extents = Math.min(extents, 1);
+          if (lp > iloc.off + iloc.size) break;
           for (var x = 0; x < extents; x++) {
             if (indexSize) lp += indexSize;
             var eo = rd(lp, offsetSize);
@@ -427,6 +432,14 @@
       try { return new TextDecoder('utf-8').decode(u8.subarray(a, b)); } catch (e) { return ''; }
     };
 
+    // IPTC IIM text is UTF-8 only when the file says so (1:90), and older
+    // writers use Latin-1; strict UTF-8 first, then Windows-1252, so
+    // "S\u00e3o Paulo" survives either way instead of losing its \u00e3.
+    H.iimText = function (u8, a, b) {
+      try { return new TextDecoder('utf-8', { fatal: true }).decode(u8.subarray(a, b)); } catch (e) { /* not UTF-8 */ }
+      try { return new TextDecoder('windows-1252').decode(u8.subarray(a, b)); } catch (e2) { return ''; }
+    };
+
     // IPTC IIM inside a Photoshop APP13 block: 8BIM resource 0x0404, record 2.
     H.iptcPlace = function (u8, s, end, out) {
       try {
@@ -449,7 +462,7 @@
               if (rec === 2) {
                 var key = ds === 90 ? 'city' : ds === 92 ? 'sublocation' : ds === 95 ? 'state' : ds === 101 ? 'country' : null;
                 if (key && out[key] === undefined) {
-                  var v = H.cleanText(H.utf8(u8, r + 5, r + 5 + len));
+                  var v = H.cleanText(H.iimText(u8, r + 5, r + 5 + len));
                   if (v) out[key] = v;
                 }
               }
@@ -475,6 +488,7 @@
         if (out[kv[0]] !== undefined) return;
         var esc = kv[1].replace(':', '\\:');
         var m = new RegExp(esc + '\\s*=\\s*"([^"]*)"').exec(xml) ||
+                new RegExp(esc + "\\s*=\\s*'([^']*)'").exec(xml) ||
                 new RegExp('<' + esc + '>([^<]*)</' + esc + '>').exec(xml);
         var v = m && H.cleanText(unent(m[1]));
         if (v) out[kv[0]] = v;
@@ -496,6 +510,7 @@
       while (p + 4 <= limit) {
         if (u8[p] !== 0xff) { p++; continue; }
         var marker = u8[p + 1];
+        if (marker === 0xff) { p++; continue; } // fill byte before a marker (JPEG B.1.1.2)
         if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { p += 2; continue; }
         if (marker === 0xda || marker === 0xd9) break;
         var len = (u8[p + 2] << 8) | u8[p + 3];
@@ -1537,4 +1552,9 @@ v1.1 (2026-10-30): Whitelist capture-metadata reader for PRD 7.12 (time,
   WebP and HEIC, run before the cache gate so cached photos get it too; the
   result rides on the record as photo.capture. heifMeta now also reports where
   its Exif TIFF block starts. The orientation reader is unchanged.
+v1.2 (2026-10-30): From review. 0xFF fill bytes before a JPEG marker no
+  longer read as a length (both readers: metadata and orientation were lost);
+  IPTC text falls back to Windows-1252 when it is not valid UTF-8; XMP
+  single-quoted attributes are read; a crafted HEIC iloc with zero-size fields
+  and 65535 extents per item no longer spins for seconds.
 */

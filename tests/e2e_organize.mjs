@@ -1,6 +1,6 @@
 /**
  * file: e2e_organize.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-10-30
  * last_updated: 2026-10-30
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
 import { deflateSync } from 'node:zlib';
-import { makeTiff, pngWith } from './lib/exif_fixture.mjs';
+import { makeTiff, makeXmp, pngWith } from './lib/exif_fixture.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ARTIFACT = path.join(ROOT, 'dist', 'photournament_v1.0.html');
@@ -71,10 +71,18 @@ for (let k = 0; k < 6; k++) {
 
 // The latent clash: two folders whose leaves share a name.
 const clash = path.join(os.tmpdir(), 'pt-clash-' + Date.now());
-for (const d of ['Day1/Canon', 'Day2/Canon']) {
+['Day1/Canon', 'Day2/Canon'].forEach((d, j) => {
   mkdirSync(path.join(clash, d), { recursive: true });
-  for (let k = 0; k < 2; k++) writeFileSync(path.join(clash, d, `C_${d[3]}_${k}.png`), pngBoard(160, 120, 40 + k + (d[3] === '2' ? 7 : 0)));
-}
+  for (let k = 0; k < 2; k++) writeFileSync(path.join(clash, d, `C_${j}_${k}.png`), pngBoard(160, 120, 40 + k + j * 7));
+});
+
+// Non-Latin group names, carried in written XMP places on ASCII paths:
+// Playwright cannot hand a page files from non-ASCII directory names.
+const places = path.join(os.tmpdir(), 'pt-places-' + Date.now());
+mkdirSync(places, { recursive: true });
+['東京', '東京', '京都', '京都'].forEach((city, k) => {
+  writeFileSync(path.join(places, `P_${k}.png`), pngWith(pngBoard(160, 120, 70 + k), { xmp: makeXmp({ city }) }));
+});
 
 function zipEntries(file) {
   const buf = readFileSync(file);
@@ -198,6 +206,16 @@ async function finishAll(page) {
     entries.length === 8 && entries.filter((e) => e.startsWith('_tagged_print/')).length === 2 &&
     entries.some((e) => e.startsWith('_finalists_2026-07-15/')), entries.join(', '));
 
+  await page.selectOption('select:has(option[value="flat"])', 'flat');
+  const [dlFlat] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }),
+    page.evaluate(() => Array.from(document.querySelectorAll('button')).find((b) => /one \.zip/i.test(b.textContent)).click())]);
+  const flatPath = path.join(os.tmpdir(), 'pt-org-flat-' + Date.now() + '.zip');
+  await dlFlat.saveAs(flatPath);
+  const flat = zipEntries(flatPath);
+  check('flattening merges the result sets but keeps the per-tag copies apart',
+    flat.length === 8 && new Set(flat).size === 8 && flat.filter((e) => e.startsWith('_finalists/')).length === 6 &&
+    flat.filter((e) => e.startsWith('_tagged_print/')).length === 2, flat.join(', '));
+
   check('zero console errors (organized run)', errors.length === 0, errors.length ? '\n  ' + errors.join('\n  ') : '0');
   await ctx.close();
 }
@@ -213,8 +231,51 @@ async function finishAll(page) {
   await finishAll(page);
   const folders = await page.$$eval('[data-t="exp-set"]', (els) => els.map((e) => e.dataset.folder).sort());
   check('Day1/Canon and Day2/Canon write to different folders',
-    folders.length === 2 && folders[0] !== folders[1] && folders.every((f) => /Day[12]_Canon$/.test(f)), folders.join(', '));
+    folders.length === 2 && folders.filter((f) => /Day1_Canon$/.test(f)).length === 1 && folders.filter((f) => /Day2_Canon$/.test(f)).length === 1,
+    folders.join(', '));
   check('zero console errors (clash)', errors.length === 0, errors.length ? '\n  ' + errors.join('\n  ') : '0');
+  await ctx.close();
+}
+
+{
+  const { ctx, page, errors } = await open();
+  await ingest(page, places);
+  await page.click('[data-t="tree-org"] [data-t="org-chosen"][data-cat="folder"] [data-t="org-remove"]');
+  await page.waitForSelector('[data-t="tree-org"]');
+  await page.click('[data-t="tree-org"] [data-t="org-add"][data-cat="location"]');
+  await page.waitForSelector('[data-t="tree-org"] [data-t="org-chosen"][data-cat="location"]');
+  await page.fill('#tree-all-input', '1');
+  await page.click('#tree-all-apply');
+  await startCulling(page);
+  await finishAll(page);
+  const folders = await page.$$eval('[data-t="exp-set"]', (els) => els.map((e) => e.dataset.folder).sort());
+  check('non-Latin group names keep their own folders instead of collapsing to "_"',
+    JSON.stringify(folders) === JSON.stringify(['_finalists_京都', '_finalists_東京']), folders.join(', '));
+  check('zero console errors (places)', errors.length === 0, errors.length ? '\n  ' + errors.join('\n  ') : '0');
+  await ctx.close();
+}
+
+/* --- D: naming an event after counts are typed still asks, then sticks --- */
+
+{
+  const { ctx, page, errors } = await open();
+  await ingest(page, tmp);
+  await page.click('[data-t="tree-org"] [data-t="org-chosen"][data-cat="folder"] [data-t="org-remove"]');
+  await page.waitForSelector('[data-t="tree-org"]');
+  await page.click('[data-t="tree-org"] [data-t="org-add"][data-cat="event"]');
+  await page.waitForSelector('[data-t="tree-org"] [data-t="org-chosen"][data-cat="event"]');
+  await page.fill('#tree-all-input', '1');
+  await page.click('#tree-all-apply');
+  await page.click('[data-t="org-name"]');
+  await page.waitForSelector('#modal[open] [data-t="org-name-input"]');
+  await page.fill('#modal [data-t="org-name-input"] >> nth=0', 'Breakfast');
+  await page.click('[data-t="org-name-save"]');
+  const asked = await page.waitForSelector('#modal[open] [data-t="org-confirm"]', { timeout: 5000 }).then(() => true, () => false);
+  check('saving names with counts typed asks before regrouping', asked);
+  if (asked) await page.click('[data-t="org-confirm"]');
+  await page.waitForSelector('[data-t="tree-org"]');
+  check('and the name takes', (await rows(page)).includes('Breakfast'), (await rows(page)).join(', '));
+  check('zero console errors (naming)', errors.length === 0, errors.length ? '\n  ' + errors.join('\n  ') : '0');
   await ctx.close();
 }
 
@@ -264,4 +325,7 @@ process.exit(failed === 0 ? 0 : 1);
 
 /* CHANGELOG
  * v1.0 (2026-10-30): Initial release.
+ * v1.1 (2026-10-30): Review fixes covered: resume scope, keyboard open,
+ *   resumable never-overwrite copies, the copied column, the BOM, non-Latin
+ *   folder names, flatten with tag sets, naming with counts typed.
  */

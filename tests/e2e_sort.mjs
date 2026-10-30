@@ -1,6 +1,6 @@
 /**
  * file: e2e_sort.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-10-30
  * last_updated: 2026-10-30
@@ -189,9 +189,12 @@ check('Shift+1 applies the first tag to the selection',
 
 /* --- the lightbox shows what the camera recorded, and tags ---------------- */
 
-await page.hover('[data-t="so-group"][data-dir="Canon EOS R6/Gion"] [data-t="so-cell"] >> nth=0');
-await page.click('[data-t="so-group"][data-dir="Canon EOS R6/Gion"] [data-t="so-expand"] >> nth=0');
+const selBefore = await page.textContent('[data-t="so-sel-count"]');
+await page.focus('[data-t="so-group"][data-dir="Canon EOS R6/Gion"] [data-t="so-expand"] >> nth=0');
+await page.keyboard.press('Enter');
 await page.waitForSelector('#lightbox[open] [data-t="lb-info"]');
+check('Enter on the expand button opens the photo and leaves the selection alone',
+  await page.textContent('[data-t="so-sel-count"]') === selBefore);
 const info = await page.textContent('#lightbox [data-t="lb-info"]');
 check('the lightbox lists time, camera and settings', /2026-07-14 09:12:33/.test(info) && /Canon EOS R6/.test(info) && /35mm/.test(info), info);
 await page.keyboard.press('Shift+Digit1');
@@ -208,7 +211,9 @@ await page.click('[data-t="so-exp-list"]');
 const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-t="so-exp-go"]')]);
 const csvPath = path.join(os.tmpdir(), 'pt-sort-' + Date.now() + '.csv');
 await dl.saveAs(csvPath);
-const csv = readFileSync(csvPath, 'utf8').trim().split('\r\n');
+const csvRaw = readFileSync(csvPath, 'utf8');
+check('the CSV opens as UTF-8 in Excel (BOM)', csvRaw.charCodeAt(0) === 0xfeff);
+const csv = csvRaw.replace(/^\ufeff/, '').trim().split('\r\n');
 check('the list is a CSV with a row per photo', csv.length === 8 && csv[0].startsWith('folder,file,original_path,tags,taken'),
   csv.length + ' lines');
 const nara = csv.find((l) => l.includes('Nara'));
@@ -251,12 +256,30 @@ check('copies are the originals, byte count for byte count',
   out1.filter((x) => /IMG_/.test(x)).every((x) => { const [p, n] = x.split(':'); return +n === srcSize(p.split('/').pop()); }));
 check('12 files in all', out1.length === 12, String(out1.length));
 
+const manifestCsv = await page.evaluate(async () => {
+  const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('out');
+  return (await (await d.getFileHandle('photournament_sort_manifest_v1.0.csv')).getFile()).text();
+});
+check('the copy manifest says which photos are in the folder',
+  /,copied\r\n/.test(manifestCsv) && (manifestCsv.match(/,yes\r\n/g) || []).length === 7);
+
+// A DIFFERENT file already holding one of the names, as after an edit.
+await page.evaluate(async () => {
+  const d = await (await (await (await navigator.storage.getDirectory()).getDirectoryHandle('out'))
+    .getDirectoryHandle('Canon EOS R6')).getDirectoryHandle('Gion');
+  const w = await (await d.getFileHandle('IMG_1000.png')).createWritable();
+  await w.write('someone else'); await w.close();
+});
 await page.evaluate(() => { document.querySelector('[data-t="so-exp-status"]').textContent = ''; });
 await page.click('[data-t="so-exp-go"]');
 await page.waitForFunction(() => /^Copied/.test(document.querySelector('[data-t="so-exp-status"]').textContent), { timeout: 30000 });
 const out2 = await listOut();
-check('a second export never overwrites: every name comes back _2',
-  out2.length === 24 && out2.filter((x) => /_2\.(png|csv|json):/.test(x)).length === 12, String(out2.length));
+const names2 = out2.map((x) => x.split(':')[0]);
+check('running it again copies nothing already there, so a stopped export resumes',
+  /9 were already there/.test(await page.textContent('[data-t="so-exp-status"]')), await page.textContent('[data-t="so-exp-status"]'));
+check('and never overwrites a different file of the same name: it gets _2 beside it',
+  names2.includes('Canon EOS R6/Gion/IMG_1000_2.png') &&
+  out2.includes('Canon EOS R6/Gion/IMG_1000.png:12') && out2.length === 15, out2.length + ' files');
 await page.click('[data-t="so-exp-close"]');
 
 /* --- resume --------------------------------------------------------------- */
@@ -271,6 +294,30 @@ const g5 = await groups();
 check('a resumed sort session comes back organized, names and all', g5.includes('Canon EOS R6/Gion:2'), g5.join(' '));
 check('and tagged', (await page.$$('.so-tag')).length === 3);
 
+/* --- a later session's resume shows only its own photos ------------------- */
+
+const tmp2 = path.join(os.tmpdir(), 'pt-sort2-' + Date.now());
+mkdirSync(tmp2, { recursive: true });
+for (let k = 0; k < 2; k++) {
+  writeFileSync(path.join(tmp2, `B_${k}.png`), pngWith(pngBoard(160, 120, 90 + k), { tiff: makeTiff({ when: '2026:08:01 10:0' + k + ':00' }) }));
+}
+await page.waitForTimeout(700);
+await page.goto(URL0);
+await page.waitForSelector('button:has-text("Start fresh")');
+await page.click('button:has-text("Start fresh")');
+await page.click('[data-t="mode-sort"]');
+await page.setInputFiles('#dir-files', tmp2);
+await page.waitForSelector('[data-t="to-sort"]', { timeout: 60000 });
+await page.click('[data-t="to-sort"]');
+await page.waitForSelector('[data-t="so-group"]');
+await page.waitForTimeout(700);
+await page.goto(URL0);
+await page.waitForSelector('button:has-text("Resume")');
+await page.click('button:has-text("Resume")');
+await page.waitForSelector('[data-t="so-group"]');
+check('resume brings back only this session\'s photos, not every photo ever cached',
+  (await page.$$('[data-t="so-cell"]')).length === 2, String((await page.$$('[data-t="so-cell"]')).length));
+
 check('zero console errors', errors.length === 0, errors.length ? '\n  ' + errors.join('\n  ') : '0');
 
 await ctx.close();
@@ -280,4 +327,7 @@ process.exit(failed === 0 ? 0 : 1);
 
 /* CHANGELOG
  * v1.0 (2026-10-30): Initial release.
+ * v1.1 (2026-10-30): Review fixes covered: resume scope, keyboard open,
+ *   resumable never-overwrite copies, the copied column, the BOM, non-Latin
+ *   folder names, flatten with tag sets, naming with counts typed.
  */

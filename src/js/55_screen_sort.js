@@ -1,6 +1,6 @@
 /**
  * @file 55_screen_sort.js
- * @version 1.1
+ * @version 1.2
  * @author Samuel Cao
  * @created 2026-10-30
  * @lastUpdated 2026-10-30
@@ -146,6 +146,9 @@
     ]);
     c.addEventListener('click', function (e) { select(id, e.shiftKey); });
     c.addEventListener('keydown', function (e) {
+      // Only keys on the cell itself: Enter on the expand button inside it
+      // must open the photo, not toggle its selection.
+      if (e.target !== c) return;
       if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); select(id, e.shiftKey); }
     });
     S.cells[id] = { el: c, tags: tags };
@@ -316,12 +319,19 @@
     return list.reduce(function (n, it) { return n + (it.photo.size || 0); }, 0);
   }
 
+  /**
+   * @param written null for the list export; for a copy, id -> {file} for
+   *   every photo actually in the folder, so the manifest says which are.
+   */
   function manifestDocs(plan, written) {
     var s = PT.store.get();
     var rows = plan.items.map(function (it) {
       var w = written && written[it.id];
-      return PT.organize.manifestRow(it.photo, it.folder, w ? w.file : it.photo.name, PT.tags.names(it.id));
+      var r = PT.organize.manifestRow(it.photo, it.folder, w ? w.file : it.photo.name, PT.tags.names(it.id));
+      if (written) r.copied = w ? 'yes' : 'no';
+      return r;
     });
+    var cols = written ? PT.organize.MANIFEST_COLS.concat(['copied']) : PT.organize.MANIFEST_COLS;
     var json = {
       _metadata: {
         file: 'photournament_sort_manifest_v1.0.json',
@@ -336,14 +346,15 @@
         var w = written && written[it.id];
         return {
           id: it.id, original: it.photo.path, folder: it.folder,
-          file: w ? w.file : it.photo.name, tags: PT.tags.names(it.id),
+          file: w ? w.file : it.photo.name, copied: written ? !!w : undefined, tags: PT.tags.names(it.id),
           capture: it.photo.capture || null, w: it.photo.w, h: it.photo.h,
           format: it.photo.kind, bytes: it.photo.size
         };
       })
     };
     return {
-      csv: new Blob([PT.organize.toCsv(rows)], { type: 'text/csv' }),
+      // The BOM is what makes Excel read the file as UTF-8 (place names, tags).
+      csv: new Blob(['\ufeff' + PT.organize.toCsv(rows, cols)], { type: 'text/csv' }),
       json: new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' })
     };
   }
@@ -365,8 +376,15 @@
     }, Promise.resolve(root));
   }
 
-  /** A name not yet used in this folder, on disk or earlier in this export. */
-  function freeName(dir, name, taken) {
+  /**
+   * Where a file goes in this folder: {name, same}. A name already used
+   * earlier in THIS export, or on disk by a different file, is never touched:
+   * the next _2, _3 is used instead. When `size` is given and a file of that
+   * name and exact size is already there, that is this photo from an earlier
+   * run, so it is reported as `same` and not copied again. That makes a
+   * stopped or partly failed export resumable by simply running it again.
+   */
+  function freeName(dir, name, taken, size) {
     var dot = name.lastIndexOf('.');
     var stem = dot > 0 ? name.slice(0, dot) : name;
     var ext = dot > 0 ? name.slice(dot) : '';
@@ -374,8 +392,14 @@
     function next() {
       var cand = k === 1 ? name : stem + '_' + k + ext;
       if (taken[cand.toLowerCase()]) { k++; return next(); }
-      return dir.getFileHandle(cand, { create: false })
-        .then(function () { k++; return next(); }, function () { taken[cand.toLowerCase()] = 1; return cand; });
+      return dir.getFileHandle(cand, { create: false }).then(function (h) {
+        if (size === undefined) { k++; return next(); }
+        return h.getFile().then(function (f) {
+          if (f.size === size) { taken[cand.toLowerCase()] = 1; return { name: cand, same: true }; }
+          k++;
+          return next();
+        });
+      }, function () { taken[cand.toLowerCase()] = 1; return { name: cand, same: false }; });
     }
     return next();
   }
@@ -484,6 +508,9 @@
         var root;
         busy = true; cancelled = false;
         go.disabled = true;
+        // The button was labelled when the dialog drew; it is Stop from here.
+        var closeBtn = PT.dom.$('[data-t="so-exp-close"]', body);
+        if (closeBtn) closeBtn.textContent = 'Stop';
         Promise.resolve(window.showDirectoryPicker({ mode: 'readwrite' }))
           .then(function (d) {
             root = d;
@@ -494,7 +521,7 @@
             var jobs = plan.items.concat(plan.tagged);
             var taken = {};      // folder -> {lowercased name: 1}
             var written = {};    // id -> {file} for the organized copy
-            var done = 0, skipped = [];
+            var done = 0, already = 0, skipped = [], failed = [];
             var seq = Promise.resolve();
             jobs.forEach(function (it, k) {
               seq = seq.then(function () {
@@ -502,14 +529,20 @@
                 if (!PT.sources[it.id]) { skipped.push(it.photo.name); return; }
                 return dirAt(root, it.folder).then(function (dir) {
                   var t = taken[it.folder] = taken[it.folder] || {};
-                  return freeName(dir, it.photo.name, t).then(function (name) {
-                    return original(it.id).then(function (blob) { return writeFile(dir, name, blob); })
-                      .then(function () {
-                        if (k < plan.items.length) written[it.id] = { file: name };
-                        done++;
-                        status.textContent = 'Copying\u2026 ' + done + ' / ' + jobs.length;
-                      });
+                  return freeName(dir, it.photo.name, t, it.photo.size).then(function (spot) {
+                    var copy = spot.same ? Promise.resolve() :
+                      original(it.id).then(function (blob) { return writeFile(dir, spot.name, blob); });
+                    return copy.then(function () {
+                      if (k < plan.items.length) written[it.id] = { file: spot.name };
+                      if (spot.same) already++; else done++;
+                      status.textContent = 'Copying\u2026 ' + (done + already) + ' / ' + jobs.length;
+                    });
                   });
+                // One unwritable file (a name the disk refuses, a vanished
+                // original) is reported, not allowed to abandon the rest.
+                }).catch(function (e) {
+                  PT.warn('sort-export', it.photo.name, e);
+                  failed.push(it.photo.name);
                 });
               });
             });
@@ -517,17 +550,21 @@
               var docs = manifestDocs(plan, written);
               var t = {};
               return freeName(root, stem + '.csv', t)
-                .then(function (n) { return writeFile(root, n, docs.csv); })
+                .then(function (n) { return writeFile(root, n.name, docs.csv); })
                 .then(function () { return freeName(root, stem + '.json', t); })
-                .then(function (n) { return writeFile(root, n, docs.json); })
-                .then(function () { return { done: done, total: jobs.length, skipped: skipped }; });
+                .then(function (n) { return writeFile(root, n.name, docs.json); })
+                .then(function () { return { done: done, already: already, total: jobs.length, skipped: skipped, failed: failed }; });
             });
           })
           .then(function (r) {
             busy = false;
             draw();
             var msg = (cancelled ? 'Stopped after ' : 'Copied ') + r.done + ' of ' + r.total + ' into ' + root.name + '.' +
-              (r.skipped.length ? ' ' + r.skipped.length + ' not reachable (reconnect the folder and run it again; nothing is overwritten).' : '');
+              (r.already ? ' ' + r.already + ' were already there from an earlier run.' : '') +
+              (r.skipped.length ? ' ' + r.skipped.length + ' not reachable: reconnect the folder and run it again.' : '') +
+              (r.failed.length ? ' ' + r.failed.length + ' could not be written (' + r.failed.slice(0, 3).join(', ') +
+                (r.failed.length > 3 ? '\u2026' : '') + ').' : '') +
+              (cancelled || r.skipped.length || r.failed.length ? ' Running it again into the same folder picks up where this left off.' : '');
             PT.dom.$('[data-t="so-exp-status"]', body).textContent = msg;
             PT.toast(msg);
           })
@@ -567,4 +604,11 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
   picked folder in the organized layout (optional per-tag sets, manifest
   beside them, never overwriting) or just the list as CSV and JSON. Reconnect
   for reloaded sessions.
+v1.2 (2026-10-30): From review. Enter on a cell's expand button opens the
+  photo instead of toggling selection. Copy export: a file already there with
+  the same name and size is this photo from an earlier run and is not copied
+  again (a stopped export resumes by running it again); one unwritable file is
+  reported instead of abandoning the rest; the button reads Stop while
+  copying; the manifest says which photos were copied; CSVs carry a BOM so
+  Excel reads UTF-8.
 */

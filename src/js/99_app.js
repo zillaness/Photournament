@@ -1,6 +1,6 @@
 /**
  * @file 99_app.js
- * @version 1.4
+ * @version 1.5
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-10-30
@@ -246,7 +246,12 @@
   function doResume(session) {
     Promise.all([PT.db.all('photos'), PT.db.all('derivatives')]).then(function (r) {
       var photos = {}, derivatives = {};
-      (r[0] || []).forEach(function (p) { photos[p.id] = p; });
+      // Only this session's photos: the store also holds records from earlier
+      // sessions (Start fresh clears sessions, not photos). Sessions saved
+      // before photoIds existed keep the old load-everything behaviour.
+      var mine = session.photoIds ? {} : null;
+      if (mine) session.photoIds.forEach(function (id) { mine[id] = 1; });
+      (r[0] || []).forEach(function (p) { if (!mine || mine[p.id]) photos[p.id] = p; });
       (r[1] || []).forEach(function (d) { derivatives[d.id] = d; });
 
       var live = Object.keys(photos).map(function (k) { return photos[k]; })
@@ -415,4 +420,6 @@
  * v1.4 (2026-10-30): A sort session resumes onto the Sort screen, and the
  *   resume card describes it as sorting rather than counting tournaments.
  *   An organized culling session's tree is rebuilt from its spec on resume.
+ * v1.5 (2026-10-30): Resume loads only the session's own photos when the
+ *   session recorded them; older sessions keep loading everything.
 */

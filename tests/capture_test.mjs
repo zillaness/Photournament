@@ -1,6 +1,6 @@
 /**
  * file: capture_test.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-10-30
  * last_updated: 2026-10-30
@@ -152,9 +152,57 @@ test('control characters and padding are stripped from camera strings', () => {
   assert.equal(c.make, 'NIKON CORPORATION');
 });
 
+test('Latin-1 IPTC text survives (older writers do not use UTF-8)', () => {
+  // makeIptc writes UTF-8; hand-build a Latin-1 city to match a pre-2008 file.
+  const latin = Uint8Array.from([0x53, 0xe3, 0x6f, 0x20, 0x50, 0x61, 0x75, 0x6c, 0x6f]); // "São Paulo" in Latin-1
+  const iim = Uint8Array.from([0x1c, 2, 90, 0, latin.length, ...latin]);
+  const body = Uint8Array.from([...Buffer.from('Photoshop 3.0\0', 'latin1'), ...Buffer.from('8BIM', 'latin1'), 0x04, 0x04, 0, 0,
+    0, 0, 0, iim.length, ...iim, ...(iim.length & 1 ? [0] : [])]);
+  const c = H.readCapture(jpegWith(JPEG, { iptc: body }), 'jpeg');
+  assert.equal(c.city, 'São Paulo');
+});
+
+test('fill bytes (0xFF 0xFF) before the Exif marker do not lose the metadata', () => {
+  const withExif = jpegWith(JPEG, { tiff: makeTiff({ make: 'Canon', orientation: 6 }) });
+  const padded = Uint8Array.from([0xff, 0xd8, 0xff, 0xff, 0xff, ...withExif.subarray(2)]);
+  assert.equal(H.readCapture(padded, 'jpeg').make, 'Canon');
+  assert.equal(H.jpegOrientation(padded), 6, 'the orientation reader takes the same fix');
+});
+
+test('single-quoted XMP attributes are read too', () => {
+  const xmp = "<x:xmpmeta xmlns:x='adobe:ns:meta/'><rdf:Description photoshop:City='Porto' photoshop:Country='Portugal'/></x:xmpmeta>";
+  const c = H.readCapture(jpegWith(JPEG, { xmp }), 'jpeg');
+  assert.equal(c.city, 'Porto');
+  assert.equal(c.country, 'Portugal');
+});
+
+test('a HEIC-shaped file with a pathological iloc finishes promptly', () => {
+  // meta > iinf (one Exif infe) + iloc with zero-size fields and 65535
+  // extents per item: the shape that used to spin for seconds.
+  const box = (type, ...parts) => {
+    const body = Buffer.concat(parts.map((p) => Buffer.from(p)));
+    const h = Buffer.alloc(8); h.writeUInt32BE(body.length + 8); h.write(type, 4, 'latin1');
+    return Buffer.concat([h, body]);
+  };
+  const infe = box('infe', [2, 0, 0, 0], [0, 1], [0, 0], Buffer.from('Exif', 'latin1'), [0]);
+  const iinf = box('iinf', [0, 0, 0, 0], [0, 1], infe);
+  const items = 2000;
+  const iloc = Buffer.alloc(4 + 2 + 2 + items * 6);
+  iloc[4] = 0x00; iloc[5] = 0x00; iloc.writeUInt16BE(items, 6);
+  for (let i = 0; i < items; i++) { iloc.writeUInt16BE(i + 1, 8 + i * 6); iloc.writeUInt16BE(65535, 8 + i * 6 + 4); }
+  const meta = box('meta', [0, 0, 0, 0], iinf, box('iloc', iloc));
+  const file = Uint8Array.from(Buffer.concat([box('ftyp', Buffer.from('heic', 'latin1'), [0, 0, 0, 0]), meta]));
+  const t0 = Date.now();
+  H.readCapture(file, 'heic');
+  assert.ok(Date.now() - t0 < 500, 'took ' + (Date.now() - t0) + ' ms');
+});
+
 /*
 CHANGELOG
 v1.0 (2026-10-30): Initial release. Covers both byte orders, hemispheres,
   no-fix GPS, unset clocks, the DateTime fallback, XMP/IPTC place names and
   their precedence, PNG and WebP carriers, and a truncation/byte-flip fuzz.
+  Then, from review: Latin-1 IPTC, JPEG fill bytes, single-quoted XMP, and a
+  pathological HEIC iloc.
+v1.1 (2026-10-30): Regression cases for the review fixes.
 */

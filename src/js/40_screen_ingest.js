@@ -1,6 +1,6 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.10
+ * @version 1.11
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-10-30
@@ -358,7 +358,7 @@
 
     if (entry.isDirectory) {
       // Never re-ingest our own output on a second run.
-      if (/^_(finalists|sidecars)/.test(entry.name) || entry.name.charAt(0) === '.') {
+      if (/^_(finalists|sidecars|tagged)/.test(entry.name) || entry.name.charAt(0) === '.') {
         return Promise.resolve(out);
       }
       var reader = entry.createReader();
@@ -463,7 +463,7 @@
       var chain = Promise.resolve();
       entries.forEach(function (entry) {
         // Our own output folders must never be re-ingested on a second run.
-        if (entry.kind === 'directory' && /^_(finalists|sidecars)/.test(entry.name)) return;
+        if (entry.kind === 'directory' && /^_(finalists|sidecars|tagged)/.test(entry.name)) return;
         if (entry.name.charAt(0) === '.') return;
 
         chain = chain.then(function () {
@@ -730,6 +730,9 @@
       PT.store.dispatch('ingest:done', function (s) {
         records.forEach(function (r) { s.photos[r.id] = r; });
         derivatives.forEach(function (d) { s.derivatives[d.id] = d; });
+        // The photos store outlives sessions ("Start fresh" clears only the
+        // session), so resume needs to know which records are this session's.
+        s.session.photoIds = records.map(function (r) { return r.id; });
         s.tree = PT.tree.build(records.filter(function (r) { return !r.err; }));
       });
 
@@ -805,4 +808,7 @@
  * v1.10 (2026-10-30): The entry screen asks which job, cull or sort (PRD
  *   7.12), before the photos arrive; a sort session's ingest ends on 'Sort and
  *   tag' instead of finalist counts.
+ * v1.11 (2026-10-30): The session records its photo ids at ingest, so resume
+ *   can tell its photos from older sessions' cached records; _tagged_ output
+ *   folders are skipped by scans, like _finalists_ and _sidecars_.
 */

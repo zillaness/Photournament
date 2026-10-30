@@ -1,6 +1,6 @@
 /**
  * @file 38_organize_ui.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-10-30
  * @lastUpdated 2026-10-30
@@ -173,13 +173,13 @@
         el('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () { dlg.close(); } }),
         el('button', { class: 'btn btn-primary', type: 'button', text: 'Save names', dataset: { t: 'org-name-save' },
           onclick: function () {
-            emit(function (n) {
-              inputs.forEach(function (i) {
-                var v = i.value.trim();
-                if (v) n.names[i.dataset.key] = v; else delete n.names[i.dataset.key];
-              });
-            });
+            var vals = inputs.map(function (i) { return [i.dataset.key, i.value.trim()]; });
+            // Close FIRST: onChange may reuse this same #modal (the allocation
+            // screen's regroup confirmation), and closing after would shut it.
             dlg.close();
+            emit(function (n) {
+              vals.forEach(function (kv) { if (kv[1]) n.names[kv[0]] = kv[1]; else delete n.names[kv[0]]; });
+            });
           } })
       ]));
       if (!dlg.open) dlg.showModal();
@@ -198,4 +198,8 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Chosen chips with
   reorder and remove, add chips with live group counts, event-gap and
   location-radius options, missing-data notes, and the event/place naming
   dialog.
+v1.1 (2026-10-30): The naming dialog closes before it reports the change.
+  On the allocation screen that change opens the regroup confirmation in the
+  same #modal, which closing afterwards shut at once: names silently did not
+  save once counts were typed.
 */

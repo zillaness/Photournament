@@ -1,6 +1,6 @@
 /**
  * @file 36_tags.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-10-30
  * @lastUpdated 2026-10-30
@@ -105,6 +105,9 @@
   function rename(tid, name) {
     name = cleanName(name);
     if (!name) return false;
+    // add() refuses a duplicate name; rename must too, or two tags end up
+    // indistinguishable in the bar and sharing one export folder.
+    if (state().defs.some(function (d) { return d.id !== tid && d.name.toLowerCase() === name.toLowerCase(); })) return false;
     PT.store.dispatch('tags:rename', function (s) {
       ensure(s).defs.forEach(function (d) { if (d.id === tid) d.name = name; });
     });
@@ -295,4 +298,6 @@ CHANGELOG
 v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
   nine), per-photo membership, set-wise toggling with mixed state, Shift+1..9,
   the self-detaching tag bar, and the rename/delete manager.
+v1.1 (2026-10-30): rename() refuses a name another tag already has, as
+  add() always did.
 */

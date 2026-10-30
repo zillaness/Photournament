@@ -1,6 +1,6 @@
 /**
  * file: organize_test.mjs
- * version: 1.0
+ * version: 1.1
  * author: Samuel Cao
  * created: 2026-10-30
  * last_updated: 2026-10-30
@@ -216,7 +216,23 @@ test('CSV quotes what needs quoting and defuses spreadsheet formulas', () => {
   assert.ok(csv.endsWith('\r\n'));
 });
 
+test('folder segments are safe on Windows too', () => {
+  assert.equal(O.seg('Washington, D.C.'), 'Washington, D.C');
+  assert.equal(O.seg('Trailing space '), 'Trailing space');
+  assert.equal(O.seg('CON'), 'CON_');
+  assert.equal(O.seg('com1.txt'), 'com1.txt_');
+  assert.equal(O.seg('Console'), 'Console');
+  assert.equal(O.seg('東京'), '東京');
+});
+
+test('exposure reads as a photographer writes it', () => {
+  assert.equal(O.exposureText({ exp: 1 / 250 }), '1/250s');
+  assert.equal(O.exposureText({ exp: 0.8 }), '0.8s');
+  assert.equal(O.exposureText({ exp: 2 }), '2s');
+});
+
 /*
 CHANGELOG
 v1.0 (2026-10-30): Initial release, with manifest-row and CSV cases.
+v1.1 (2026-10-30): Regression cases for the review fixes.
 */

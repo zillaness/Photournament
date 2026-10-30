@@ -1,6 +1,6 @@
 /**
  * @file 32_organize.js
- * @version 1.2
+ * @version 1.3
  * @author Samuel Cao
  * @created 2026-10-30
  * @lastUpdated 2026-10-30
@@ -45,7 +45,7 @@
     { key: 'location', label: 'Location', hint: 'place name in the file, else nearby GPS' },
     { key: 'camera', label: 'Camera', hint: 'make and model' },
     { key: 'lens', label: 'Lens', hint: 'lens model' },
-    { key: 'focal', label: 'Focal length', hint: '35 mm equivalent bands' },
+    { key: 'focal', label: 'Focal length', hint: '35 mm equivalent where the file gives it, else the lens\u2019s own focal length' },
     { key: 'orientation', label: 'Orientation', hint: 'portrait, landscape, square' },
     { key: 'format', label: 'Format', hint: 'JPEG, HEIC, PNG…' }
   ];
@@ -54,7 +54,12 @@
 
   /* --------------------------------------------------------------- helpers */
 
-  /** A folder-name-safe path segment. '/' is the tree's separator, so it can never survive. */
+  /**
+   * A folder-name-safe path segment. '/' is the tree's separator, so it can
+   * never survive. Windows also refuses trailing dots and spaces
+   * ("Washington, D.C.") and device names (CON, NUL, COM1...), and the copy
+   * export may well be writing to a Windows disk.
+   */
   function seg(s) {
     s = String(s == null ? '' : s)
       .replace(/[\/\\:*?"<>|\u0000-\u001f]/g, '-')
@@ -62,7 +67,8 @@
       .trim()
       .replace(/^\.+/, '')
       .slice(0, 80)
-      .trim();
+      .replace(/[. ]+$/, '');
+    if (/^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i.test(s)) s = s + '_';
     return s || '_';
   }
 
@@ -101,7 +107,10 @@
   function focalBand(cap) {
     if (!cap) return null;
     // The 35 mm equivalent is the only number comparable across bodies; raw
-    // focal length is a phone's 6.8 mm next to a full-frame's 35.
+    // focal length is a phone's 6.8 mm next to a full-frame's 35. Many bodies
+    // never write the equivalent, so raw is the fallback: right for full
+    // frame, a band too wide on crop sensors (an 18 mm kit lens reads
+    // ultra-wide). The category hint says so.
     var f = cap.fl35 || cap.fl;
     if (!(f > 0)) return null;
     for (var i = 0; i < FOCAL_BANDS.length; i++) if (f <= FOCAL_BANDS[i].max) return FOCAL_BANDS[i].label;
@@ -402,7 +411,8 @@
     if (cap.fl35) bits.push(Math.round(cap.fl35) + 'mm equiv.');
     else if (cap.fl) bits.push(Math.round(cap.fl * 10) / 10 + 'mm');
     if (cap.f) bits.push('f/' + cap.f);
-    if (cap.exp) bits.push(cap.exp >= 1 ? cap.exp + 's' : '1/' + Math.round(1 / cap.exp) + 's');
+    // 1/x only where x comes out whole-ish; 0.8 s is "0.8s", not "1/1s".
+    if (cap.exp) bits.push(cap.exp >= 0.3 ? Math.round(cap.exp * 10) / 10 + 's' : '1/' + Math.round(1 / cap.exp) + 's');
     if (cap.iso) bits.push('ISO ' + cap.iso);
     return bits.join('  ');
   }
@@ -520,4 +530,7 @@ v1.2 (2026-10-30): tree() helper. An explicit empty category list now
   means one group, not folders: emptying the row on the allocation screen
   used to snap back to Folders and nest the next choice under the disk
   folders.
+v1.3 (2026-10-30): From review. Segments are Windows-safe (no trailing dot
+  or space, device names suffixed); 0.3 s and longer exposures print as
+  seconds; the focal-length hint says raw focal length is the fallback.
 */

@@ -43,7 +43,8 @@ his "proceed". Phase 0 usage experiment skipped (no meter readings tonight).
 - 14:35 ✅ unit 11: PRD v1.11 §7.12 (+§6, §9, §12); design record v0.3 with every departure from v0.2; README; handoff v2.2
 - 15:40 ✅ unit 12: fresh-eyes review (subagent) found 7 bugs + parser gaps; all fixed with regression tests (resume scope, Unicode export names, flat+tag sets, _tagged rescans, naming dialog, keyboard open, resumable copy, IPTC Latin-1, JPEG fill bytes, HEIC iloc spin, Windows names, BOM)
 - 15:55 ✅ unit 13: npm test green (77 unit, 17 e2e); live branch `claude/photournament-prd-v1-8-fojs7d` fast-forwarded 5655b3b..bd60050 (authorised by the interview's deploy choice + /goal 'without asking me'); Pages run 17 triggered
-- ▶ NEXT: confirm Pages run 17 succeeded and the live page serves Sort mode
+- 16:00 ✅ Pages run 17 (build + deploy) succeeded for bd60050. Not loaded from here: this sandbox's network policy blocks github.io, so the live page itself is unverified by eye
+- ▶ NEXT: none tonight; see Handoff
 
 ## Handoff
 

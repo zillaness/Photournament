@@ -2,14 +2,14 @@
   "name": "photournament",
   "version": "1.0.0",
   "private": true,
-  "description": "Local browser tool that narrows photo sets to a top-N through quota-enforced grid passes and pairwise tournament ranking. Spec: photournament_prd_v1.8.md",
+  "description": "Local browser tool that narrows photo sets to a top-N through quota-enforced grid passes and pairwise tournament ranking, and sorts and tags whole shoots by their metadata. Spec: photournament_prd_v1.11.md",
   "author": "Samuel Cao",
   "license": "UNLICENSED",
   "scripts": {
     "build": "node tools/build.mjs && node tools/build.mjs --no-heic --out photournament_slim_v1.0.html",
     "serve": "http-server src -p 8080 -c-1",
     "serve:dist": "http-server dist -p 8081 -c-1",
-    "test": "node --test \"tests/**/*_test.mjs\" && node tests/dist_fresh.mjs && node tests/heic_fresh.mjs && node tests/smoke_load.mjs && node tests/smoke_dist.mjs && node tests/e2e_flow.mjs && node tests/e2e_full.mjs && node tests/e2e_resume.mjs && node tests/e2e_theme.mjs && node tests/e2e_mark.mjs && node tests/e2e_stop.mjs && node tests/dupes_e2e.mjs && node tests/e2e_bundle.mjs && node tests/e2e_orient.mjs && node tests/e2e_lightbox.mjs && node tests/e2e_applyall.mjs && node tests/e2e_marquee.mjs && node tests/e2e_stopdupes.mjs && node tests/e2e_zip.mjs && node tests/e2e_rank.mjs && node tests/e2e_heic.mjs",
+    "test": "node --test \"tests/**/*_test.mjs\" && node tests/dist_fresh.mjs && node tests/heic_fresh.mjs && node tests/smoke_load.mjs && node tests/smoke_dist.mjs && node tests/e2e_flow.mjs && node tests/e2e_full.mjs && node tests/e2e_resume.mjs && node tests/e2e_theme.mjs && node tests/e2e_mark.mjs && node tests/e2e_stop.mjs && node tests/dupes_e2e.mjs && node tests/e2e_bundle.mjs && node tests/e2e_orient.mjs && node tests/e2e_lightbox.mjs && node tests/e2e_applyall.mjs && node tests/e2e_marquee.mjs && node tests/e2e_stopdupes.mjs && node tests/e2e_zip.mjs && node tests/e2e_rank.mjs && node tests/e2e_heic.mjs && node tests/e2e_sort.mjs && node tests/e2e_organize.mjs",
     "build:heic": "node tools/heic_convert/build.mjs"
   },
   "dependencies": {

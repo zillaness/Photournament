@@ -39,7 +39,8 @@ his "proceed". Phase 0 usage experiment skipped (no meter readings tonight).
 - 12:30 ✅ unit 6: Sort export (priced copy / list, per-tag sets, manifest CSV+JSON, never-overwrite, reconnect); CSV formula-injection guard; verified copy path on OPFS over localhost
 - 12:55 ✅ unit 7: Organize-by on the allocation screen (reset warning, lock once started), organized tree on resume; found+fixed: emptying the row snapped back to Folders
 - 13:30 ✅ units 8+9: culling export names sets by group path, fixes same-leaf folder collisions, per-tag sets, tag bars on export rows and bracket panes, finalists CSV, JSON gains tags/capture; browser-verified incl. resume
-- ▶ NEXT: unit 10, committed e2e tests (sort, organize-in-cull, tags) wired into npm test
+- 14:10 ✅ unit 10: e2e_sort.mjs (28 checks) + e2e_organize.mjs (21 checks) wired into npm test; full suite green (17 e2e); found+fixed: per-tag export option hidden until reload
+- ▶ NEXT: unit 11, docs: PRD v1.11 §7.12, README, handoff v2.2, package description
 
 ## Handoff
 (filled at stop)

@@ -1,6 +1,6 @@
 /**
  * @file 80_screen_export.js
- * @version 1.7
+ * @version 1.8
  * @author Samuel Cao
  * @created 2026-07-28
  * @lastUpdated 2026-10-30
@@ -433,9 +433,14 @@
         renderList();
       });
       opts.appendChild(structSel);
-      if (PT.tags && PT.tags.defs().length) {
-        opts.appendChild(toggle('A set per tag', 'tagSets',
-          'Also write each tag\u2019s finalists into its own folder (_tagged_<tag>/)'));
+      // Present whenever tagging is; shown once a tag exists, including one
+      // made a moment ago in this very review.
+      var tagToggle = PT.tags ? toggle('A set per tag', 'tagSets',
+        'Also write each tag\u2019s finalists into its own folder (_tagged_<tag>/)') : null;
+      if (tagToggle) {
+        tagToggle.dataset.t = 'exp-tagsets';
+        tagToggle.hidden = !PT.tags.defs().length;
+        opts.appendChild(tagToggle);
       }
       opts.appendChild(el('span', { class: 'spacer' }));
       opts.appendChild(el('span', { class: 'small dim', id: 'exp-total' }));
@@ -521,7 +526,9 @@
       // With per-tag sets on, a tag change moves photos between sets.
       var offTags = PT.store.subscribe(function (s, name) {
         if (!listHost.isConnected) { offTags(); return; }
-        if (/^tags:/.test(name) && s.session.settings.tagSets) renderList();
+        if (!/^tags:/.test(name)) return;
+        if (tagToggle) tagToggle.hidden = !PT.tags.defs().length;
+        if (s.session.settings.tagSets) renderList();
       });
 
       /* --------------------------------------------------------- actions -- */
@@ -1138,4 +1145,6 @@
  *   full path for the sets involved. Optional per-tag sets (_tagged_<tag>/), a
  *   tag bar on each finalist, a finalists CSV, and tags + capture metadata in
  *   the decision JSON.
+ * v1.8 (2026-10-30): The per-tag option now appears the moment a first tag
+ *   exists, including one made in this review; it used to wait for a reload.
 */

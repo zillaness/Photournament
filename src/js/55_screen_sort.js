@@ -1,6 +1,6 @@
 /**
  * @file 55_screen_sort.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-10-30
  * @lastUpdated 2026-10-30
@@ -276,6 +276,278 @@
     }
   });
 
+  /* ------------------------------------------------------------- export -- */
+
+  /**
+   * PRD 7.12 Sort export, chosen each time and priced first, because the two
+   * outputs cost wildly different amounts: a copy is the whole shoot again on
+   * disk, a manifest is a few kilobytes.
+   *
+   *   Copy  -> <picked folder>/<organized path>/<original name>, plus optional
+   *            per-tag sets (_tagged_<tag>/) and the manifest beside them.
+   *   List  -> the manifest only, as CSV and JSON downloads.
+   *
+   * Never overwrites: a name already taken, on disk or earlier in this same
+   * export (two source folders can both hold IMG_0001.jpg), gets _2, _3...
+   */
+  function sources(ids) {
+    return ids.filter(function (id) { return !PT.sources[id]; });
+  }
+
+  function exportPlan(withTags) {
+    var g = grouped();
+    var s = PT.store.get();
+    var items = [];
+    g.groups.forEach(function (gr) {
+      gr.ids.forEach(function (id) { items.push({ id: id, photo: s.photos[id], folder: gr.dir }); });
+    });
+    var tagged = [];
+    if (withTags) {
+      PT.tags.defs().forEach(function (d) {
+        PT.tags.photosWith(d.id, g.order).forEach(function (id) {
+          tagged.push({ id: id, photo: s.photos[id], folder: '_tagged_' + PT.organize.seg(d.name) });
+        });
+      });
+    }
+    return { items: items, tagged: tagged, order: g.order };
+  }
+
+  function bytesOf(list) {
+    return list.reduce(function (n, it) { return n + (it.photo.size || 0); }, 0);
+  }
+
+  function manifestDocs(plan, written) {
+    var s = PT.store.get();
+    var rows = plan.items.map(function (it) {
+      var w = written && written[it.id];
+      return PT.organize.manifestRow(it.photo, it.folder, w ? w.file : it.photo.name, PT.tags.names(it.id));
+    });
+    var json = {
+      _metadata: {
+        file: 'photournament_sort_manifest_v1.0.json',
+        version: '1.0',
+        app: 'Photournament v' + PT.VERSION,
+        exported: new Date().toISOString(),
+        source: s.session.rootName
+      },
+      organize: PT.organize.normSpec(s.session.organize),
+      tags: PT.tags.defs(),
+      photos: plan.items.map(function (it) {
+        var w = written && written[it.id];
+        return {
+          id: it.id, original: it.photo.path, folder: it.folder,
+          file: w ? w.file : it.photo.name, tags: PT.tags.names(it.id),
+          capture: it.photo.capture || null, w: it.photo.w, h: it.photo.h,
+          format: it.photo.kind, bytes: it.photo.size
+        };
+      })
+    };
+    return {
+      csv: new Blob([PT.organize.toCsv(rows)], { type: 'text/csv' }),
+      json: new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' })
+    };
+  }
+
+  function download(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: name });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  /** Walks (creating) a nested folder path under a directory handle. */
+  function dirAt(root, path) {
+    var parts = String(path || '').split('/').filter(Boolean);
+    return parts.reduce(function (p, seg) {
+      return p.then(function (d) { return d.getDirectoryHandle(seg, { create: true }); });
+    }, Promise.resolve(root));
+  }
+
+  /** A name not yet used in this folder, on disk or earlier in this export. */
+  function freeName(dir, name, taken) {
+    var dot = name.lastIndexOf('.');
+    var stem = dot > 0 ? name.slice(0, dot) : name;
+    var ext = dot > 0 ? name.slice(dot) : '';
+    var k = 1;
+    function next() {
+      var cand = k === 1 ? name : stem + '_' + k + ext;
+      if (taken[cand.toLowerCase()]) { k++; return next(); }
+      return dir.getFileHandle(cand, { create: false })
+        .then(function () { k++; return next(); }, function () { taken[cand.toLowerCase()] = 1; return cand; });
+    }
+    return next();
+  }
+
+  function writeFile(dir, name, blob) {
+    return dir.getFileHandle(name, { create: true })
+      .then(function (f) { return f.createWritable(); })
+      .then(function (w) { return w.write(blob).then(function () { return w.close(); }); });
+  }
+
+  function original(id) {
+    var src = PT.sources[id];
+    if (!src) return Promise.reject(new Error('original not reachable'));
+    return typeof src.getFile === 'function' ? src.getFile() : Promise.resolve(src);
+  }
+
+  PT.sortExport = {
+    open: function () {
+      var body = PT.dom.$('#modal-body');
+      var dlg = PT.dom.$('#modal');
+      if (!body || !dlg) return;
+      var canCopy = typeof window.showDirectoryPicker === 'function';
+      var mode = canCopy ? 'copy' : 'list';
+      var withTags = false;
+      var busy = false;
+      var cancelled = false;
+
+      function draw() {
+        var plan = exportPlan(withTags);
+        var missing = sources(plan.items.map(function (it) { return it.id; }));
+        PT.dom.clear(body);
+        body.appendChild(el('h2', { text: 'Export the sorted shoot' }));
+
+        var copyText = plan.items.length + ' photos, ' + PT.fmt.bytes(bytesOf(plan.items)) +
+          (plan.tagged.length ? ' + ' + plan.tagged.length + ' tagged cop' + (plan.tagged.length === 1 ? 'y' : 'ies') + ', ' + PT.fmt.bytes(bytesOf(plan.tagged)) : '') +
+          ' — written into a folder you pick, in the groups you see, with the manifest beside them. ' +
+          'Pick an empty folder (the dialog can make one). Your originals are not touched.';
+        var opt = function (key, title, text, disabled) {
+          var input = el('input', { type: 'radio', name: 'so-exp-mode', value: key, dataset: { t: 'so-exp-' + key }, disabled: disabled });
+          input.checked = mode === key;
+          input.addEventListener('change', function () { mode = key; draw(); });
+          return el('label', { class: 'so-exp-opt' + (mode === key ? ' on' : '') + (disabled ? ' off' : '') }, [
+            input, el('span', {}, [el('b', { text: title }), el('span', { class: 'small dim', text: text })])
+          ]);
+        };
+        body.appendChild(opt('copy', 'Copy into a new folder', canCopy ? copyText :
+          'This browser cannot write into a folder you pick (Chromium can). The list still works.', !canCopy));
+        body.appendChild(opt('list', 'Just the list',
+          'A CSV and a JSON of every photo: its group, tags, and what the camera recorded. A few kilobytes; nothing is copied.'));
+
+        if (mode === 'copy' && PT.tags.defs().length) {
+          var cb = el('input', { type: 'checkbox', dataset: { t: 'so-exp-tags' } });
+          cb.checked = withTags;
+          cb.addEventListener('change', function () { withTags = cb.checked; draw(); });
+          body.appendChild(el('label', { class: 'so-exp-check small' }, [cb,
+            el('span', { text: 'Also copy each tag into its own folder (_tagged_<tag>/). A photo with two tags is copied twice.' })]));
+        }
+
+        if (mode === 'copy' && missing.length) {
+          var input = el('input', { type: 'file', multiple: true, style: 'display:none', dataset: { t: 'so-reconnect-input' } });
+          input.setAttribute('webkitdirectory', '');
+          input.addEventListener('change', function () {
+            var s = PT.store.get();
+            var byPath = Object.create(null);
+            Object.keys(s.photos).forEach(function (id) { byPath[s.photos[id].path] = id; });
+            var hits = 0;
+            Array.prototype.forEach.call(input.files, function (f) {
+              var id = byPath[f.webkitRelativePath || f.name];
+              if (id) { PT.sources[id] = f; hits++; }
+            });
+            PT.toast(hits ? 'Reconnected ' + hits + ' original' + (hits === 1 ? '' : 's') + '.' :
+              'Nothing matched \u2014 is that the folder this session was read from?');
+            draw();
+          });
+          body.appendChild(el('div', { class: 'notice notice-warn small', style: 'margin-top:10px' }, [
+            el('span', { text: missing.length + ' of ' + plan.items.length + ' originals are not reachable: the page was reloaded since the folder was read. ' +
+              'Reconnect it to copy them; the list works without.' }),
+            input,
+            el('button', { class: 'btn btn-sm', type: 'button', text: 'Reconnect the folder\u2026', onclick: function () { input.click(); } })
+          ]));
+        }
+
+        var status = el('div', { class: 'small', dataset: { t: 'so-exp-status' } });
+        var go = el('button', { class: 'btn btn-primary', type: 'button', dataset: { t: 'so-exp-go' },
+          text: mode === 'copy' ? 'Choose a folder and copy' : 'Download the list',
+          disabled: busy || (mode === 'copy' && (!canCopy || missing.length === plan.items.length)),
+          onclick: function () { run(plan, status, go); } });
+        body.appendChild(status);
+        body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+          el('span', { class: 'spacer' }),
+          el('button', { class: 'btn', type: 'button', text: busy ? 'Stop' : 'Close', dataset: { t: 'so-exp-close' },
+            onclick: function () { if (busy) cancelled = true; else dlg.close(); } }),
+          go
+        ]));
+      }
+
+      function run(plan, status, go) {
+        var stem = 'photournament_sort_manifest_v1.0';
+        if (mode === 'list') {
+          var docs = manifestDocs(plan, null);
+          download(docs.csv, stem + '.csv');
+          download(docs.json, stem + '.json');
+          status.textContent = 'Downloaded the list for ' + plan.items.length + ' photos.';
+          return;
+        }
+        var root;
+        busy = true; cancelled = false;
+        go.disabled = true;
+        Promise.resolve(window.showDirectoryPicker({ mode: 'readwrite' }))
+          .then(function (d) {
+            root = d;
+            return d.requestPermission ? d.requestPermission({ mode: 'readwrite' }) : 'granted';
+          })
+          .then(function (perm) {
+            if (perm !== 'granted') throw new Error('permission to write was not granted');
+            var jobs = plan.items.concat(plan.tagged);
+            var taken = {};      // folder -> {lowercased name: 1}
+            var written = {};    // id -> {file} for the organized copy
+            var done = 0, skipped = [];
+            var seq = Promise.resolve();
+            jobs.forEach(function (it, k) {
+              seq = seq.then(function () {
+                if (cancelled) return;
+                if (!PT.sources[it.id]) { skipped.push(it.photo.name); return; }
+                return dirAt(root, it.folder).then(function (dir) {
+                  var t = taken[it.folder] = taken[it.folder] || {};
+                  return freeName(dir, it.photo.name, t).then(function (name) {
+                    return original(it.id).then(function (blob) { return writeFile(dir, name, blob); })
+                      .then(function () {
+                        if (k < plan.items.length) written[it.id] = { file: name };
+                        done++;
+                        status.textContent = 'Copying\u2026 ' + done + ' / ' + jobs.length;
+                      });
+                  });
+                });
+              });
+            });
+            return seq.then(function () {
+              var docs = manifestDocs(plan, written);
+              var t = {};
+              return freeName(root, stem + '.csv', t)
+                .then(function (n) { return writeFile(root, n, docs.csv); })
+                .then(function () { return freeName(root, stem + '.json', t); })
+                .then(function (n) { return writeFile(root, n, docs.json); })
+                .then(function () { return { done: done, total: jobs.length, skipped: skipped }; });
+            });
+          })
+          .then(function (r) {
+            busy = false;
+            draw();
+            var msg = (cancelled ? 'Stopped after ' : 'Copied ') + r.done + ' of ' + r.total + ' into ' + root.name + '.' +
+              (r.skipped.length ? ' ' + r.skipped.length + ' not reachable (reconnect the folder and run it again; nothing is overwritten).' : '');
+            PT.dom.$('[data-t="so-exp-status"]', body).textContent = msg;
+            PT.toast(msg);
+          })
+          .catch(function (e) {
+            busy = false;
+            draw();
+            if (e && e.name === 'AbortError') return;
+            PT.warn('sort-export', e);
+            PT.dom.$('[data-t="so-exp-status"]', body).textContent = 'Could not copy: ' + (e && e.message || e);
+          });
+      }
+
+      draw();
+      if (!dlg.open) dlg.showModal();
+    },
+    /** Exposed for tests: the plan an export would carry out. */
+    plan: exportPlan,
+    manifest: manifestDocs
+  };
+
   PT.sortScreen = {
     /** The photos in the current organization, in on-screen order, with their dirs. */
     current: function () {
@@ -291,4 +563,8 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Whole-shoot grouped
   view driven by the shared Organize-by control, lazy thumbnails, click and
   shift-click selection, per-group select, a selection bar carrying the tag
   bar (Shift+1..9), lightbox per group, and the Export entry point.
+v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
+  picked folder in the organized layout (optional per-tag sets, manifest
+  beside them, never overwriting) or just the list as CSV and JSON. Reconnect
+  for reloaded sessions.
 */

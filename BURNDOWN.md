@@ -36,7 +36,8 @@ his "proceed". Phase 0 usage experiment skipped (no meter readings tonight).
 - 10:45 ✅ unit 3: `PT.organize` (32_organize.js): 11 categories, events, offline location clusters, named missing buckets; 16 unit tests
 - 11:25 ✅ unit 4: `PT.tags` (36_tags.js) + lightbox metadata row and tag bar, Shift+1..9; browser-verified (two focus bugs found and fixed)
 - 11:55 ✅ unit 5: entry mode choice; shared Organize-by control (38_organize_ui.js); Sort screen (55_screen_sort.js) with grouping, selection, tagging; browser-verified
-- ▶ NEXT: unit 6, Sort export: priced copy-into-folder / manifest (CSV+JSON), per-tag copies
+- 12:30 ✅ unit 6: Sort export (priced copy / list, per-tag sets, manifest CSV+JSON, never-overwrite, reconnect); CSV formula-injection guard; verified copy path on OPFS over localhost
+- ▶ NEXT: unit 7, culling: Organize-by on the allocation screen + tree rebuild on resume
 
 ## Handoff
 (filled at stop)

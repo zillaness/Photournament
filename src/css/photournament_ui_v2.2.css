@@ -2835,6 +2835,21 @@ kbd {
 #app .so-selbar:not(.active) .pt-tags { opacity: 0.5; }
 
 
+#modal .so-exp-opt {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  margin-top: 8px;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  cursor: pointer;
+}
+#modal .so-exp-opt > span { display: flex; flex-direction: column; gap: 3px; }
+#modal .so-exp-opt.on { border-color: var(--accent); }
+#modal .so-exp-opt.off { opacity: 0.55; cursor: not-allowed; }
+#modal .so-exp-check { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; cursor: pointer; }
+
 /* CHANGELOG (appended block)
  * v2.2a (2026-10-30): PRD 7.12 organize-and-tag block, tokens only: lightbox
  *   metadata row, the tag chip in its off / mixed / on states, the inline
@@ -2842,4 +2857,5 @@ kbd {
  * v2.2b (2026-10-30): Entry mode choice, the shared Organize-by control and
  *   its naming dialog, and Sort mode's grouped grid, selection ring (accent,
  *   around the frame, never on the photo) and floating selection bar.
+ * v2.2c (2026-10-30): Sort export's two priced options.
  */

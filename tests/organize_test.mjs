@@ -186,7 +186,31 @@ test('the organized records build an allocation tree whose leaves are the groups
   assert.ok(ps.every((p) => p.dir === ''));
 });
 
+test('manifest rows carry where the photo went, its tags and its capture data', () => {
+  const p = photo({ when: '2026-07-14T09:12:33', tz: '+09:00', make: 'Canon', model: 'Canon EOS R6', f: 2.8, iso: 400, lat: -33.85, lon: 151.2 }, { path: 'DCIM/IMG_1.jpg', size: 1234 });
+  const r = O.manifestRow(p, '2026-07-14/Canon EOS R6', 'IMG_1.jpg', ['portfolio', 'print']);
+  assert.equal(r.folder, '2026-07-14/Canon EOS R6');
+  assert.equal(r.original_path, 'DCIM/IMG_1.jpg');
+  assert.equal(r.tags, 'portfolio; print');
+  assert.equal(r.taken, '2026-07-14 09:12:33');
+  assert.equal(r.camera, 'Canon EOS R6');
+  assert.equal(r.latitude, -33.85);
+});
+
+test('CSV quotes what needs quoting and defuses spreadsheet formulas', () => {
+  const csv = O.toCsv([
+    { folder: 'a,b', file: 'say "hi".jpg', tags: '=HYPERLINK("x")', latitude: -33.85, iso: '' },
+    { folder: '@risk', file: '+1.jpg', tags: '-x' }
+  ]);
+  const lines = csv.trim().split('\r\n');
+  assert.equal(lines[0], O.MANIFEST_COLS.join(','));
+  assert.ok(lines[1].startsWith('"a,b","say ""hi"".jpg",,"\'=HYPERLINK(""x"")"'), lines[1]);
+  assert.ok(lines[1].includes(',-33.85,'), 'numbers stay numbers: ' + lines[1]);
+  assert.ok(lines[2].startsWith("'@risk,'+1.jpg,,'-x"), lines[2]);
+  assert.ok(csv.endsWith('\r\n'));
+});
+
 /*
 CHANGELOG
-v1.0 (2026-10-30): Initial release.
+v1.0 (2026-10-30): Initial release, with manifest-row and CSV cases.
 */

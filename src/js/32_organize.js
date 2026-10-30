@@ -1,6 +1,6 @@
 /**
  * @file 32_organize.js
- * @version 1.0
+ * @version 1.1
  * @author Samuel Cao
  * @created 2026-10-30
  * @lastUpdated 2026-10-30
@@ -414,6 +414,64 @@
     return rows;
   }
 
+  /* -------------------------------------------------------------- manifest */
+
+  var MANIFEST_COLS = ['folder', 'file', 'original_path', 'tags', 'taken', 'timezone', 'camera', 'lens',
+    'focal_mm', 'focal_35mm', 'aperture', 'shutter_s', 'iso', 'latitude', 'longitude', 'place',
+    'width', 'height', 'format', 'bytes'];
+
+  /**
+   * One manifest row: where the photo went, its tags, and everything the camera
+   * recorded. Shared by the Sort export and the culling export, which prepends
+   * its own rank/set/label columns.
+   */
+  function manifestRow(p, folder, file, tagNames) {
+    var cap = p.capture || {};
+    return {
+      folder: folder || '',
+      file: file || p.name,
+      original_path: p.path || p.name,
+      tags: (tagNames || []).join('; '),
+      taken: cap.when ? cap.when.replace('T', ' ') : '',
+      timezone: cap.tz || '',
+      camera: cameraLabel(cap) || '',
+      lens: cap.lens || '',
+      focal_mm: cap.fl || '',
+      focal_35mm: cap.fl35 || '',
+      aperture: cap.f || '',
+      shutter_s: cap.exp || '',
+      iso: cap.iso || '',
+      latitude: hasGps(cap) ? cap.lat : '',
+      longitude: hasGps(cap) ? cap.lon : '',
+      place: writtenPlace(cap) || '',
+      width: p.w || '',
+      height: p.h || '',
+      format: p.kind || '',
+      bytes: p.size || ''
+    };
+  }
+
+  /**
+   * RFC 4180 CSV. Text that a spreadsheet would read as a formula (=, +, -, @
+   * at the start, or a leading tab/CR) is prefixed with an apostrophe: tags,
+   * labels and filenames are user-controlled, and a manifest is exactly the
+   * file people open in Excel. Numbers are written as numbers, so a southern
+   * latitude stays -33.85.
+   */
+  function toCsv(rows, cols) {
+    cols = cols || MANIFEST_COLS;
+    var cell = function (v) {
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'number') return isFinite(v) ? String(v) : '';
+      var t = String(v);
+      if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+      return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+    };
+    var out = [cols.join(',')];
+    rows.forEach(function (r) { out.push(cols.map(function (c) { return cell(r[c]); }).join(',')); });
+    return out.join('\r\n') + '\r\n';
+  }
+
   PT.organize = {
     CATEGORIES: CATEGORIES,
     DEFAULTS: DEFAULTS,
@@ -430,7 +488,10 @@
     infoRows: infoRows,
     placeKey: placeKey,
     km: km,
-    seg: seg
+    seg: seg,
+    MANIFEST_COLS: MANIFEST_COLS,
+    manifestRow: manifestRow,
+    toCsv: toCsv
   };
 })();
 
@@ -440,4 +501,7 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Eleven categories, time-
   gap events, offline location clusters with written-name precedence and
   distance-matched user names, named missing buckets, per-category chip
   summaries, and apply() handing synthetic dirs to the unchanged tree.
+v1.1 (2026-10-30): manifestRow and toCsv, shared by both exports. The CSV
+  defuses spreadsheet formulas in user-controlled text and keeps numbers
+  numeric.
 */

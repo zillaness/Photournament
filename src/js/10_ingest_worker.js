@@ -84,7 +84,9 @@
     // ---- EXIF ------------------------------------------------------------
     // Reads only tag 0x0112 (Orientation) out of IFD0. Deliberately tiny: a
     // general EXIF parser is not needed and is a much bigger attack surface on
-    // malformed files.
+    // malformed files. Orientation gates decoding, so it stays separate from
+    // the whitelist capture reader further down (PRD 7.12), which only ever
+    // informs organizing.
     H.exifOrientationFromTiff = function (u8, tiffStart) {
       try {
         if (tiffStart + 8 > u8.length) return 0;
@@ -259,6 +261,8 @@
                 var o2 = H.exifOrientationFromTiff(u8, tiff);
                 if (!o2) o2 = H.exifOrientationFromTiff(u8, payload + 4);
                 if (o2) res.orientation = o2;
+                // Kept for the capture reader, which wants the whole block.
+                res.tiff = H.isTiff(u8, tiff) ? tiff : H.isTiff(u8, payload + 4) ? payload + 4 : -1;
               }
               void el;
             }
@@ -268,6 +272,325 @@
         /* orientation is best-effort; never fail an ingest over it */
       }
       return res;
+    };
+
+    // ---- capture metadata (PRD 7.12) ------------------------------------
+    // Still not a general EXIF parser. Organizing by metadata needs a fixed
+    // WHITELIST: capture time, camera, lens, exposure and GPS out of IFD0, the
+    // Exif IFD and the GPS IFD, plus written place names from IPTC IIM or XMP
+    // (Lightroom and Photo Mechanic write them; phones store coordinates only).
+    // The orientation reader's contract carries over unchanged: every read is
+    // bounds-checked against the buffer, and anything malformed yields an
+    // absent field, never a failed ingest.
+    //
+    // `capture` is {} when the file was read and carried nothing, and absent
+    // on records from before this existed — the UI says those two differently.
+    var TIFF_SIZES = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8, 4];
+
+    H.isTiff = function (u8, t) {
+      if (!(t >= 0) || t + 8 > u8.length) return false;
+      return (u8[t] === 0x49 && u8[t + 1] === 0x49 && u8[t + 2] === 0x2a && u8[t + 3] === 0) ||
+             (u8[t] === 0x4d && u8[t + 1] === 0x4d && u8[t + 2] === 0 && u8[t + 3] === 0x2a);
+    };
+
+    // Camera strings arrive NUL-padded, space-padded, and occasionally full of
+    // garbage from firmware that never initialised the field.
+    H.cleanText = function (s) {
+      s = String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f�]/g, '').replace(/\s+/g, ' ').trim();
+      return s ? s.slice(0, 96) : undefined;
+    };
+
+    /** "2026:07:14 09:12:33" -> "2026-07-14T09:12:33", or undefined. */
+    H.exifDate = function (s) {
+      var m = /^(\d{4})[:\-](\d{2})[:\-](\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(String(s || ''));
+      if (!m) return undefined;
+      var y = +m[1], mo = +m[2], d = +m[3], h = +m[4], mi = +m[5], se = +m[6];
+      // 0000:00:00 is what a camera with an unset clock writes.
+      if (y < 1970 || y > 2200 || mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || se > 60) return undefined;
+      return m[1] + '-' + m[2] + '-' + m[3] + 'T' + m[4] + ':' + m[5] + ':' + m[6];
+    };
+
+    H.tiffCapture = function (u8, t, out) {
+      out = out || {};
+      try {
+        if (!H.isTiff(u8, t)) return out;
+        var le = u8[t] === 0x49;
+        var dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+
+        var ifd = function (rel) {
+          var map = {};
+          if (!(rel >= 8)) return map;
+          var p = t + rel;
+          if (p + 2 > u8.length) return map;
+          var n = dv.getUint16(p, le);
+          if (n > 1024) return map;
+          for (var i = 0; i < n; i++) {
+            var e = p + 2 + i * 12;
+            if (e + 12 > u8.length) break;
+            var type = dv.getUint16(e + 2, le);
+            var count = dv.getUint32(e + 4, le);
+            var sz = TIFF_SIZES[type] || 0;
+            if (!sz || count < 1 || count > 4096) continue;
+            var bytes = sz * count;
+            var at = bytes <= 4 ? e + 8 : t + dv.getUint32(e + 8, le);
+            if (at < 0 || at + bytes > u8.length) continue;
+            map[dv.getUint16(e, le)] = { type: type, count: count, at: at };
+          }
+          return map;
+        };
+        var num = function (ent, k) {
+          if (!ent) return undefined;
+          k = k || 0;
+          if (k >= ent.count) return undefined;
+          var a = ent.at, v;
+          switch (ent.type) {
+            case 1: case 7: v = u8[a + k]; break;
+            case 3: v = dv.getUint16(a + 2 * k, le); break;
+            case 4: case 13: v = dv.getUint32(a + 4 * k, le); break;
+            case 9: v = dv.getInt32(a + 4 * k, le); break;
+            case 5: case 10: {
+              var signed = ent.type === 10;
+              var nu = signed ? dv.getInt32(a + 8 * k, le) : dv.getUint32(a + 8 * k, le);
+              var de = signed ? dv.getInt32(a + 8 * k + 4, le) : dv.getUint32(a + 8 * k + 4, le);
+              if (!de) return undefined;
+              v = nu / de;
+              break;
+            }
+            default: return undefined;
+          }
+          return isFinite(v) ? v : undefined;
+        };
+        var str = function (ent) {
+          if (!ent || ent.type !== 2) return undefined;
+          var s = '';
+          for (var i = 0; i < ent.count && i < 256; i++) {
+            var c = u8[ent.at + i];
+            if (!c) break;
+            s += String.fromCharCode(c);
+          }
+          return H.cleanText(s);
+        };
+        var put = function (k, v) { if (v !== undefined && v !== null && v !== '' && out[k] === undefined) out[k] = v; };
+
+        var i0 = ifd(dv.getUint32(t + 4, le));
+        put('make', str(i0[0x010f]));
+        put('model', str(i0[0x0110]));
+
+        var ex = ifd(num(i0[0x8769]));
+        var when = H.exifDate(str(ex[0x9003]));
+        var whenSrc = 'original';
+        if (!when) { when = H.exifDate(str(ex[0x9004])); whenSrc = 'digitized'; }
+        if (!when) { when = H.exifDate(str(i0[0x0132])); whenSrc = 'modified'; }
+        if (when) {
+          put('when', when);
+          put('whenSrc', whenSrc);
+          var tz = str(ex[0x9011]);
+          if (tz && /^[+\-]\d{2}:\d{2}$/.test(tz)) put('tz', tz);
+        }
+        var fl = num(ex[0x920a]);
+        if (fl > 0 && fl < 5000) put('fl', Math.round(fl * 10) / 10);
+        var fl35 = num(ex[0xa405]);
+        if (fl35 > 0 && fl35 < 10000) put('fl35', fl35);
+        var fn = num(ex[0x829d]);
+        if (fn > 0 && fn < 256) put('f', Math.round(fn * 10) / 10);
+        var et = num(ex[0x829a]);
+        if (et > 0 && et < 100000) put('exp', et);
+        var iso = num(ex[0x8827]);
+        if (iso > 0 && iso < 10000000) put('iso', iso);
+        put('lensMake', str(ex[0xa433]));
+        put('lens', str(ex[0xa434]));
+
+        var gp = ifd(num(i0[0x8825]));
+        var deg = function (ent) {
+          var d = num(ent, 0), m = num(ent, 1), s = num(ent, 2);
+          if (d === undefined) return undefined;
+          return d + (m || 0) / 60 + (s || 0) / 3600;
+        };
+        var lat = deg(gp[2]), lon = deg(gp[4]);
+        var latRef = str(gp[1]), lonRef = str(gp[3]);
+        if (lat !== undefined && lon !== undefined) {
+          if (latRef === 'S') lat = -lat;
+          if (lonRef === 'W') lon = -lon;
+          // 0,0 is what a body with no fix writes, not a photo in the Gulf of Guinea.
+          if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat === 0 && lon === 0)) {
+            put('lat', Math.round(lat * 1e6) / 1e6);
+            put('lon', Math.round(lon * 1e6) / 1e6);
+          }
+        }
+      } catch (err) {
+        /* malformed EXIF is not an ingest failure */
+      }
+      return out;
+    };
+
+    H.utf8 = function (u8, a, b) {
+      try { return new TextDecoder('utf-8').decode(u8.subarray(a, b)); } catch (e) { return ''; }
+    };
+
+    // IPTC IIM inside a Photoshop APP13 block: 8BIM resource 0x0404, record 2.
+    H.iptcPlace = function (u8, s, end, out) {
+      try {
+        var p = s, guard = 0;
+        while (p + 12 <= end && guard++ < 512) {
+          if (u8[p] !== 0x38 || u8[p + 1] !== 0x42 || u8[p + 2] !== 0x49 || u8[p + 3] !== 0x4d) break;
+          var id = (u8[p + 4] << 8) | u8[p + 5];
+          var nameLen = u8[p + 6];
+          var q = p + 6 + ((nameLen + 2) & ~1);
+          if (q + 4 > end) break;
+          var size = ((u8[q] << 24) >>> 0) + (u8[q + 1] << 16) + (u8[q + 2] << 8) + u8[q + 3];
+          var data = q + 4;
+          if (data + size > end) break;
+          if (id === 0x0404) {
+            var r = data, stop = data + size;
+            while (r + 5 <= stop && u8[r] === 0x1c) {
+              var rec = u8[r + 1], ds = u8[r + 2], len = (u8[r + 3] << 8) | u8[r + 4];
+              if (len & 0x8000) break; // extended length: never used for text fields
+              if (r + 5 + len > stop) break;
+              if (rec === 2) {
+                var key = ds === 90 ? 'city' : ds === 92 ? 'sublocation' : ds === 95 ? 'state' : ds === 101 ? 'country' : null;
+                if (key && out[key] === undefined) {
+                  var v = H.cleanText(H.utf8(u8, r + 5, r + 5 + len));
+                  if (v) out[key] = v;
+                }
+              }
+              r += 5 + len;
+            }
+          }
+          p = data + size + (size & 1);
+        }
+      } catch (err) { /* best-effort */ }
+      return out;
+    };
+
+    var XMP_PLACES = [['city', 'photoshop:City'], ['state', 'photoshop:State'],
+      ['country', 'photoshop:Country'], ['sublocation', 'Iptc4xmpCore:Location']];
+    H.xmpPlace = function (xml, out) {
+      if (!xml) return out;
+      xml = xml.slice(0, 262144);
+      var unent = function (s) {
+        return s.replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(+n); })
+          .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+      };
+      XMP_PLACES.forEach(function (kv) {
+        if (out[kv[0]] !== undefined) return;
+        var esc = kv[1].replace(':', '\\:');
+        var m = new RegExp(esc + '\\s*=\\s*"([^"]*)"').exec(xml) ||
+                new RegExp('<' + esc + '>([^<]*)</' + esc + '>').exec(xml);
+        var v = m && H.cleanText(unent(m[1]));
+        if (v) out[kv[0]] = v;
+      });
+      return out;
+    };
+
+    var XMP_SIG = 'http://ns.adobe.com/xap/1.0/';
+    H.bytesAre = function (u8, p, s) {
+      if (p + s.length > u8.length) return false;
+      for (var i = 0; i < s.length; i++) if (u8[p + i] !== s.charCodeAt(i)) return false;
+      return true;
+    };
+
+    H.jpegCapture = function (u8, out) {
+      var p = 2;
+      var limit = Math.min(u8.length, 4 * 1024 * 1024);
+      var tiffSeen = false, xml = '', iptc = null;
+      while (p + 4 <= limit) {
+        if (u8[p] !== 0xff) { p++; continue; }
+        var marker = u8[p + 1];
+        if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { p += 2; continue; }
+        if (marker === 0xda || marker === 0xd9) break;
+        var len = (u8[p + 2] << 8) | u8[p + 3];
+        if (len < 2) break;
+        var body = p + 4, end = Math.min(u8.length, p + 2 + len);
+        if (marker === 0xe1 && !tiffSeen && H.bytesAre(u8, body, 'Exif\u0000')) {
+          H.tiffCapture(u8, body + 6, out);
+          tiffSeen = true;
+        } else if (marker === 0xe1 && !xml && H.bytesAre(u8, body, XMP_SIG + '\u0000')) {
+          xml = H.utf8(u8, body + XMP_SIG.length + 1, end);
+        } else if (marker === 0xed && !iptc && H.bytesAre(u8, body, 'Photoshop 3.0\u0000')) {
+          iptc = [body + 14, end];
+        }
+        p += 2 + len;
+      }
+      // XMP before IIM: it is the modern carrier, and the one an edit updates.
+      H.xmpPlace(xml, out);
+      if (iptc) H.iptcPlace(u8, iptc[0], iptc[1], out);
+      return out;
+    };
+
+    H.pngCapture = function (u8, out) {
+      var p = 8, guard = 0;
+      while (p + 12 <= u8.length && guard++ < 10000) {
+        var len = ((u8[p] << 24) >>> 0) + (u8[p + 1] << 16) + (u8[p + 2] << 8) + u8[p + 3];
+        var body = p + 8, end = body + len;
+        if (end + 4 > u8.length) break;
+        if (H.bytesAre(u8, p + 4, 'eXIf')) H.tiffCapture(u8, body, out);
+        else if (H.bytesAre(u8, p + 4, 'iTXt') && H.bytesAre(u8, body, 'XML:com.adobe.xmp\u0000')) {
+          var q = body + 18;
+          if (u8[q] === 0) { // uncompressed only; a deflated packet is not worth an inflater
+            q += 2;
+            while (q < end && u8[q]) q++; // language tag
+            q++;
+            while (q < end && u8[q]) q++; // translated keyword
+            q++;
+            H.xmpPlace(H.utf8(u8, q, end), out);
+          }
+        } else if (H.bytesAre(u8, p + 4, 'IEND')) break;
+        p = end + 4;
+      }
+      return out;
+    };
+
+    H.webpCapture = function (u8, out) {
+      var p = 12, guard = 0;
+      while (p + 8 <= u8.length && guard++ < 1000) {
+        var size = (u8[p + 4] | (u8[p + 5] << 8) | (u8[p + 6] << 16) | (u8[p + 7] << 24)) >>> 0;
+        var body = p + 8, end = body + size;
+        if (end > u8.length) break;
+        if (H.bytesAre(u8, p, 'EXIF')) {
+          // Some writers keep the JPEG-style "Exif\0\0" prefix; the spec says not to.
+          H.tiffCapture(u8, H.bytesAre(u8, body, 'Exif\u0000') ? body + 6 : body, out);
+        } else if (H.bytesAre(u8, p, 'XMP ')) {
+          H.xmpPlace(H.utf8(u8, body, end), out);
+        }
+        p = end + (size & 1);
+      }
+      return out;
+    };
+
+    // HEIC keeps XMP as a 'mime' item that can sit anywhere in mdat, so it is
+    // found by its packet text rather than by walking iloc a second time.
+    H.scanXmp = function (u8, cap) {
+      var lim = Math.min(u8.length, cap || 16 * 1024 * 1024);
+      var open = '<x:xmpmeta', p = 0;
+      while ((p = u8.indexOf(0x3c, p)) >= 0 && p < lim) {
+        if (H.bytesAre(u8, p, open)) {
+          var q = p, close = '</x:xmpmeta>';
+          var stop = Math.min(lim, p + 262144);
+          while ((q = u8.indexOf(0x3c, q + 1)) >= 0 && q < stop) {
+            if (H.bytesAre(u8, q, close)) return H.utf8(u8, p, q + close.length);
+          }
+          return '';
+        }
+        p++;
+      }
+      return '';
+    };
+
+    H.readCapture = function (u8, kind) {
+      var out = {};
+      try {
+        if (kind === 'jpeg') H.jpegCapture(u8, out);
+        else if (kind === 'png') H.pngCapture(u8, out);
+        else if (kind === 'webp') H.webpCapture(u8, out);
+        else if (kind === 'heic') {
+          var hm = H.heifMeta(u8);
+          if (hm.tiff >= 0) H.tiffCapture(u8, hm.tiff, out);
+          H.xmpPlace(H.scanXmp(u8), out);
+        }
+      } catch (err) {
+        /* capture metadata is best-effort, exactly like orientation */
+      }
+      return out;
     };
 
     // ---- fingerprint (PRD 7.9: hash + filename + byte size + last modified) --
@@ -791,11 +1114,16 @@
       var meta = msg.meta || {};
       var t0 = (self.performance && self.performance.now) ? self.performance.now() : Date.now();
       var u8 = null;
+      var capture = null;
 
       return Promise.resolve()
         .then(function () { return blob.arrayBuffer(); })
         .then(function (buf) {
           u8 = new Uint8Array(buf);
+          // Read here, BEFORE the cache gate, so a photo whose pixels come from
+          // the cache still gets its capture metadata from the bytes already
+          // in hand. No second read of the file, ever.
+          capture = H.readCapture(u8, H.sniff(u8).kind);
           return H.fingerprint(u8, meta.name || blob.name || '', blob.size, meta.lastMod || blob.lastModified || 0);
         })
         .then(function (id) {
@@ -819,6 +1147,7 @@
         .then(function (r) {
           var t1 = (self.performance && self.performance.now) ? self.performance.now() : Date.now();
           r.ms = Math.round((t1 - t0) * 10) / 10;
+          if (capture) r.capture = capture;
           self.postMessage({ t: 'ok', jid: jid, res: r });
         })
         .catch(function (e) {
@@ -1035,6 +1364,9 @@
           for (var k in c) if (Object.prototype.hasOwnProperty.call(c, k) && c[k] !== undefined) rec[k] = c[k];
           rec.id = r.id || rec.id;
           rec.fromCache = true;
+          // Fresh from this file's bytes: a cached record from before PRD 7.12
+          // has none, and the bytes are authoritative over any stored copy.
+          if (r.capture) rec.capture = r.capture;
         } else {
           if (r.kind) rec.kind = r.kind;
           rec.w = r.w || 0;
@@ -1049,6 +1381,7 @@
           rec.orientationApplied = r.orientationApplied;
           rec.browserAppliesExif = r.browserAppliesExif;
           rec.orientationSource = r.orientationSource;
+          if (r.capture) rec.capture = r.capture;
           rec.ms = r.ms;
         }
         finish(job, w);

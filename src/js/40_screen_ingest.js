@@ -1,9 +1,9 @@
 /**
  * @file 40_screen_ingest.js
- * @version 1.9
+ * @version 1.10
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-10-30
  * @description PRD 7.9 ingest: folder entry by picker or drag, recursive scan, format triage, worker-pool derivative generation with progress, and cache reporting.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -110,10 +110,36 @@
           brandMark(),
           wordmark(true)
         ]),
-        el('p', { class: 'muted', text:
-          'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
-          'passes, then ranks what survives head to head.' })
+        el('p', { class: 'muted', id: 'entry-lede' })
       ]));
+
+      // PRD 7.12: two jobs, chosen before the photos arrive because the
+      // screen after ingest differs. Culling stays the default and the first
+      // option; sorting is the whole set, grouped by metadata, nothing cut.
+      var LEDE = {
+        cull: 'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
+          'passes, then ranks what survives head to head.',
+        sort: 'Point it at a folder of photos. It groups every one of them by when, where and what ' +
+          'they were shot with, lets you tag them, and writes an organized copy. Nothing is cut.'
+      };
+      PT.entryMode = PT.entryMode === 'sort' ? 'sort' : 'cull';
+      var modeBtns = {};
+      function paintMode() {
+        PT.dom.$('#entry-lede').textContent = LEDE[PT.entryMode];
+        Object.keys(modeBtns).forEach(function (k) {
+          modeBtns[k].classList.toggle('on', k === PT.entryMode);
+          modeBtns[k].setAttribute('aria-pressed', k === PT.entryMode ? 'true' : 'false');
+        });
+      }
+      root.appendChild(el('div', { class: 'entry-mode', role: 'group', 'aria-label': 'What to do with the photos' }, [
+        modeBtns.cull = el('button', { type: 'button', class: 'entry-mode-btn', dataset: { t: 'mode-cull' },
+          onclick: function () { PT.entryMode = 'cull'; paintMode(); } }, [
+          el('b', { text: 'Cull to keepers' }), el('span', { class: 'small dim', text: 'quotas, grid passes, head to head' })]),
+        modeBtns.sort = el('button', { type: 'button', class: 'entry-mode-btn', dataset: { t: 'mode-sort' },
+          onclick: function () { PT.entryMode = 'sort'; paintMode(); } }, [
+          el('b', { text: 'Sort and tag' }), el('span', { class: 'small dim', text: 'group by date, place, camera; keep everything' })])
+      ]));
+      paintMode();
 
       // The webkitdirectory input is the workhorse. It preserves the folder tree,
       // works on every Chromium build and on a file:// origin, and needs no
@@ -398,7 +424,7 @@
   /* -------------------------------------------------------------- scan ---- */
 
   function beginFromHandle(dirHandle) {
-    var session = PT.session.newSession(dirHandle.name, 'handle');
+    var session = PT.session.newSession(dirHandle.name, 'handle', PT.entryMode);
     PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
     PT.db.put('handles', { key: 'root', handle: dirHandle }).catch(function (e) {
       PT.warn('ingest', 'could not persist the folder handle; resume will not work', e);
@@ -407,7 +433,7 @@
   }
 
   function beginFromFiles(files, rootName) {
-    var session = PT.session.newSession(rootName || 'selected photos', 'files');
+    var session = PT.session.newSession(rootName || 'selected photos', 'files', PT.entryMode);
     PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
     PT.router.go('ingest', { source: { type: 'files', files: files } });
   }
@@ -418,7 +444,7 @@
    * folder tree survives even though there is no directory handle to write into.
    */
   function beginFromEntries(entries, rootName) {
-    var session = PT.session.newSession(rootName || 'dropped folder', 'files');
+    var session = PT.session.newSession(rootName || 'dropped folder', 'files', PT.entryMode);
     PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
     PT.router.go('ingest', { source: { type: 'entries', entries: entries } });
   }
@@ -546,6 +572,16 @@
               return reportCache(summary);
             })
             .then(function () {
+              if (PT.store.get().session.mode === 'sort') {
+                PT.dom.clear(actions).appendChild(el('button', {
+                  class: 'btn btn-primary', text: 'Sort and tag →', dataset: { t: 'to-sort' },
+                  onclick: function () {
+                    PT.store.dispatch('stage:sort', function (s) { s.session.stage = 'sort'; });
+                    PT.router.go('sort');
+                  }
+                }));
+                return;
+              }
               PT.dom.clear(actions).appendChild(el('button', {
                 class: 'btn btn-primary', text: 'Set finalist counts →',
                 onclick: function () {
@@ -766,4 +802,7 @@
  *   (the loose picker also names HEIC explicitly, which image/* misses on some
  *   platforms), and re-derived thumbnails re-apply a stored manual orientation
  *   before anything renders or persists them.
+ * v1.10 (2026-10-30): The entry screen asks which job, cull or sort (PRD
+ *   7.12), before the photos arrive; a sort session's ingest ends on 'Sort and
+ *   tag' instead of finalist counts.
 */

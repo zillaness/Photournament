@@ -1,7 +1,7 @@
 <!--
   Photournament v1.0 — built 2026-10-30
   GENERATED FILE. Do not edit; edit src/ and re-run: node tools/build.mjs
-  14 script(s), 1 stylesheet(s). omitted (--no-heic): HEIC files will be flagged as unsupported.
+  16 script(s), 1 stylesheet(s). omitted (--no-heic): HEIC files will be flagged as unsupported.
   Open by double-clicking. Chromium only: resume and disk-write need the
   File System Access API, which Chromium alone implements.
 -->
@@ -2734,10 +2734,170 @@ kbd {
   color: var(--text);
 }
 
+/* Entry: the two jobs, chosen before the photos arrive. */
+#app .entry-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0;
+}
+#app .entry-mode-btn {
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+#app .entry-mode-btn:hover { border-color: var(--hover-line); }
+#app .entry-mode-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#app .entry-mode-btn.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+@media (max-width: 560px) { #app .entry-mode { grid-template-columns: 1fr; } }
+
+/* Organize-by control, shared by Sort mode and the allocation screen. */
+#app .org-bar { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+#app .org-chosen,
+#app .org-add,
+#app .org-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+#app .org-label { font-size: var(--fs-micro); color: var(--text-mute); min-width: 74px; }
+#app .org-sep { color: var(--text-mute); }
+#app .org-chip {
+  font: inherit;
+  font-size: var(--fs-small);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+#app .org-chip:hover { border-color: var(--hover-line); color: var(--text); }
+#app .org-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#app .org-chip.on { border-color: var(--accent); color: var(--text); cursor: default; padding: 4px 6px 4px 10px; }
+#app .org-chip.flat { opacity: 0.6; }
+#app .org-n { font-size: var(--fs-micro); color: var(--text-mute); }
+#app .org-mini {
+  font: inherit;
+  font-size: var(--fs-micro);
+  line-height: 1;
+  border: 0;
+  border-radius: 999px;
+  padding: 3px 6px;
+  background: transparent;
+  color: var(--text-mute);
+  cursor: pointer;
+}
+#app .org-mini:hover { background: var(--surface-3); color: var(--text); }
+#app .org-opts select {
+  font: inherit;
+  font-size: var(--fs-small);
+  padding: 5px 8px;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--field);
+  color: var(--text);
+}
+#app .org-notes { max-width: var(--measure); }
+#modal .org-h3 { font-size: var(--fs-small); margin: 14px 0 6px; color: var(--text-dim); }
+#modal .org-names { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow: auto; }
+#modal .org-names .row { gap: 10px; align-items: center; }
+#modal .org-name-what { min-width: 220px; }
+#modal .org-names input {
+  font: inherit;
+  font-size: var(--fs-small);
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--field);
+  color: var(--text);
+}
+
+/* Sort mode: every photo, grouped. */
+#app .so-top { margin-bottom: 14px; }
+#app .so-top h1 { margin: 0; }
+#app .so-groups { display: flex; flex-direction: column; gap: 18px; padding-bottom: 90px; }
+#app .so-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+#app .so-title { font-size: var(--fs-body); margin: 0; color: var(--text); }
+#app .so-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+#app .so-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r);
+  border: 1px solid transparent;
+  cursor: pointer;
+  outline: none;
+}
+#app .so-cell:hover { border-color: var(--line-2); }
+#app .so-cell:focus-visible { border-color: var(--accent); }
+/* Selection is a control state, so it is the accent ring AROUND the frame;
+   the photograph itself is never tinted. */
+#app .so-cell.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--surface-2); }
+#app .so-frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--well);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#app .so-frame img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+#app .so-cell:hover .expand-btn { opacity: 1; }
+#app .so-cap { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#app .so-name { font-size: var(--fs-micro); color: var(--text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#app .so-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+#app .so-tag {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--text);
+}
+#app .so-selbar {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: min(1100px, calc(100vw - 32px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+#app .so-selbar:not(.active) .pt-tags { opacity: 0.5; }
+
+
 /* CHANGELOG (appended block)
  * v2.2a (2026-10-30): PRD 7.12 organize-and-tag block, tokens only: lightbox
  *   metadata row, the tag chip in its off / mixed / on states, the inline
  *   new-tag field and the tag manager.
+ * v2.2b (2026-10-30): Entry mode choice, the shared Organize-by control and
+ *   its naming dialog, and Sort mode's grouped grid, selection ring (accent,
+ *   around the frame, never on the photo) and floating selection bar.
  */
 
 </style>
@@ -7459,10 +7619,10 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Eleven categories, time-
 /* ===== 35_session.js ===== */
 /**
  * @file 35_session.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-30
+ * @lastUpdated 2026-10-30
  * @description Session model and stage flow for Photournament: settings defaults, tournament unit state, quota resolution, pass bookkeeping, and persistence shaping.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -7502,12 +7662,15 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Eleven categories, time-
 
   var PHASES = ['gridA', 'rescue', 'dupes', 'bracket', 'runoff', 'done'];
 
-  function newSession(rootName, sourceKind) {
+  function newSession(rootName, sourceKind, mode) {
     return {
       id: 'sess-' + Date.now().toString(36),
       createdAt: Date.now(),
       rootName: rootName || 'photos',
       sourceKind: sourceKind || 'files',   // 'handle' = can resume and write to disk
+      mode: mode === 'sort' ? 'sort' : 'cull', // PRD 7.12; absent on older sessions = cull
+      organize: null,                      // PRD 7.12 {cats, eventGapH, radiusKm, names}; null = folders
+      tags: null,                          // PRD 7.12 {defs, on}; see 36_tags.js
       settings: Object.assign({}, DEFAULTS),
       allocs: {},                          // path -> {mode, value}
       rankPaths: {},                       // path -> 1: rank this folder, don't cull it
@@ -7899,6 +8062,8 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Eleven categories, time-
  *   ~30% cheaper than the textbook count); projectSchedule() prices the culling
  *   path to the same handoff point, so the two can sit side by side on the
  *   setup screen and the user commits to a cost they have seen.
+ * v1.4 (2026-10-30): Sessions carry mode ('cull' | 'sort'; absent = cull),
+ *   organize (PRD 7.12 spec, null = folders) and tags, for PRD 7.12.
 */
 
 </script>
@@ -8205,13 +8370,218 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
 
 </script>
 <script>
+/* ===== 38_organize_ui.js ===== */
+/**
+ * @file 38_organize_ui.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-10-30
+ * @lastUpdated 2026-10-30
+ * @description PRD 7.12 "Organize by" control: the category chip row (choose, order, remove), the event-gap and location-radius options, and the naming dialog for events and places. Shared by Sort mode and the culling allocation screen.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * One control, two homes, so the two modes cannot drift into two meanings of
+ * "organize by". It owns no state: it reads a spec through a getter and hands
+ * every change to onChange, and the screen decides what a change costs (the
+ * allocation screen warns that set counts will reset; Sort mode just redraws).
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+  var el = function () { return PT.dom.el.apply(null, arguments); };
+
+  function gapText(h) { return h < 1 ? Math.round(h * 60) + ' min' : h + ' h'; }
+
+  /**
+   * @param {{
+   *   spec: function():object,            current organize spec
+   *   photos: function():object[],        live photo records
+   *   onChange: function(object):void,    receives the next spec
+   *   locked?: string                     when set, the reason it cannot change
+   * }} opts
+   * @returns {{el:HTMLElement, refresh:function()}}
+   */
+  function organizeBar(opts) {
+    var root = el('div', { class: 'org-bar', dataset: { t: 'org-bar' } });
+
+    function emit(mut) {
+      var cur = PT.organize.normSpec(opts.spec());
+      var next = { cats: cur.cats.slice(), eventGapH: cur.eventGapH, radiusKm: cur.radiusKm, names: Object.assign({}, cur.names) };
+      mut(next);
+      opts.onChange(next);
+    }
+
+    function render() {
+      PT.dom.clear(root);
+      var spec = PT.organize.normSpec(opts.spec());
+      var photos = opts.photos() || [];
+      var pl = PT.organize.plan(photos, spec);
+      var locked = opts.locked;
+
+      var chosen = el('div', { class: 'org-chosen' }, [el('span', { class: 'org-label', text: 'Organize by' })]);
+      if (!spec.cats.length) chosen.appendChild(el('span', { class: 'small dim', text: 'nothing yet: everything in one group' }));
+      spec.cats.forEach(function (key, i) {
+        var cat = PT.organize.CATEGORIES.filter(function (c) { return c.key === key; })[0];
+        if (i) chosen.appendChild(el('span', { class: 'org-sep', text: '›' }));
+        chosen.appendChild(el('span', { class: 'org-chip on', dataset: { t: 'org-chosen', cat: key }, title: cat.hint }, [
+          i > 0 && !locked ? el('button', { type: 'button', class: 'org-mini', text: '←', title: 'Move up a level',
+            dataset: { t: 'org-left' },
+            onclick: function () { emit(function (n) { var t = n.cats[i - 1]; n.cats[i - 1] = n.cats[i]; n.cats[i] = t; }); } }) : null,
+          el('span', { text: cat.label }),
+          !locked ? el('button', { type: 'button', class: 'org-mini', text: '×', title: 'Stop organizing by ' + cat.label.toLowerCase(),
+            dataset: { t: 'org-remove' },
+            onclick: function () { emit(function (n) { n.cats.splice(i, 1); }); } }) : null
+        ]));
+      });
+      root.appendChild(chosen);
+
+      if (locked) {
+        root.appendChild(el('div', { class: 'small dim', text: locked }));
+      } else {
+        var add = el('div', { class: 'org-add' }, [el('span', { class: 'org-label', text: spec.cats.length ? 'then' : 'Add' })]);
+        PT.organize.CATEGORIES.forEach(function (c) {
+          if (spec.cats.indexOf(c.key) >= 0) return;
+          var sm = pl.summary[c.key];
+          // A category that puts every photo in one bucket organizes nothing;
+          // it stays offered, but says so, rather than vanishing unexplained.
+          var only = sm.groups <= 1;
+          add.appendChild(el('button', {
+            type: 'button', class: 'org-chip' + (only ? ' flat' : ''),
+            dataset: { t: 'org-add', cat: c.key },
+            title: c.hint + ' — ' + sm.groups + ' group' + (sm.groups === 1 ? '' : 's') +
+              (sm.missing ? ', ' + sm.missing + ' photo' + (sm.missing === 1 ? '' : 's') + ' without it' : ''),
+            onclick: function () { emit(function (n) { n.cats.push(c.key); }); }
+          }, [c.label, el('span', { class: 'org-n nums', text: String(sm.groups) })]));
+        });
+        root.appendChild(add);
+      }
+
+      // Options only for what is chosen, and naming only where names are made up.
+      var optsRow = el('div', { class: 'org-opts' });
+      if (spec.cats.indexOf('event') >= 0) {
+        var gap = el('select', { dataset: { t: 'org-gap' }, disabled: !!locked });
+        PT.organize.GAP_CHOICES.forEach(function (h) {
+          var o = el('option', { value: String(h), text: 'new event after ' + gapText(h) + ' without a photo' });
+          if (h === spec.eventGapH) o.selected = true;
+          gap.appendChild(o);
+        });
+        gap.addEventListener('change', function () { emit(function (n) { n.eventGapH = +gap.value; }); });
+        optsRow.appendChild(el('label', { class: 'small' }, [el('span', { class: 'dim', text: 'Events: ' }), gap]));
+      }
+      if (spec.cats.indexOf('location') >= 0) {
+        var rad = el('select', { dataset: { t: 'org-radius' }, disabled: !!locked });
+        PT.organize.RADIUS_CHOICES.forEach(function (k) {
+          var o = el('option', { value: String(k), text: 'photos within ' + k + ' km are one place' });
+          if (k === spec.radiusKm) o.selected = true;
+          rad.appendChild(o);
+        });
+        rad.addEventListener('change', function () { emit(function (n) { n.radiusKm = +rad.value; }); });
+        optsRow.appendChild(el('label', { class: 'small' }, [el('span', { class: 'dim', text: 'Places: ' }), rad]));
+      }
+      var nameable = (spec.cats.indexOf('event') >= 0 && pl.events.length) || (spec.cats.indexOf('location') >= 0 && pl.locations.length);
+      if (nameable && !locked) {
+        optsRow.appendChild(el('button', { type: 'button', class: 'btn btn-sm', text: 'Name events and places…',
+          dataset: { t: 'org-name' }, onclick: function () { nameDialog(spec, pl); } }));
+      }
+      if (optsRow.childNodes.length) root.appendChild(optsRow);
+
+      var notes = [];
+      if (pl.noCapture) {
+        notes.push(pl.noCapture + ' photo' + (pl.noCapture === 1 ? ' was' : 's were') +
+          ' read before Photournament kept metadata, so ' + (pl.noCapture === 1 ? 'it lands' : 'they land') +
+          ' in the "unknown" groups. Adding the folder again reads it.');
+      }
+      spec.cats.forEach(function (k) {
+        var sm = pl.summary[k];
+        if (k !== 'folder' && sm.missing && sm.missing < photos.length) {
+          var cat = PT.organize.CATEGORIES.filter(function (c) { return c.key === k; })[0];
+          notes.push(sm.missing + ' without ' + cat.label.toLowerCase() + ' information go to their own group.');
+        }
+      });
+      if (notes.length) root.appendChild(el('div', { class: 'small dim org-notes', text: notes.join(' ') }));
+    }
+
+    /**
+     * Events and places are the two categories whose names are made up
+     * ("2026-07-14 09.12", "Near 35.01N 135.77E"), so they are the two that
+     * can be renamed. A name is saved on the spec, keyed so it survives a
+     * change of gap or radius (PT.organize matches places by distance).
+     */
+    function nameDialog(spec, pl) {
+      var body = PT.dom.$('#modal-body');
+      var dlg = PT.dom.$('#modal');
+      if (!body || !dlg) return;
+      PT.dom.clear(body);
+      body.appendChild(el('h2', { text: 'Name events and places' }));
+      body.appendChild(el('p', { class: 'muted small', text:
+        'Names become folder names when you export. Leave one blank to keep its automatic name.' }));
+      var inputs = [];
+      function section(title, list, fmt) {
+        if (!list.length) return;
+        body.appendChild(el('h3', { class: 'org-h3', text: title }));
+        var box = el('div', { class: 'org-names' });
+        list.forEach(function (g) {
+          var input = el('input', { type: 'text', maxlength: '60', placeholder: g.auto, dataset: { t: 'org-name-input', key: g.key } });
+          input.value = spec.names[g.key] || '';
+          inputs.push(input);
+          box.appendChild(el('label', { class: 'row' }, [
+            el('span', { class: 'small dim org-name-what', text: fmt(g) }),
+            input
+          ]));
+        });
+        body.appendChild(box);
+      }
+      if (spec.cats.indexOf('event') >= 0) {
+        section('Events', pl.events, function (g) { return g.auto + ' · ' + g.count + ' photo' + (g.count === 1 ? '' : 's'); });
+      }
+      if (spec.cats.indexOf('location') >= 0) {
+        section('Places from GPS', pl.locations, function (g) {
+          return g.lat.toFixed(3) + ', ' + g.lon.toFixed(3) + ' · ' + g.count + ' photo' + (g.count === 1 ? '' : 's');
+        });
+      }
+      body.appendChild(el('div', { class: 'row', style: 'margin-top:14px' }, [
+        el('span', { class: 'spacer' }),
+        el('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () { dlg.close(); } }),
+        el('button', { class: 'btn btn-primary', type: 'button', text: 'Save names', dataset: { t: 'org-name-save' },
+          onclick: function () {
+            emit(function (n) {
+              inputs.forEach(function (i) {
+                var v = i.value.trim();
+                if (v) n.names[i.dataset.key] = v; else delete n.names[i.dataset.key];
+              });
+            });
+            dlg.close();
+          } })
+      ]));
+      if (!dlg.open) dlg.showModal();
+    }
+
+    render();
+    return { el: root, refresh: render };
+  }
+
+  PT.organizeBar = organizeBar;
+})();
+
+/*
+CHANGELOG
+v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Chosen chips with
+  reorder and remove, add chips with live group counts, event-gap and
+  location-radius options, missing-data notes, and the event/place naming
+  dialog.
+*/
+
+</script>
+<script>
 /* ===== 40_screen_ingest.js ===== */
 /**
  * @file 40_screen_ingest.js
- * @version 1.9
+ * @version 1.10
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-10-30
  * @description PRD 7.9 ingest: folder entry by picker or drag, recursive scan, format triage, worker-pool derivative generation with progress, and cache reporting.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -8318,10 +8688,36 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
           brandMark(),
           wordmark(true)
         ]),
-        el('p', { class: 'muted', text:
-          'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
-          'passes, then ranks what survives head to head.' })
+        el('p', { class: 'muted', id: 'entry-lede' })
       ]));
+
+      // PRD 7.12: two jobs, chosen before the photos arrive because the
+      // screen after ingest differs. Culling stays the default and the first
+      // option; sorting is the whole set, grouped by metadata, nothing cut.
+      var LEDE = {
+        cull: 'Point it at a folder of photos. It cuts the field down with quota-enforced grid ' +
+          'passes, then ranks what survives head to head.',
+        sort: 'Point it at a folder of photos. It groups every one of them by when, where and what ' +
+          'they were shot with, lets you tag them, and writes an organized copy. Nothing is cut.'
+      };
+      PT.entryMode = PT.entryMode === 'sort' ? 'sort' : 'cull';
+      var modeBtns = {};
+      function paintMode() {
+        PT.dom.$('#entry-lede').textContent = LEDE[PT.entryMode];
+        Object.keys(modeBtns).forEach(function (k) {
+          modeBtns[k].classList.toggle('on', k === PT.entryMode);
+          modeBtns[k].setAttribute('aria-pressed', k === PT.entryMode ? 'true' : 'false');
+        });
+      }
+      root.appendChild(el('div', { class: 'entry-mode', role: 'group', 'aria-label': 'What to do with the photos' }, [
+        modeBtns.cull = el('button', { type: 'button', class: 'entry-mode-btn', dataset: { t: 'mode-cull' },
+          onclick: function () { PT.entryMode = 'cull'; paintMode(); } }, [
+          el('b', { text: 'Cull to keepers' }), el('span', { class: 'small dim', text: 'quotas, grid passes, head to head' })]),
+        modeBtns.sort = el('button', { type: 'button', class: 'entry-mode-btn', dataset: { t: 'mode-sort' },
+          onclick: function () { PT.entryMode = 'sort'; paintMode(); } }, [
+          el('b', { text: 'Sort and tag' }), el('span', { class: 'small dim', text: 'group by date, place, camera; keep everything' })])
+      ]));
+      paintMode();
 
       // The webkitdirectory input is the workhorse. It preserves the folder tree,
       // works on every Chromium build and on a file:// origin, and needs no
@@ -8606,7 +9002,7 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
   /* -------------------------------------------------------------- scan ---- */
 
   function beginFromHandle(dirHandle) {
-    var session = PT.session.newSession(dirHandle.name, 'handle');
+    var session = PT.session.newSession(dirHandle.name, 'handle', PT.entryMode);
     PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
     PT.db.put('handles', { key: 'root', handle: dirHandle }).catch(function (e) {
       PT.warn('ingest', 'could not persist the folder handle; resume will not work', e);
@@ -8615,7 +9011,7 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
   }
 
   function beginFromFiles(files, rootName) {
-    var session = PT.session.newSession(rootName || 'selected photos', 'files');
+    var session = PT.session.newSession(rootName || 'selected photos', 'files', PT.entryMode);
     PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
     PT.router.go('ingest', { source: { type: 'files', files: files } });
   }
@@ -8626,7 +9022,7 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
    * folder tree survives even though there is no directory handle to write into.
    */
   function beginFromEntries(entries, rootName) {
-    var session = PT.session.newSession(rootName || 'dropped folder', 'files');
+    var session = PT.session.newSession(rootName || 'dropped folder', 'files', PT.entryMode);
     PT.store.init({ session: session, photos: {}, derivatives: {}, tree: null, resolution: null });
     PT.router.go('ingest', { source: { type: 'entries', entries: entries } });
   }
@@ -8754,6 +9150,16 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
               return reportCache(summary);
             })
             .then(function () {
+              if (PT.store.get().session.mode === 'sort') {
+                PT.dom.clear(actions).appendChild(el('button', {
+                  class: 'btn btn-primary', text: 'Sort and tag →', dataset: { t: 'to-sort' },
+                  onclick: function () {
+                    PT.store.dispatch('stage:sort', function (s) { s.session.stage = 'sort'; });
+                    PT.router.go('sort');
+                  }
+                }));
+                return;
+              }
               PT.dom.clear(actions).appendChild(el('button', {
                 class: 'btn btn-primary', text: 'Set finalist counts →',
                 onclick: function () {
@@ -8974,6 +9380,9 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
  *   (the loose picker also names HEIC explicitly, which image/* misses on some
  *   platforms), and re-derived thumbnails re-apply a stored manual orientation
  *   before anything renders or persists them.
+ * v1.10 (2026-10-30): The entry screen asks which job, cull or sort (PRD
+ *   7.12), before the photos arrive; a sort session's ingest ends on 'Sort and
+ *   tag' instead of finalist counts.
 */
 
 </script>
@@ -10771,6 +11180,304 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
  *   flag onto the units; a session where EVERY unit ranks skips the duplicate
  *   review gate via PT.dupes.materialise(), because the gate was the friction
  *   and the runoff can still prise a wrong bundle apart.
+*/
+
+</script>
+<script>
+/* ===== 55_screen_sort.js ===== */
+/**
+ * @file 55_screen_sort.js
+ * @version 1.0
+ * @author Samuel Cao
+ * @created 2026-10-30
+ * @lastUpdated 2026-10-30
+ * @description PRD 7.12 Sort mode: every photo of a shoot, grouped by the categories the user chooses, selectable and taggable, with an export that writes an organized copy or a manifest.
+ * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
+ *
+ * Sort mode is the other job: nothing is kept or cut and there is no quota,
+ * because nothing is being narrowed. It shares ingest, PT.organize, the
+ * Organize-by control, the lightbox and the tags with culling; what it adds is
+ * a screen that shows the WHOLE set, grouped, and an export for the whole set.
+ *
+ * The organization lives on session.organize and persists; the selection is
+ * deliberately transient (a reload lands with nothing selected, which is
+ * never wrong, where a stale selection can be).
+ */
+
+(function () {
+  'use strict';
+
+  var PT = (window.PT = window.PT || {});
+  var el = function () { return PT.dom.el.apply(null, arguments); };
+
+  var S = null; // screen state while mounted
+
+  function livePhotos() {
+    var s = PT.store.get();
+    return Object.keys(s.photos || {}).map(function (k) { return s.photos[k]; })
+      .filter(function (p) { return p && !p.err && (!S || !S.ids || S.ids[p.id]); });
+  }
+
+  /**
+   * Sort mode's opening view. Day when most photos carry a capture date (the
+   * usual shape of a camera roll), folders otherwise; either way it is only a
+   * starting point and the chips are right there.
+   */
+  function defaultSpec(photos) {
+    var dated = photos.filter(function (p) { return p.capture && p.capture.when; }).length;
+    return { cats: dated * 2 >= photos.length && dated ? ['day'] : ['folder'] };
+  }
+
+  function spec() {
+    var sess = PT.store.get().session;
+    return sess.organize || { cats: [] };
+  }
+
+  function thumbFor(id) {
+    var s = PT.store.get();
+    var d = s.derivatives && s.derivatives[id];
+    if (d && (d.thumb || d.preview)) return Promise.resolve(d.thumb || d.preview);
+    return PT.db.get('derivatives', id).then(function (r) { return r ? (r.thumb || r.preview) : null; })
+      .catch(function () { return null; });
+  }
+
+  /* ------------------------------------------------------------- groups -- */
+
+  function grouped() {
+    var photos = livePhotos();
+    var pl = PT.organize.plan(photos, spec());
+    var byDir = {};
+    photos.forEach(function (p) {
+      var d = pl.dir[p.id];
+      (byDir[d] = byDir[d] || []).push(p);
+    });
+    var dirs = Object.keys(byDir).sort(function (a, b) {
+      // Missing-data buckets sink to the end of their level.
+      var ua = /(^|\/)(No date|No location|Unknown [^/]*|Other format)(\/|$)/.test(a);
+      var ub = /(^|\/)(No date|No location|Unknown [^/]*|Other format)(\/|$)/.test(b);
+      if (ua !== ub) return ua ? 1 : -1;
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
+    var order = [];
+    var groups = dirs.map(function (d) {
+      var ps = byDir[d].sort(function (a, b) {
+        var ta = a.capture && a.capture.when || '', tb = b.capture && b.capture.when || '';
+        if (ta !== tb) return ta < tb ? -1 : 1;
+        return (a.path || a.name) < (b.path || b.name) ? -1 : 1;
+      });
+      ps.forEach(function (p) { order.push(p.id); });
+      return { dir: d, ids: ps.map(function (p) { return p.id; }) };
+    });
+    return { groups: groups, order: order, plan: pl };
+  }
+
+  /* ------------------------------------------------------------- render -- */
+
+  function renderGroups() {
+    var host = S.groupsHost;
+    if (S.io) S.io.disconnect();
+    PT.dom.$$('img', host).forEach(function (img) { PT.dom.releaseImg(img); });
+    PT.dom.clear(host);
+
+    var g = grouped();
+    S.order = g.order;
+    S.cells = {};
+    S.summary.textContent = g.order.length + ' photo' + (g.order.length === 1 ? '' : 's') + ' in ' +
+      g.groups.length + ' group' + (g.groups.length === 1 ? '' : 's');
+
+    // Thumbnails load as they scroll into view: a 742-photo shoot is 742
+    // object URLs otherwise, all decoded up front.
+    S.io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var img = e.target;
+        S.io.unobserve(img);
+        thumbFor(img.dataset.id).then(function (b) { if (b && S && img.isConnected) PT.dom.setImg(img, b); });
+      });
+    }, { root: null, rootMargin: '600px 0px' });
+
+    g.groups.forEach(function (gr) {
+      var title = gr.dir ? gr.dir.split('/').join('  ›  ') : 'All photos';
+      var head = el('div', { class: 'so-head' }, [
+        el('h3', { class: 'so-title', text: title }),
+        el('span', { class: 'small dim nums', text: gr.ids.length + ' photo' + (gr.ids.length === 1 ? '' : 's') }),
+        el('span', { class: 'spacer' }),
+        el('button', { type: 'button', class: 'btn btn-sm btn-quiet', text: 'Select group', dataset: { t: 'so-select-group' },
+          onclick: function () {
+            var all = gr.ids.every(function (id) { return S.sel[id]; });
+            gr.ids.forEach(function (id) { if (all) delete S.sel[id]; else S.sel[id] = 1; });
+            S.anchor = null;
+            paintSelection();
+          } })
+      ]);
+      var grid = el('div', { class: 'so-grid' });
+      gr.ids.forEach(function (id) { grid.appendChild(cell(id, gr.ids)); });
+      host.appendChild(el('section', { class: 'so-group', dataset: { t: 'so-group', dir: gr.dir } }, [head, grid]));
+    });
+    paintSelection();
+  }
+
+  function cell(id, groupIds) {
+    var p = PT.store.get().photos[id];
+    var img = el('img', { alt: '', dataset: { id: id }, loading: 'lazy' });
+    var tags = el('div', { class: 'so-tags' });
+    var c = el('div', { class: 'so-cell', dataset: { t: 'so-cell', id: id }, tabindex: '0',
+      title: p.name + ' — click to select, shift-click for a range' }, [
+      el('div', { class: 'so-frame' }, [
+        img,
+        el('button', { type: 'button', class: 'expand-btn', text: '⤢', title: 'Open large (and see its metadata)',
+          dataset: { t: 'so-expand' },
+          onclick: function (e) { e.stopPropagation(); PT.lightbox.open(groupIds.slice(), groupIds.indexOf(id)); } })
+      ]),
+      el('div', { class: 'so-cap' }, [el('span', { class: 'so-name', text: p.name }), tags])
+    ]);
+    c.addEventListener('click', function (e) { select(id, e.shiftKey); });
+    c.addEventListener('keydown', function (e) {
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); select(id, e.shiftKey); }
+    });
+    S.cells[id] = { el: c, tags: tags };
+    paintTags(id);
+    S.io.observe(img);
+    return c;
+  }
+
+  function select(id, range) {
+    if (range && S.anchor && S.order.indexOf(S.anchor) >= 0) {
+      var a = S.order.indexOf(S.anchor), b = S.order.indexOf(id);
+      var lo = Math.min(a, b), hi = Math.max(a, b);
+      for (var i = lo; i <= hi; i++) S.sel[S.order[i]] = 1;
+    } else {
+      if (S.sel[id]) delete S.sel[id]; else S.sel[id] = 1;
+      S.anchor = id;
+    }
+    paintSelection();
+  }
+
+  function selectedIds() {
+    return S.order.filter(function (id) { return S.sel[id]; });
+  }
+
+  function paintSelection() {
+    Object.keys(S.cells).forEach(function (id) {
+      S.cells[id].el.classList.toggle('sel', !!S.sel[id]);
+      S.cells[id].el.setAttribute('aria-selected', S.sel[id] ? 'true' : 'false');
+    });
+    var n = selectedIds().length;
+    S.selCount.textContent = n ? n + ' selected' : 'Nothing selected — click photos, or Select group';
+    S.selBar.classList.toggle('active', n > 0);
+    S.tagBar.refresh();
+  }
+
+  function paintTags(id) {
+    var c = S.cells[id];
+    if (!c) return;
+    PT.dom.clear(c.tags);
+    PT.tags.names(id).forEach(function (n) { c.tags.appendChild(el('span', { class: 'so-tag', text: n })); });
+  }
+
+  /* ------------------------------------------------------------- screen -- */
+
+  PT.router.register('sort', {
+    mount: function (root) {
+      var st = PT.store.get();
+      PT.dom.$('#topbar').hidden = false;
+      PT.dom.$('#topbar-context').textContent = st.session.rootName;
+      PT.dom.$('#topbar-stop').hidden = true;
+      var counters = PT.dom.$('#topbar-counters');
+      if (counters) counters.textContent = '';
+
+      S = { sel: {}, anchor: null, order: [], cells: {}, io: null, ids: null };
+
+      if (!st.session.organize) {
+        var first = defaultSpec(livePhotos());
+        PT.store.dispatch('sort:organize', function (s) { s.session.organize = first; });
+      }
+
+      S.summary = el('span', { class: 'muted small' });
+      var bar = PT.organizeBar({
+        spec: spec,
+        photos: livePhotos,
+        onChange: function (next) {
+          PT.store.dispatch('sort:organize', function (s) { s.session.organize = next; });
+          bar.refresh();
+          renderGroups();
+        }
+      });
+
+      root.appendChild(el('div', { class: 'card so-top' }, [
+        el('div', { class: 'row' }, [
+          el('h1', { text: 'Sort and tag' }),
+          S.summary,
+          el('span', { class: 'spacer' }),
+          el('button', { type: 'button', class: 'btn btn-quiet', text: 'Tags…', dataset: { t: 'so-manage-tags' },
+            onclick: function () { PT.tags.manage(); } }),
+          el('button', { type: 'button', class: 'btn btn-primary', text: 'Export…', dataset: { t: 'so-export' },
+            onclick: function () { if (PT.sortExport) PT.sortExport.open(); } })
+        ]),
+        el('p', { class: 'muted small', text:
+          'Nothing here is kept or cut. Choose how to group the shoot, tag what you like, then export ' +
+          'an organized copy or just the list.' }),
+        bar.el
+      ]));
+
+      S.groupsHost = el('div', { class: 'so-groups' });
+      root.appendChild(S.groupsHost);
+
+      S.selCount = el('span', { class: 'small nums', dataset: { t: 'so-sel-count' } });
+      S.tagBar = PT.tags.bar({ ids: selectedIds, keys: true, label: 'Tag selection' });
+      S.selBar = el('div', { class: 'so-selbar', dataset: { t: 'so-selbar' } }, [
+        S.selCount,
+        S.tagBar.el,
+        el('span', { class: 'spacer' }),
+        el('button', { type: 'button', class: 'btn btn-sm btn-quiet', text: 'Select all', dataset: { t: 'so-select-all' },
+          onclick: function () { S.order.forEach(function (id) { S.sel[id] = 1; }); paintSelection(); } }),
+        el('button', { type: 'button', class: 'btn btn-sm btn-quiet', text: 'Clear', dataset: { t: 'so-clear' },
+          onclick: function () { S.sel = {}; S.anchor = null; paintSelection(); } })
+      ]);
+      root.appendChild(S.selBar);
+
+      S.off = PT.store.subscribe(function (s, name) {
+        if (!S) return;
+        if (/^tags:/.test(name)) Object.keys(S.cells).forEach(paintTags);
+      });
+
+      S.onKey = function (e) {
+        if (!S || document.querySelector('dialog[open]')) return;
+        var t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+        if (PT.tags.handleKey(e, selectedIds())) return;
+        if (e.key === 'Escape') { S.sel = {}; S.anchor = null; paintSelection(); }
+      };
+      document.addEventListener('keydown', S.onKey);
+
+      renderGroups();
+    },
+
+    unmount: function () {
+      if (!S) return;
+      if (S.io) S.io.disconnect();
+      if (S.off) S.off();
+      document.removeEventListener('keydown', S.onKey);
+      PT.dom.$$('#screen img').forEach(function (img) { PT.dom.releaseImg(img); });
+      S = null;
+    }
+  });
+
+  PT.sortScreen = {
+    /** The photos in the current organization, in on-screen order, with their dirs. */
+    current: function () {
+      var g = grouped();
+      return g;
+    }
+  };
+})();
+
+/*
+CHANGELOG
+v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Whole-shoot grouped
+  view driven by the shared Organize-by control, lazy thumbnails, click and
+  shift-click selection, per-group select, a selection bar carrying the tag
+  bar (Shift+1..9), lightbox per group, and the Export entry point.
 */
 
 </script>
@@ -15103,10 +15810,10 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
 /* ===== 99_app.js ===== */
 /**
  * @file 99_app.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-10-30
  * @description Application boot: environment checks, session resume, stage routing, toasts, and the global keyboard layer.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -15240,6 +15947,7 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
     // edit is never stranded behind a reload.
     if (session.groups && session.groups.status === 'review') return { name: 'dupes' };
     switch (session.stage) {
+      case 'sort':   return { name: 'sort' };
       case 'tree':   return { name: 'tree' };
       case 'export': return { name: 'export' };
       case 'unit': {
@@ -15333,7 +16041,8 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
       el('h1', { text: 'Pick up where you left off?' }),
       el('p', { class: 'muted', text:
         session.rootName + ' — started ' + when + '. ' +
-        (units.length ? done + ' of ' + units.length + ' tournaments finished.' : '') }),
+        (session.mode === 'sort' ? 'Sorting and tagging; nothing is cut.' :
+          units.length ? done + ' of ' + units.length + ' tournaments finished.' : '') }),
       el('div', { class: 'row', style: 'margin-top:14px' }, [
         el('button', { class: 'btn btn-primary', text: 'Resume', onclick: function () { doResume(session); } }),
         el('button', { class: 'btn', text: 'Start fresh', onclick: function () {
@@ -15511,6 +16220,8 @@ v1.0 (2026-10-30): Initial release (PRD 7.12 draft). Session tag list (max
  *   leaving the keyboard means it stops being asked. Chrome colour is resolved by
  *   painting --bg and reading the pixel: fillStyle returns oklch verbatim and
  *   meta[theme-color] does not accept it.
+ * v1.4 (2026-10-30): A sort session resumes onto the Sort screen, and the
+ *   resume card describes it as sorting rather than counting tournaments.
 */
 
 </script>

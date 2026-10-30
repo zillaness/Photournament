@@ -2678,8 +2678,168 @@ kbd {
   color: var(--text);
 }
 
+/* Entry: the two jobs, chosen before the photos arrive. */
+#app .entry-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0;
+}
+#app .entry-mode-btn {
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+#app .entry-mode-btn:hover { border-color: var(--hover-line); }
+#app .entry-mode-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#app .entry-mode-btn.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+@media (max-width: 560px) { #app .entry-mode { grid-template-columns: 1fr; } }
+
+/* Organize-by control, shared by Sort mode and the allocation screen. */
+#app .org-bar { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+#app .org-chosen,
+#app .org-add,
+#app .org-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+#app .org-label { font-size: var(--fs-micro); color: var(--text-mute); min-width: 74px; }
+#app .org-sep { color: var(--text-mute); }
+#app .org-chip {
+  font: inherit;
+  font-size: var(--fs-small);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+#app .org-chip:hover { border-color: var(--hover-line); color: var(--text); }
+#app .org-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#app .org-chip.on { border-color: var(--accent); color: var(--text); cursor: default; padding: 4px 6px 4px 10px; }
+#app .org-chip.flat { opacity: 0.6; }
+#app .org-n { font-size: var(--fs-micro); color: var(--text-mute); }
+#app .org-mini {
+  font: inherit;
+  font-size: var(--fs-micro);
+  line-height: 1;
+  border: 0;
+  border-radius: 999px;
+  padding: 3px 6px;
+  background: transparent;
+  color: var(--text-mute);
+  cursor: pointer;
+}
+#app .org-mini:hover { background: var(--surface-3); color: var(--text); }
+#app .org-opts select {
+  font: inherit;
+  font-size: var(--fs-small);
+  padding: 5px 8px;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--field);
+  color: var(--text);
+}
+#app .org-notes { max-width: var(--measure); }
+#modal .org-h3 { font-size: var(--fs-small); margin: 14px 0 6px; color: var(--text-dim); }
+#modal .org-names { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow: auto; }
+#modal .org-names .row { gap: 10px; align-items: center; }
+#modal .org-name-what { min-width: 220px; }
+#modal .org-names input {
+  font: inherit;
+  font-size: var(--fs-small);
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--field);
+  color: var(--text);
+}
+
+/* Sort mode: every photo, grouped. */
+#app .so-top { margin-bottom: 14px; }
+#app .so-top h1 { margin: 0; }
+#app .so-groups { display: flex; flex-direction: column; gap: 18px; padding-bottom: 90px; }
+#app .so-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+#app .so-title { font-size: var(--fs-body); margin: 0; color: var(--text); }
+#app .so-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+#app .so-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r);
+  border: 1px solid transparent;
+  cursor: pointer;
+  outline: none;
+}
+#app .so-cell:hover { border-color: var(--line-2); }
+#app .so-cell:focus-visible { border-color: var(--accent); }
+/* Selection is a control state, so it is the accent ring AROUND the frame;
+   the photograph itself is never tinted. */
+#app .so-cell.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--surface-2); }
+#app .so-frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--well);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#app .so-frame img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+#app .so-cell:hover .expand-btn { opacity: 1; }
+#app .so-cap { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#app .so-name { font-size: var(--fs-micro); color: var(--text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#app .so-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+#app .so-tag {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--text);
+}
+#app .so-selbar {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: min(1100px, calc(100vw - 32px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+#app .so-selbar:not(.active) .pt-tags { opacity: 0.5; }
+
+
 /* CHANGELOG (appended block)
  * v2.2a (2026-10-30): PRD 7.12 organize-and-tag block, tokens only: lightbox
  *   metadata row, the tag chip in its off / mixed / on states, the inline
  *   new-tag field and the tag manager.
+ * v2.2b (2026-10-30): Entry mode choice, the shared Organize-by control and
+ *   its naming dialog, and Sort mode's grouped grid, selection ring (accent,
+ *   around the frame, never on the photo) and floating selection bar.
  */

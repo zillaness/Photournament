@@ -1,9 +1,9 @@
 /**
  * @file 35_session.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-30
+ * @lastUpdated 2026-10-30
  * @description Session model and stage flow for Photournament: settings defaults, tournament unit state, quota resolution, pass bookkeeping, and persistence shaping.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -43,12 +43,15 @@
 
   var PHASES = ['gridA', 'rescue', 'dupes', 'bracket', 'runoff', 'done'];
 
-  function newSession(rootName, sourceKind) {
+  function newSession(rootName, sourceKind, mode) {
     return {
       id: 'sess-' + Date.now().toString(36),
       createdAt: Date.now(),
       rootName: rootName || 'photos',
       sourceKind: sourceKind || 'files',   // 'handle' = can resume and write to disk
+      mode: mode === 'sort' ? 'sort' : 'cull', // PRD 7.12; absent on older sessions = cull
+      organize: null,                      // PRD 7.12 {cats, eventGapH, radiusKm, names}; null = folders
+      tags: null,                          // PRD 7.12 {defs, on}; see 36_tags.js
       settings: Object.assign({}, DEFAULTS),
       allocs: {},                          // path -> {mode, value}
       rankPaths: {},                       // path -> 1: rank this folder, don't cull it
@@ -440,4 +443,6 @@
  *   ~30% cheaper than the textbook count); projectSchedule() prices the culling
  *   path to the same handoff point, so the two can sit side by side on the
  *   setup screen and the user commits to a cost they have seen.
+ * v1.4 (2026-10-30): Sessions carry mode ('cull' | 'sort'; absent = cull),
+ *   organize (PRD 7.12 spec, null = folders) and tags, for PRD 7.12.
 */

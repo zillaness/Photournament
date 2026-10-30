@@ -1,9 +1,9 @@
 /**
  * @file 99_app.js
- * @version 1.3
+ * @version 1.4
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-10-30
  * @description Application boot: environment checks, session resume, stage routing, toasts, and the global keyboard layer.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -137,6 +137,7 @@
     // edit is never stranded behind a reload.
     if (session.groups && session.groups.status === 'review') return { name: 'dupes' };
     switch (session.stage) {
+      case 'sort':   return { name: 'sort' };
       case 'tree':   return { name: 'tree' };
       case 'export': return { name: 'export' };
       case 'unit': {
@@ -230,7 +231,8 @@
       el('h1', { text: 'Pick up where you left off?' }),
       el('p', { class: 'muted', text:
         session.rootName + ' — started ' + when + '. ' +
-        (units.length ? done + ' of ' + units.length + ' tournaments finished.' : '') }),
+        (session.mode === 'sort' ? 'Sorting and tagging; nothing is cut.' :
+          units.length ? done + ' of ' + units.length + ' tournaments finished.' : '') }),
       el('div', { class: 'row', style: 'margin-top:14px' }, [
         el('button', { class: 'btn btn-primary', text: 'Resume', onclick: function () { doResume(session); } }),
         el('button', { class: 'btn', text: 'Start fresh', onclick: function () {
@@ -408,4 +410,6 @@
  *   leaving the keyboard means it stops being asked. Chrome colour is resolved by
  *   painting --bg and reading the pixel: fillStyle returns oklch verbatim and
  *   meta[theme-color] does not accept it.
+ * v1.4 (2026-10-30): A sort session resumes onto the Sort screen, and the
+ *   resume card describes it as sorting rather than counting tournaments.
 */

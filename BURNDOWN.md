@@ -35,7 +35,8 @@ his "proceed". Phase 0 usage experiment skipped (no meter readings tonight).
 - 10:20 ✅ units 1+2: whitelist capture reader (EXIF/GPS, XMP/IPTC places; JPEG/PNG/WebP/HEIC) + 14 unit tests; `photo.capture` on fresh and cached ingests — committed (see git log)
 - 10:45 ✅ unit 3: `PT.organize` (32_organize.js): 11 categories, events, offline location clusters, named missing buckets; 16 unit tests
 - 11:25 ✅ unit 4: `PT.tags` (36_tags.js) + lightbox metadata row and tag bar, Shift+1..9; browser-verified (two focus bugs found and fixed)
-- ▶ NEXT: unit 5, Sort mode: entry choice + Sort screen (src/js/55_screen_sort.js)
+- 11:55 ✅ unit 5: entry mode choice; shared Organize-by control (38_organize_ui.js); Sort screen (55_screen_sort.js) with grouping, selection, tagging; browser-verified
+- ▶ NEXT: unit 6, Sort export: priced copy-into-folder / manifest (CSV+JSON), per-tag copies
 
 ## Handoff
 (filled at stop)

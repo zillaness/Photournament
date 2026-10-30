@@ -42,7 +42,33 @@ his "proceed". Phase 0 usage experiment skipped (no meter readings tonight).
 - 14:10 ✅ unit 10: e2e_sort.mjs (28 checks) + e2e_organize.mjs (21 checks) wired into npm test; full suite green (17 e2e); found+fixed: per-tag export option hidden until reload
 - 14:35 ✅ unit 11: PRD v1.11 §7.12 (+§6, §9, §12); design record v0.3 with every departure from v0.2; README; handoff v2.2
 - 15:40 ✅ unit 12: fresh-eyes review (subagent) found 7 bugs + parser gaps; all fixed with regression tests (resume scope, Unicode export names, flat+tag sets, _tagged rescans, naming dialog, keyboard open, resumable copy, IPTC Latin-1, JPEG fill bytes, HEIC iloc spin, Windows names, BOM)
-- ▶ NEXT: unit 13, full npm test, then deploy (Sam: /goal 'functional prototype without asking me' + chose fast-forward in the interview)
+- 15:55 ✅ unit 13: npm test green (77 unit, 17 e2e); live branch `claude/photournament-prd-v1-8-fojs7d` fast-forwarded 5655b3b..bd60050 (authorised by the interview's deploy choice + /goal 'without asking me'); Pages run 17 triggered
+- ▶ NEXT: confirm Pages run 17 succeeded and the live page serves Sort mode
 
 ## Handoff
-(filled at stop)
+
+**Done.** Organize and tag (PRD v1.11 §7.12) is built, reviewed and deployed:
+capture metadata at ingest; one Organize-by control (day, event, location,
+camera, lens, focal length, orientation, format, folders; any nesting) used by
+the new Sort mode and by the culling allocation screen; offline location
+(written names from the file, else GPS clusters you can name); up to nine
+tags that never touch keep/cut; Sort export (organized copy, resumable and
+never overwriting, or just the list); per-tag sets + CSV on the culling export.
+A latent export bug was fixed on the way (same-leaf folders merged into one
+output folder). A fresh-eyes review found 7 more bugs; all fixed and tested.
+
+**Where.** Branch `claude/eager-galileo-wx2cge`; the live branch was
+fast-forwarded to bd60050. Rollback, if wanted:
+`git push origin 5655b3b:claude/photournament-prd-v1-8-fojs7d --force-with-lease`
+(or a revert commit) redeploys the previous app.
+
+**Review these first.** `docs/prd_organize_and_tag_v0.3.md` §7 lists every
+place the build departs from the v0.2 draft you saw; the draft was never
+explicitly signed off.
+
+**Parked.** Keep-rate stats by camera/lens/day; a bundled offline city list
+for naming GPS clusters; focal-length bands use raw focal length when a file
+lacks the 35 mm equivalent (wide on crop sensors).
+
+**Next session could start with:** a real-shoot run (your 742-photo folder) in
+Sort mode, then culling with Organize by Day, and report what reads wrong.

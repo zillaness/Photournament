@@ -2904,6 +2904,10 @@ kbd {
 #modal .so-exp-opt > span { display: flex; flex-direction: column; gap: 3px; }
 #modal .so-exp-opt.on { border-color: var(--accent); }
 #modal .so-exp-opt.off { opacity: 0.55; cursor: not-allowed; }
+#app .bk-tags { padding: 2px 4px 4px; background: var(--well); }
+#app .bk-tags .pt-tag { padding: 3px 8px; }
+#app .exp-row .pt-tags { margin-top: 6px; }
+#app .exp-set-tag { border-style: dashed; }
 #app .tree-org { margin: 10px 0 12px; }
 #app .tree-org .org-bar { margin-top: 8px; }
 #modal .so-exp-check { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; cursor: pointer; }
@@ -2916,6 +2920,9 @@ kbd {
  *   its naming dialog, and Sort mode's grouped grid, selection ring (accent,
  *   around the frame, never on the photo) and floating selection bar.
  * v2.2c (2026-10-30): Sort export's two priced options.
+ * v2.2d (2026-10-30): Allocation-screen organize card, tag rows under
+ *   bracket panes (on the well, outside the viewport) and in the export
+ *   review, and the dashed per-tag result sets.
  */
 
 </style>
@@ -13439,10 +13446,10 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
 /* ===== 70_screen_bracket.js ===== */
 /**
  * @file 70_screen_bracket.js
- * @version 1.9
+ * @version 1.10
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-30
+ * @lastUpdated 2026-10-30
  * @description Stage B bracket with the second-chance (repechage) round and Stage C burst runoff. Registers the 'bracket' and 'runoff' screens plus the pure PT.bracket ranking engine.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -14221,6 +14228,14 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
     ]);
     var pane = el('div', { class: 'bk-pane' }, [vp, cap]);
     var P = { side: side, pane: pane, vp: vp, img: img, cap: cap, id: null, nat: { w: 0, h: 0 } };
+    // PRD 7.12: tag the photo while it is in front of you. Below the caption,
+    // outside the viewport, so a tag click can never register as a choice
+    // (choices fire on the viewport's pointerup only). No Shift+digit here:
+    // with two photos on screen, which one a key meant would be a guess.
+    if (PT.tags) {
+      P.tagBar = PT.tags.bar({ ids: function () { return P.id ? [P.id] : []; } });
+      pane.appendChild(el('div', { class: 'bk-tags', dataset: { t: 'bk-tags' } }, [P.tagBar.el]));
+    }
 
     img.addEventListener('load', function () {
       P.nat.w = img.naturalWidth || 0;
@@ -14639,6 +14654,7 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
   function loadPane(P, id) {
     P.id = id;
     P.nat.w = 0; P.nat.h = 0;
+    if (P.tagBar) P.tagBar.refresh();
     var nm = P.cap.querySelector('.nm');
     if (nm) nm.textContent = nameOf(id);
 
@@ -15219,6 +15235,8 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
  *   identity, so sessions persisted before this change resume unchanged. The
  *   topbar's first counter says what is being decided (top N / full order) in
  *   ranking mode, and the standings tag reads Ranking complete.
+ * v1.10 (2026-10-30): A tag row under each pane (PRD 7.12), outside the
+ *   viewport so a tag click can never register as a choice.
 */
 
 </script>
@@ -15226,10 +15244,10 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
 /* ===== 80_screen_export.js ===== */
 /**
  * @file 80_screen_export.js
- * @version 1.6
+ * @version 1.7
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-28
+ * @lastUpdated 2026-10-30
  * @description PRD 7.8 export review and output: per-finalist intent labels, ordered prefixes, per-source folder naming, mirrored or flat structure, disk writing with collision handling, download bundles, and the decision JSON.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -15268,12 +15286,45 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
     return parts.join('_');
   }
 
-  /** Each result set writes to its own folder named for its source (PRD 7.8). */
-  function folderFor(unit) {
+  function safeName(s) { return String(s).replace(/[^A-Za-z0-9._-]+/g, '_'); }
+
+  /** A unit's tree path, from its id ('fixed:Trip/Day1' -> 'Trip/Day1'). */
+  function ownerPathOf(unit) {
+    var id = String(unit.id || '');
+    var i = id.indexOf(':');
+    var p = i >= 0 ? id.slice(i + 1) : '';
+    return p === 'root' ? '' : p;
+  }
+
+  function organized(session) {
+    return !!(session && PT.organize && !PT.organize.isFolders(session.organize));
+  }
+
+  /**
+   * Each result set writes to its own folder named for its source (PRD 7.8).
+   * An organized session (PRD 7.12) names it for the whole group path, since
+   * its leaves repeat by design: "Day > Camera" has a "Canon EOS R6" under
+   * every day. One folder level either way, so the collision prompt and the
+   * replace/sibling choices keep working exactly as they do.
+   */
+  function folderFor(unit, session) {
     if (unit.id === 'stageD') return '_finalists_overall';
+    if (organized(session)) {
+      var p = ownerPathOf(unit);
+      if (unit.kind === 'pooled') return '_finalists_pooled' + (p ? '_' + safeName(p.split('/').join('_')) : '');
+      return '_finalists_' + safeName((p || 'all').split('/').join('_'));
+    }
     if (unit.kind === 'pooled') return '_finalists_pooled';
     var leaf = String(unit.label || 'unit').split('/').pop();
-    return '_finalists_' + leaf.replace(/[^A-Za-z0-9._-]+/g, '_');
+    return '_finalists_' + safeName(leaf);
+  }
+
+  /** On-screen title for a set: the group path when organized, else the unit label. */
+  function titleFor(unit, session) {
+    if (unit.id === 'stageD' || !organized(session)) return unit.label;
+    var p = ownerPathOf(unit);
+    var t = p ? p.split('/').join(' \u203a ') : 'All photos';
+    return unit.kind === 'pooled' ? 'pooled under ' + t : t;
   }
 
   /**
@@ -15462,10 +15513,49 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
   }
 
   function resultSets(session) {
-    return Object.keys(session.units)
+    var base = Object.keys(session.units)
       .map(function (k) { return session.units[k]; })
       .filter(function (u) { return u.winners && u.winners.length; })
-      .map(function (u) { return { unit: u, folder: folderFor(u), ids: u.winners.slice() }; });
+      .map(function (u) {
+        return { unit: u, folder: folderFor(u, session), title: titleFor(u, session), ids: u.winners.slice() };
+      });
+
+    // Two sets must never share a folder: their files would land together and
+    // their 01_ prefixes collide. Leaf names repeat across a tree ("Day1/Canon",
+    // "Day2/Canon"), so a clash falls back to the full path for the sets
+    // involved, and names that never clashed stay exactly as before.
+    var count = {};
+    base.forEach(function (set) { count[set.folder] = (count[set.folder] || 0) + 1; });
+    base.forEach(function (set) {
+      if (count[set.folder] > 1 && set.unit.id !== 'stageD') {
+        var p = ownerPathOf(set.unit);
+        set.folder = '_finalists_' + (set.unit.kind === 'pooled' ? 'pooled_' : '') + safeName((p || 'root').split('/').join('_'));
+      }
+    });
+
+    return base.concat(tagSets(session, base));
+  }
+
+  /**
+   * PRD 7.12: one extra set per tag, holding the finalists that carry it, in
+   * the order they appear above. Duplication across sets is intentional (PRD
+   * 10), and a tag never adds a photo that did not already win.
+   */
+  function tagSets(session, base) {
+    if (!session.settings.tagSets || !PT.tags) return [];
+    var seen = {}, order = [];
+    base.forEach(function (set) {
+      set.ids.forEach(function (id) { if (!seen[id]) { seen[id] = 1; order.push(id); } });
+    });
+    return PT.tags.defs().map(function (d) {
+      return {
+        unit: { id: 'tag:' + d.id, label: 'Tagged \u201c' + d.name + '\u201d', kind: 'tag' },
+        title: 'Tagged \u201c' + d.name + '\u201d',
+        folder: '_tagged_' + safeName(d.name),
+        ids: PT.tags.photosWith(d.id, order),
+        tag: true
+      };
+    }).filter(function (set) { return set.ids.length; });
   }
 
   PT.router.register('export', {
@@ -15587,6 +15677,10 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
         renderList();
       });
       opts.appendChild(structSel);
+      if (PT.tags && PT.tags.defs().length) {
+        opts.appendChild(toggle('A set per tag', 'tagSets',
+          'Also write each tag\u2019s finalists into its own folder (_tagged_<tag>/)'));
+      }
       opts.appendChild(el('span', { class: 'spacer' }));
       opts.appendChild(el('span', { class: 'small dim', id: 'exp-total' }));
 
@@ -15594,13 +15688,15 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
 
       function renderList() {
         var s = PT.store.get();
+        PT.dom.$$('.exp-thumb', listHost).forEach(function (img) { PT.dom.releaseImg(img); });
         PT.dom.clear(listHost);
         var totalFiles = 0, totalBytes = 0;
+        sets = resultSets(s.session);
 
         sets.forEach(function (set) {
-          var card = el('div', { class: 'card exp-set' });
+          var card = el('div', { class: 'card exp-set' + (set.tag ? ' exp-set-tag' : ''), dataset: { t: 'exp-set', folder: set.folder } });
           card.appendChild(el('div', { class: 'row' }, [
-            el('h2', { text: set.unit.label }),
+            el('h2', { text: set.title || set.unit.label }),
             el('span', { class: 'muted small mono', text:
               (s.session.settings.outputStructure === 'flat' ? '_finalists' : set.folder) + '/' }),
             el('span', { class: 'spacer' }),
@@ -15648,7 +15744,11 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
                 el('div', { class: 'exp-name', text: photo.name }),
                 el('div', { class: 'small dim', text: photo.dir || '/' })
               ]),
-              el('div', {}, [labelInput, dest])
+              el('div', {}, [labelInput, dest,
+                // PRD 7.12: tagging here is the last chance before the per-tag
+                // sets and the manifest are written. Tag rows are copies, so
+                // they show what they carry rather than offering edits twice.
+                PT.tags && !set.tag ? PT.tags.bar({ ids: function () { return [id]; } }).el : null])
             ]));
           });
 
@@ -15661,6 +15761,12 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
       }
 
       renderList();
+
+      // With per-tag sets on, a tag change moves photos between sets.
+      var offTags = PT.store.subscribe(function (s, name) {
+        if (!listHost.isConnected) { offTags(); return; }
+        if (/^tags:/.test(name) && s.session.settings.tagSets) renderList();
+      });
 
       /* --------------------------------------------------------- actions -- */
 
@@ -15696,6 +15802,9 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
       }));
       actions.appendChild(el('button', { class: 'btn', text: 'Copy filename list',
         onclick: function () { copyList(sets); } }));
+      actions.appendChild(el('button', { class: 'btn btn-quiet', text: 'Manifest CSV', dataset: { t: 'exp-csv' },
+        title: 'Every exported file with its set, rank, label, tags and what the camera recorded',
+        onclick: function () { downloadCsv(sets); } }));
       actions.appendChild(el('button', { class: 'btn btn-quiet', text: 'Decision JSON',
         onclick: function () { downloadJson(sets); } }));
       actions.appendChild(el('span', { class: 'spacer' }));
@@ -16194,12 +16303,16 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
           winners: u.winners
         };
       }),
+      organize: s.session.organize || null,
+      tags: PT.tags ? PT.tags.defs() : [],
       mapping: items.map(function (it) {
         return {
           id: it.id, rank: it.rank, unit: it.unit,
           original: it.photo.path,
           label: s.session.labels[it.id] || '',
-          exported: it.folder + '/' + it.name
+          exported: it.folder + '/' + it.name,
+          tags: PT.tags ? PT.tags.names(it.id) : [],
+          capture: it.photo.capture || null
         };
       }),
       actionLog: PT.store.actionLog()
@@ -16207,6 +16320,25 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
     saveBlob(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }),
       'photournament_decisions_v1.0.json');
     PT.toast('Decision JSON downloaded.');
+  }
+
+  /** PRD 7.12: the finalists as a spreadsheet, sharing the Sort export's columns. */
+  function downloadCsv(sets) {
+    var s = PT.store.get();
+    // folder/file would repeat set/exported here, so they are left out.
+    var cols = ['set', 'rank', 'exported', 'label'].concat(PT.organize.MANIFEST_COLS.filter(function (c) {
+      return c !== 'folder' && c !== 'file';
+    }));
+    var rows = plan(sets).map(function (it) {
+      var r = PT.organize.manifestRow(it.photo, it.folder, it.name, PT.tags ? PT.tags.names(it.id) : []);
+      r.set = it.folder;
+      r.rank = it.rank;
+      r.exported = it.folder + '/' + it.name;
+      r.label = (s.session.labels || {})[it.id] || '';
+      return r;
+    });
+    saveBlob(new Blob([PT.organize.toCsv(rows, cols)], { type: 'text/csv' }), 'photournament_finalists_v1.0.csv');
+    PT.toast('Manifest CSV downloaded.');
   }
 })();
 
@@ -16242,6 +16374,14 @@ v1.1 (2026-10-30): Export, priced and chosen each time: copy into a
  *   what every reloaded session got, because file sources die with the page.
  *   And the export screen now says so up front: a reconnect notice re-attaches
  *   the originals by relative path when any finalist's file is unreachable.
+ * v1.7 (2026-10-30): PRD 7.12. An organized session names each result set for
+ *   its whole group path (_finalists_2026-07-14_Canon_EOS_R6), still one folder
+ *   level so the collision prompt and replace/sibling choices are untouched.
+ *   Fixed for every session: two sets whose leaves shared a name (Day1/Canon,
+ *   Day2/Canon) both wrote into _finalists_Canon; a clash now falls back to the
+ *   full path for the sets involved. Optional per-tag sets (_tagged_<tag>/), a
+ *   tag bar on each finalist, a finalists CSV, and tags + capture metadata in
+ *   the decision JSON.
 */
 
 </script>

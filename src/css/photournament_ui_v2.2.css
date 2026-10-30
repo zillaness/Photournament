@@ -2848,6 +2848,10 @@ kbd {
 #modal .so-exp-opt > span { display: flex; flex-direction: column; gap: 3px; }
 #modal .so-exp-opt.on { border-color: var(--accent); }
 #modal .so-exp-opt.off { opacity: 0.55; cursor: not-allowed; }
+#app .bk-tags { padding: 2px 4px 4px; background: var(--well); }
+#app .bk-tags .pt-tag { padding: 3px 8px; }
+#app .exp-row .pt-tags { margin-top: 6px; }
+#app .exp-set-tag { border-style: dashed; }
 #app .tree-org { margin: 10px 0 12px; }
 #app .tree-org .org-bar { margin-top: 8px; }
 #modal .so-exp-check { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; cursor: pointer; }
@@ -2860,4 +2864,7 @@ kbd {
  *   its naming dialog, and Sort mode's grouped grid, selection ring (accent,
  *   around the frame, never on the photo) and floating selection bar.
  * v2.2c (2026-10-30): Sort export's two priced options.
+ * v2.2d (2026-10-30): Allocation-screen organize card, tag rows under
+ *   bracket panes (on the well, outside the viewport) and in the export
+ *   review, and the dashed per-tag result sets.
  */

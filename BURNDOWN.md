@@ -38,7 +38,8 @@ his "proceed". Phase 0 usage experiment skipped (no meter readings tonight).
 - 11:55 ✅ unit 5: entry mode choice; shared Organize-by control (38_organize_ui.js); Sort screen (55_screen_sort.js) with grouping, selection, tagging; browser-verified
 - 12:30 ✅ unit 6: Sort export (priced copy / list, per-tag sets, manifest CSV+JSON, never-overwrite, reconnect); CSV formula-injection guard; verified copy path on OPFS over localhost
 - 12:55 ✅ unit 7: Organize-by on the allocation screen (reset warning, lock once started), organized tree on resume; found+fixed: emptying the row snapped back to Folders
-- ▶ NEXT: unit 8, culling export: nested category folders, same-leaf collision fix, per-tag sets, CSV
+- 13:30 ✅ units 8+9: culling export names sets by group path, fixes same-leaf folder collisions, per-tag sets, tag bars on export rows and bracket panes, finalists CSV, JSON gains tags/capture; browser-verified incl. resume
+- ▶ NEXT: unit 10, committed e2e tests (sort, organize-in-cull, tags) wired into npm test
 
 ## Handoff
 (filled at stop)

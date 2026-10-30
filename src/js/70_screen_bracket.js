@@ -1,9 +1,9 @@
 /**
  * @file 70_screen_bracket.js
- * @version 1.9
+ * @version 1.10
  * @author Samuel Cao
  * @created 2026-07-28
- * @lastUpdated 2026-07-30
+ * @lastUpdated 2026-10-30
  * @description Stage B bracket with the second-chance (repechage) round and Stage C burst runoff. Registers the 'bracket' and 'runoff' screens plus the pure PT.bracket ranking engine.
  * @aiUpdate Update @lastUpdated and @version. Append changelog at bottom.
  *
@@ -782,6 +782,14 @@
     ]);
     var pane = el('div', { class: 'bk-pane' }, [vp, cap]);
     var P = { side: side, pane: pane, vp: vp, img: img, cap: cap, id: null, nat: { w: 0, h: 0 } };
+    // PRD 7.12: tag the photo while it is in front of you. Below the caption,
+    // outside the viewport, so a tag click can never register as a choice
+    // (choices fire on the viewport's pointerup only). No Shift+digit here:
+    // with two photos on screen, which one a key meant would be a guess.
+    if (PT.tags) {
+      P.tagBar = PT.tags.bar({ ids: function () { return P.id ? [P.id] : []; } });
+      pane.appendChild(el('div', { class: 'bk-tags', dataset: { t: 'bk-tags' } }, [P.tagBar.el]));
+    }
 
     img.addEventListener('load', function () {
       P.nat.w = img.naturalWidth || 0;
@@ -1200,6 +1208,7 @@
   function loadPane(P, id) {
     P.id = id;
     P.nat.w = 0; P.nat.h = 0;
+    if (P.tagBar) P.tagBar.refresh();
     var nm = P.cap.querySelector('.nm');
     if (nm) nm.textContent = nameOf(id);
 
@@ -1780,4 +1789,6 @@
  *   identity, so sessions persisted before this change resume unchanged. The
  *   topbar's first counter says what is being decided (top N / full order) in
  *   ranking mode, and the standings tag reads Ranking complete.
+ * v1.10 (2026-10-30): A tag row under each pane (PRD 7.12), outside the
+ *   viewport so a tag click can never register as a choice.
 */

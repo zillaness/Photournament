@@ -1,14 +1,14 @@
 ---
-file: prd_organize_and_tag_v0.2.md
-version: 0.2
+file: prd_organize_and_tag_v0.3.md
+version: 0.3
 author: Samuel Cao
 created: 2026-10-30
 last_updated: 2026-10-30
-description: Draft PRD for metadata-aware organizing and user tagging in Photournament, as a standalone Sort mode and inside the culling flow. Awaiting sign-off; folds into the main PRD as section 7.12 once approved.
+description: Design record for metadata-aware organizing and user tagging in Photournament (Sort mode and the culling tree). Built on branch claude/eager-galileo-wx2cge and folded into photournament_prd_v1.11.md section 7.12; not yet deployed.
 ai_update: Update last_updated and version. Rename file to match. Append changelog at bottom.
 ---
 
-# Organize and tag: draft PRD (v0.2, awaiting sign-off)
+# Organize and tag: design record (v0.3, built, awaiting review)
 
 ## 0. The current workflow, mapped
 
@@ -199,6 +199,40 @@ units' identity). Finalists export into the chosen category folders.
     fast-forwarding `claude/photournament-prd-v1-8-fojs7d`, which deploys the
     live site (revertible, but public the moment it lands).
 
+## 7. Build notes (2026-10-30)
+
+Built overnight on `claude/eager-galileo-wx2cge` under a token-burndown run,
+taking "get as much done without input" as the go-ahead. v0.2 was not
+explicitly signed off, so every departure from it is listed here for review.
+
+Where the build differs from sections 3 to 6:
+
+- **Culling export folders are one level, named for the group path**
+  (`_finalists_2026-07-14_Canon_EOS_R6`), not nested category folders. One
+  level keeps PRD §7.8's collision prompt and add/replace/sibling choices
+  working untouched. Sort mode's copy IS nested, because it has no such
+  machinery to preserve.
+- **An emptied Organize-by row means one group**, not folders. Found in a
+  browser: the earlier rule snapped the row back to Folders and nested the
+  next choice under the disk folders.
+- **No Shift+digit on bracket panes.** With two photos showing, which one a
+  key meant would be a guess. Chips under each pane instead, outside the
+  viewport so a tag click can never count as a choice.
+- **A latent bug fixed in passing:** two folders with the same leaf name
+  (Day1/Canon, Day2/Canon) both exported into `_finalists_Canon`. Organizing
+  makes that shape common, so a clash now falls back to the full path.
+- **Sort mode's opening view** is Day when most photos are dated, else
+  Folders. An assumption, one click to change.
+- **Parked:** keep-rate stats by camera/lens/day (§3.5); a bundled offline city
+  list for naming GPS clusters.
+
+Not done, waiting on Sam: the deploy. Pages builds only from
+`claude/photournament-prd-v1-8-fojs7d`; pushing there replaces the live site,
+and he asked to be asked first.
+
+Coverage: `tests/capture_test.mjs` (14), `tests/organize_test.mjs` (19),
+`tests/e2e_sort.mjs`, `tests/e2e_organize.mjs`; full `npm test` green.
+
 ## CHANGELOG
 
 - v0.1 (2026-10-30): Draft for review. Current workflow mapped, scope proposed,
@@ -208,3 +242,6 @@ units' identity). Finalists export into the chosen category folders.
   (written place names when present, else offline coordinate clusters);
   priced copy-or-manifest choice for Sort export; deploy path fixed;
   assumptions listed.
+- v0.3 (2026-10-30): Built. Status changed to design record; section 7 lists
+  every departure from v0.2, the bug fixed in passing, what is parked, and
+  the deploy still awaiting a go-ahead. Folded into the main PRD as §7.12.

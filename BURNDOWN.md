@@ -40,7 +40,8 @@ his "proceed". Phase 0 usage experiment skipped (no meter readings tonight).
 - 12:55 ✅ unit 7: Organize-by on the allocation screen (reset warning, lock once started), organized tree on resume; found+fixed: emptying the row snapped back to Folders
 - 13:30 ✅ units 8+9: culling export names sets by group path, fixes same-leaf folder collisions, per-tag sets, tag bars on export rows and bracket panes, finalists CSV, JSON gains tags/capture; browser-verified incl. resume
 - 14:10 ✅ unit 10: e2e_sort.mjs (28 checks) + e2e_organize.mjs (21 checks) wired into npm test; full suite green (17 e2e); found+fixed: per-tag export option hidden until reload
-- ▶ NEXT: unit 11, docs: PRD v1.11 §7.12, README, handoff v2.2, package description
+- 14:35 ✅ unit 11: PRD v1.11 §7.12 (+§6, §9, §12); design record v0.3 with every departure from v0.2; README; handoff v2.2
+- ▶ NEXT: unit 12, adversarial review of the whole diff (fresh-eyes subagent), then fixes
 
 ## Handoff
 (filled at stop)

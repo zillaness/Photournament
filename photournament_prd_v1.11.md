@@ -1,10 +1,10 @@
 ---
-file: photournament_prd_v1.10.md
-version: 1.10
+file: photournament_prd_v1.11.md
+version: 1.11
 author: Samuel Cao
 created: 2026-07-27
-last_updated: 2026-07-30
-description: Product requirements for Photournament, a local browser-based tool that narrows photo sets to a top-N through quota-enforced grid passes and pairwise tournament ranking, with per-folder allocation, an optional cross-category final, and annotated export.
+last_updated: 2026-10-30
+description: Product requirements for Photournament, a local browser-based tool that narrows photo sets to a top-N through quota-enforced grid passes and pairwise tournament ranking, with per-folder allocation, an optional cross-category final, annotated export, and a Sort mode that groups and tags whole shoots by their capture metadata.
 ai_update: Update last_updated and version. Rename file to match. Append changelog at bottom.
 ---
 
@@ -161,6 +161,8 @@ Ingest → [Tree setup] → per unit: [Stage A: Grid passes] → [Cut pile rescu
 Stages A through C run per tournament unit: a fixed-count folder, an uncapped folder, or a pooled group of blank siblings. Stage D runs once, across the winners of all units.
 
 A unit marked for **ranking** (§7.11) skips Stage A entirely: Ingest → Tree → Stage B at a chosen, priced depth → Stage C → Export. The choice is per unit, so a 30-photo album can rank while a 700-photo folder culls in the same session.
+
+**Sort mode** (§7.12) is the other job, chosen on the entry screen: Ingest → Sort (group by metadata, tag) → Export an organized copy or a manifest. Nothing is kept or cut. The same Organize-by control also reshapes the culling tree, so a flat roll can be allocated per day, per camera or per place.
 
 ---
 
@@ -327,6 +329,68 @@ front of it.
 - Everything downstream is unchanged: standings, runoff, export. Rank prefixes
   in filenames make a ranked album's order durable on disk.
 
+### 7.12 Organize and tag
+
+**Problem.** The tree could only use structure already on disk, and a flat
+camera roll got one quota. Ingest read every file's capture metadata and kept
+only orientation. Labels existed only for finalists, only at export. And
+sorting a whole shoot was not a job the tool did at all. Full design record:
+`docs/prd_organize_and_tag_v0.3.md`.
+
+**Capture metadata, read at ingest.** A whitelist reader beside the
+orientation reader (which stays minimal, because it gates decoding): capture
+time (DateTimeOriginal, falling back to Digitized then IFD0 DateTime, with the
+fallback named), offset, make, model, lens, focal length and 35 mm
+equivalent, aperture, shutter, ISO, GPS; and written place names from XMP or
+IPTC IIM, which Lightroom-type tools write and phones do not. JPEG, PNG, WebP,
+HEIC. It runs in the worker before the cache gate, on bytes already in hand,
+so cached photos get it without a second read. Every read is bounds-checked;
+malformed data is an absent field, never a failed ingest. `0,0` GPS and
+`0000:00:00` dates read as absent.
+
+**Organize by.** One control in both modes. Categories, nested in the order
+chosen: Folders, Year, Month, Day, Event (time gaps, default 2 h), Location,
+Camera, Lens, Focal length (35 mm bands), Orientation, Format. Each photo gets
+a synthetic dir handed to the unchanged `PT.tree.build()`, so allocation
+states, percent, ranking, the broadcast row and Stage D work as they always
+did. A missing field is a named group ("No date", "Unknown camera"), never
+nowhere. No spec, or Folders alone, is exactly the old tree; an explicitly
+emptied list is one group.
+
+**Location never leaves the device.** Reading GPS is local. Names: a written
+place in the file wins; otherwise coordinates cluster offline (1 / 5 / 25 km,
+default 5) and a cluster borrows the most common written name among its
+members, else its centre coordinates. Users can name events and places; names
+attach by distance so they survive a radius change. No reverse geocoding: it
+would send coordinates to a third party and break the one-request promise.
+
+**Inside culling.** The allocation screen carries the control. Regrouping
+clears typed counts and rank flags, so it asks first; it locks once
+tournaments exist, because a unit's identity is its path. Result sets are
+named for their group path (`_finalists_2026-07-14_Canon_EOS_R6`), one folder
+level so §7.8's collision handling is untouched. Fixed alongside: two sets
+whose leaves shared a name used to write into one folder.
+
+**Sort mode.** Every photo, grouped; click, shift-click or a whole group to
+select; tag the selection. Export is chosen each time and priced first: copy
+into a picked folder in the organized layout (optional per-tag sets, manifest
+beside them, never overwriting: taken names get `_2`), or just the list (CSV +
+JSON). Reloaded sessions reconnect their folder by relative path.
+
+**Tags.** Up to nine per session (Shift+1..9). Applied from the lightbox,
+bracket panes (below the caption, outside the viewport; no keyboard there,
+since with two photos showing a key would be a guess), the export review and
+the Sort screen. **Tags never keep, cut or change a quota (§2)**: nothing that
+handles tags touches a pool, a cut pile or a bracket, so a "maybe" tag cannot
+become a second keep pile. Tags organize the output, not the allocation:
+allocation is fixed before judging, and a photo with several tags must still
+sit in exactly one unit. On export: an optional set per tag (duplication
+across sets intended, §10), tags in the CSV and the decision JSON. Originals
+are never modified (§9).
+
+**Manifests.** One column set shared by both exports. Text that a spreadsheet
+would read as a formula is prefixed with an apostrophe; numbers stay numeric.
+
 ---
 
 ## 8. Architecture and constraints
@@ -389,7 +453,9 @@ What does work on `file://`, all verified: IndexedDB in full, including Blob, Fi
 - RAW decoding (CR2, NEF, ARW, DNG)
 - Image editing, rating sync, or writing back into original files
 - Cloud sync or multi-device sessions
-- EXIF-based automatic scoring or aesthetic ML models
+- EXIF-based automatic scoring or aesthetic ML models (organizing BY metadata is in, §7.12; ranking or cutting by it is not)
+- Online reverse geocoding of GPS coordinates (§7.12: names come from the file or the user)
+- Writing tags into original files (§7.12: manifests and per-tag export sets only)
 - Video files
 - Non-Chromium browsers as a supported target
 
@@ -451,6 +517,11 @@ Every option below is user-configurable; defaults shown.
 | Export format for HEIC finalists | Chosen per export |
 | Uncapped entry | `*` typed or ∞ toggle, both always available |
 | Ranking mode (§7.11) | Off; per-folder ⇅ toggle or the priced offer on pass setup |
+| Job (§7.12) | Cull to keepers; Sort and tag chosen on the entry screen |
+| Organize by (§7.12) | Folders when culling; Day (if most photos are dated) when sorting |
+| Event gap | 2 h (30 min, 2 h, 6 h, 24 h) |
+| Location radius | 5 km (1, 5, 25 km) |
+| A set per tag (export) | Off |
 
 ---
 
@@ -476,3 +547,11 @@ v1.10 (2026-07-30): Ranking mode (new §7.11). Culling subtracts, ranking
   full order, each priced against the measured engine); the standings cap
   stays the folder's target. Rank-only sessions skip the §7.7 review gate
   while keeping the bundling. §6 gains the ranking path, §12 the setting row.
+v1.11 (2026-10-30): Organize and tag (new §7.12). Capture metadata read at
+  ingest by a bounded whitelist reader; one Organize-by control that groups a
+  shoot by date, event, place, camera, lens, focal length, orientation or
+  format, both as the new Sort mode and as the culling tree; location from the
+  file's own metadata only; up to nine tags that never touch keep/cut and
+  organize the output; priced Sort export (organized copy or list) and
+  per-tag sets, CSV and JSON on the culling export. §6 gains Sort mode, §9
+  three out-of-scope lines, §12 five settings.

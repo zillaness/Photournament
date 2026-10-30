@@ -2,8 +2,10 @@
 
 Narrows a folder of photos down to a small set of keepers: quota-enforced grid
 passes to cut the field, then head-to-head comparison to rank what survives.
+Or, as its second job, sorts and tags a whole shoot by when, where and what it
+was shot with, cutting nothing.
 
-Spec: [`photournament_prd_v1.10.md`](photournament_prd_v1.10.md).
+Spec: [`photournament_prd_v1.11.md`](photournament_prd_v1.11.md).
 
 | 1 — Ingest | 2 — Allocation | 3 — Duplicates |
 | --- | --- | --- |
@@ -42,7 +44,7 @@ browser profile.
 ```
 npm install
 npm run build     # -> dist/photournament_v1.0.html  (and a slim, no-HEIC build)
-npm test          # unit tests, artifact smoke, and fifteen end-to-end runs
+npm test          # unit tests, artifact smoke, and seventeen end-to-end runs
 ```
 
 The build concatenates `src/` into one self-contained HTML file. That is not a
@@ -84,6 +86,39 @@ for the measured constraint table.
 6. **Export** — review every finalist, label it in its own words, and write the
    results to a folder, download them as one zip, or take a contact sheet.
 
+### Sort and tag (the other job)
+
+Pick **Sort and tag** on the entry screen instead of culling. Every photo is
+kept; the screen shows the whole shoot grouped however you choose, and the
+export writes an organized copy (or just the list).
+
+- **Organize by** any of: folders, year, month, day, event (a new one after a
+  gap in shooting you set), location, camera, lens, focal length, orientation,
+  format, in any nesting order. "Day › Camera" is a folder per day with a
+  camera folder inside each. Each choice shows how many groups it would make
+  before you pick it.
+- **It reads what the camera recorded**: capture time, camera, lens, focal
+  length, aperture, shutter, ISO, GPS, and a written place name when the file
+  has one (Lightroom and similar tools write them; phones store only
+  coordinates). Photos missing something land in a named group like "No date",
+  never nowhere.
+- **Location stays on your machine.** GPS is read from the file; nearby
+  coordinates are grouped into places you can name once ("Gion"). Nothing is
+  looked up online.
+- **Tags**: make up to nine (portfolio, print, client…) and apply them to a
+  selection, from the large view (<kbd>Shift</kbd>+<kbd>1</kbd>…<kbd>9</kbd>),
+  under each bracket photo, or on the export review. Tags never keep or cut
+  anything; they ride along to the export.
+- **Export**, priced before you choose: copy the shoot into a folder you pick,
+  in the groups you see, with an optional folder per tag and a CSV/JSON
+  manifest beside it, never overwriting anything; or download only the
+  manifest.
+
+The same **Organize by** control sits on the culling allocation screen, so a
+flat camera roll can get a quota per day, per camera or per place instead of
+one quota for everything. Finalists then export into folders named for their
+group, and tags can become their own result sets.
+
 Press <kbd>T</kbd> anywhere to switch between the dark and light surround. The
 light theme is a mid-grey, not white, deliberately: a white surround makes a
 photograph read darker and flatter than the same photograph against mid-grey,
@@ -103,6 +138,13 @@ which is the interference the whole tool exists to avoid.
   contact sheet never needed the originals in the first place.
 - **Perceptual-hash thresholds were tuned on procedurally generated images**, not
   photographs. The defaults measure well, but real bursts are the real test.
+- **Metadata is read, never written.** Tags live in the session and in the
+  exported manifests and per-tag folders; originals are copied byte for byte.
+  Sessions from before metadata support read as "No date" until the folder is
+  added again.
+- **The Sort copy path is covered in CI through the browser's private file
+  system**, which speaks the same directory-handle API as the native picker;
+  the picker dialog itself still cannot be driven headlessly.
 - **Manual rotations and flips are visual.** They correct what you judge and the
   contact sheet, and they persist with the session — but exported files are
   written exactly as shot, byte for byte. Fix the tag in your photo app after

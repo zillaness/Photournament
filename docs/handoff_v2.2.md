@@ -1,10 +1,10 @@
 ---
-file: handoff_v2.1.md
-version: 2.1
+file: handoff_v2.2.md
+version: 2.2
 author: Samuel Cao
 created: 2026-07-29
-last_updated: 2026-07-30
-description: Handoff for Photournament with ranking mode shipped. Replaces handoff_v1.0.md, whose queue is now mostly shipped. Everything below the line is a prompt for a fresh session.
+last_updated: 2026-10-30
+description: Handoff for Photournament with ranking mode shipped and organize-and-tag built on a review branch. Replaces handoff_v1.0.md, whose queue is now mostly shipped. Everything below the line is a prompt for a fresh session.
 ai_update: Update last_updated and version. Rename file to match. Append changelog at bottom.
 ---
 
@@ -24,9 +24,14 @@ browser rather than by reading code.
 
 ## Where things stand
 
-- **Branch:** `claude/photournament-prd-v1-8-fojs7d`. Everything is pushed;
-  HEAD is `657f5b3`. Never push elsewhere without asking.
-- **Spec:** `photournament_prd_v1.10.md`. §4.2 documents five allocation
+- **Branches:** `claude/photournament-prd-v1-8-fojs7d` is the live line (the
+  default branch, and the only one Pages deploys from). Organize-and-tag
+  (PRD §7.12) is built on `claude/eager-galileo-wx2cge`, fast-forwardable onto
+  it, and NOT yet deployed: Sam asked to say "proceed" before anything goes
+  live. Never push to the live branch without that.
+- **Spec:** `photournament_prd_v1.11.md` (§7.12 organize and tag; design record
+  and every departure from the approved draft in
+  `docs/prd_organize_and_tag_v0.3.md`). §4.2 documents five allocation
   states (Percent joined the four); §7.11 documents ranking mode. Cite section
   numbers in commits.
 - **Hosted:** <https://zillaness.github.io/Photournament/> — live and current.
@@ -35,7 +40,7 @@ browser rather than by reading code.
   trap, now resolved: while the source was "Deploy from a branch", GitHub's
   Jekyll pipeline republished the README render over every deploy.)
 - **Build:** `npm run build` emits `dist/photournament_v1.0.html` and a slim
-  no-HEIC twin. `npm test` is unit tests + freshness + 2 smokes + **15 e2e
+  no-HEIC twin. `npm test` is unit tests + freshness + 2 smokes + **17 e2e
   runs**, and it is green at HEAD. Keep it that way; `tests/dist_fresh.mjs`
   fails if the committed artifacts drift from a fresh build, so rebuild before
   committing.
@@ -73,7 +78,11 @@ order by `tools/build.mjs`. No framework, no bundler.
 | `50_screen_tree.js` | allocation screen, broadcast row |
 | `60_screen_grid.js` | Stage A passes, rescue, finish-early |
 | `70_screen_bracket.js` | bracket engine + screen, Stage C runoff |
-| `80_screen_export.js` | export review, zip, contact sheet, session stats |
+| `32_organize.js` | PRD 7.12 categories → synthetic dir per photo, events, offline location clusters, manifest/CSV; pure, unit-tested |
+| `36_tags.js` | PRD 7.12 session tags (max 9), the self-detaching tag bar, Shift+1..9, the manager |
+| `38_organize_ui.js` | the one Organize-by control both modes use, and the event/place naming dialog |
+| `55_screen_sort.js` | Sort mode screen and its priced export (organized copy / list) |
+| `80_screen_export.js` | export review, zip, contact sheet, session stats, per-tag sets, finalists CSV |
 | `99_app.js` | boot, resume, `PT.advance()`, theme |
 
 State lives in the store, never in screen closures — that is what makes PRD
@@ -154,6 +163,29 @@ steer means the offer is uncapped, but the projection line for an UNCAPPED
 folder is thin ("no projected end") — if he ranks large uncapped folders
 often, that line could price a pass-first alternative properly.
 
+## Organize and tag: built 2026-10-30, awaiting review and deploy
+
+Asked for: tagging and organizing, using photo metadata, with the user
+choosing the categories. Interviewed decisions: both a standalone Sort mode
+and the same grouping inside culling; tags from the lightbox, bracket and
+export review; category folders + manifest on export; Sort output chosen per
+export and priced; location from the file's own metadata only ("aren't some
+photos tagged with where they were taken?" — yes: GPS is read locally, names
+come from the file or the user, never an online lookup).
+
+Seams worth knowing:
+- `photo.capture` is set in the worker BEFORE the cache gate, so cached photos
+  get it too. `{}` = read and empty; absent = a record from before this.
+- `PT.organize.apply()` returns the input untouched for folders-only, so the
+  default tree is byte-for-byte what it was. `{cats: []}` is one group.
+- Culling result sets stay ONE folder level (`_finalists_<group_path>`) so
+  §7.8 collision handling is untouched; Sort's copy is nested.
+- Tags are inert to every stage by construction. Keep it that way (§2).
+- The Sort copy path is tested through OPFS over localhost (`e2e_sort.mjs`);
+  OPFS refuses file://.
+
+Parked: keep-rate stats by camera/lens/day; a bundled offline city list.
+
 ## The open queue
 
 ### Tabled by the user — do not start without asking
@@ -211,6 +243,10 @@ percent toggle that silently changed counts. If you make a substantial change,
 review it before he does.
 
 CHANGELOG
+v2.2 (2026-10-30): Organize and tag (PRD 7.12) built on claude/eager-galileo-wx2cge
+  and recorded here: the decisions from the interview, the seams, what is
+  parked, and that the deploy waits on Sam's "proceed". Branch notes, spec
+  pointer and the architecture table updated for the four new modules.
 v2.1 (2026-07-30): Ranking mode shipped; the "what the next session is for"
   section now records what was built and the decisions made building it —
   both entry points with no size cap, depth asked priced each time, depth
